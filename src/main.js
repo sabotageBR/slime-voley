@@ -447,6 +447,7 @@ if (D.ganchos) {
     get emAnuncio() { return emAnuncio; },
     get jogando() { return jogando; },
     get motivoPausa() { return motivoPausa; },
+    get medidas() { return laco.medidas; },
     passo,
     desenhar,
     interagir: () => interagir(null),

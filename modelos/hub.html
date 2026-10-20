@@ -1,0 +1,278 @@
+<title>Modelos do Vôlei de Gosma</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Folha de checkpoint na areia: uma coluna larga, um seletor que leva ao jogo, as tres direcoes
+   lado a lado (empilham no celular) e as perguntas no fim. */
+@font-face { font-family: 'Fredoka'; src: url('src/ui/fontes/fredoka-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+:root {
+  --fundo: #fbf3e2;
+  --papel: #fffdf7;
+  --tinta: #17161c;
+  --tinta-suave: #575365;
+  --gosma: #f28c3f;
+  --mar: #138d93;
+  --coral: #d9493a;
+  --linha: rgba(23, 22, 28, 0.16);
+  --display: 'Fredoka', 'Nunito', system-ui, sans-serif;
+  --texto: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --fundo: #11151b; --papel: #1a2029; --tinta: #f3eee3; --tinta-suave: #b5b0a6; --gosma: #ff9d55; --mar: #3fd0c8; --coral: #ff7a66; --linha: rgba(243, 238, 227, 0.16); color-scheme: dark; }
+}
+:root[data-theme="dark"] { --fundo: #11151b; --papel: #1a2029; --tinta: #f3eee3; --tinta-suave: #b5b0a6; --gosma: #ff9d55; --mar: #3fd0c8; --coral: #ff7a66; --linha: rgba(243, 238, 227, 0.16); color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--fundo); color: var(--tinta); font-family: var(--texto); font-size: 16px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 22px 56px; }
+.folha { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 36px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; margin: 0; line-height: 1.1; text-wrap: balance; }
+h1 { font-size: clamp(2.2rem, 7vw, 3.6rem); letter-spacing: 0.01em; }
+h1 .gota { color: var(--gosma); }
+h2 { font-size: clamp(1.5rem, 4vw, 2rem); }
+h3 { font-size: 1.2rem; }
+p { margin: 0; max-width: 68ch; }
+.rotulo { font-family: var(--display); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tinta-suave); }
+.topo { display: flex; flex-direction: column; gap: 12px; }
+.lead { font-size: 1.08rem; color: var(--tinta-suave); }
+.lead b { color: var(--tinta); }
+
+/* seletor + jogar */
+.painel { background: var(--papel); border: 3px solid var(--tinta); border-radius: 20px; box-shadow: 0 5px 0 var(--tinta); padding: 18px; display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+.escolhas { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+legend { font-family: var(--display); font-size: 0.95rem; margin-bottom: 4px; }
+.opcoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.opcoes input { position: absolute; opacity: 0; pointer-events: none; }
+.opcoes label { font-family: var(--display); font-size: 0.95rem; border: 2.5px solid var(--tinta); border-radius: 999px; padding: 6px 12px; cursor: pointer; background: var(--fundo); }
+.opcoes input:checked + label { background: var(--tinta); color: var(--papel); }
+.opcoes input:focus-visible + label { outline: 3px dashed var(--mar); outline-offset: 2px; }
+.jogar { display: inline-flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; font-family: var(--display); font-size: 1.5rem; color: #fff;
+  background: var(--gosma); border: 3px solid var(--tinta); border-radius: 18px; padding: 12px 26px; box-shadow: 0 5px 0 var(--tinta); min-height: 60px; -webkit-text-stroke: 0.08em #17161c; paint-order: stroke fill; }
+.jogar:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--tinta); }
+.jogar:focus-visible, a:focus-visible { outline: 3px dashed var(--mar); outline-offset: 3px; }
+.atual { font-size: 0.92rem; color: var(--tinta-suave); grid-column: 1 / -1; }
+.atual b { color: var(--tinta); }
+@media (max-width: 640px) { .painel { grid-template-columns: 1fr; } .jogar { width: 100%; } }
+
+/* direcoes */
+.direcoes { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.direcao { background: var(--papel); border: 2px solid var(--linha); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.direcao .cab { display: flex; align-items: baseline; gap: 10px; }
+.letra { font-family: var(--display); font-size: 1.6rem; color: var(--gosma); }
+.direcao img { width: 100%; height: auto; border-radius: 10px; border: 2px solid var(--tinta); display: block; background: var(--fundo); }
+.quadros { display: grid; grid-template-columns: 1.15fr 0.55fr 1.15fr; gap: 6px; align-items: start; }
+.quadros img { border-width: 1.5px; }
+.direcao p { font-size: 0.95rem; }
+.dados { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.85rem; color: var(--tinta-suave); font-variant-numeric: tabular-nums; }
+.dados b { color: var(--tinta); font-weight: 800; }
+.direcao .ir { margin-top: auto; font-family: var(--display); color: var(--mar); text-decoration: none; }
+.direcao .ir:hover { text-decoration: underline; }
+
+/* duas colunas de texto */
+.duas { display: grid; gap: 18px 28px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.bloco { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.bloco ul, .bloco ol { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 5px; }
+kbd { font-family: var(--display); font-size: 0.85em; border: 2px solid var(--tinta); border-bottom-width: 4px; border-radius: 7px; padding: 0 6px; background: var(--papel); white-space: nowrap; }
+.medidas { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.medida { border-left: 4px solid var(--mar); padding: 4px 10px; }
+.medida .v { font-family: var(--display); font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.medida .n { font-size: 0.85rem; color: var(--tinta-suave); }
+
+/* perguntas */
+.perguntas { background: var(--papel); border: 3px solid var(--tinta); border-radius: 20px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 5px 0 var(--tinta); }
+.perguntas ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 8px; }
+.nomes { display: flex; flex-wrap: wrap; gap: 8px; }
+.nome { font-family: var(--display); border: 2.5px dashed var(--tinta); border-radius: 12px; padding: 2px 10px; }
+
+/* tabela */
+.rolar { overflow-x: auto; border: 2px solid var(--linha); border-radius: 14px; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 0.9rem; background: var(--papel); }
+th, td { text-align: left; vertical-align: top; padding: 9px 11px; border-bottom: 1px solid var(--linha); }
+th { font-family: var(--display); font-weight: 700; font-size: 0.95rem; }
+tbody th { white-space: nowrap; }
+td.nosso { background: color-mix(in srgb, var(--gosma) 12%, transparent); }
+.nota { font-size: 0.85rem; color: var(--tinta-suave); }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<main class="folha">
+  <header class="topo">
+    <span class="rotulo">Checkpoint M1 · 2026-10-20</span>
+    <h1>Vôlei de <span class="gota">Gosma</span></h1>
+    <p class="lead">Escolha a <b>direção visual</b>, o <b>controle</b> e o <b>gatilho da cortada lenta</b> e jogue no celular, em pé ou deitado. É a mesma Praia do Saque em todas, contra a <b>Gota</b> (a 1ª partida, até 5, com o tutorial sem texto) e depois a <b>Geleia</b>.</p>
+  </header>
+
+  <section class="painel" aria-label="Escolher e jogar">
+    <div class="escolhas">
+      <fieldset>
+        <legend>Direção visual</legend>
+        <div class="opcoes">
+          <input type="radio" name="visual" id="v-a" value="a" checked><label for="v-a">A · Gel Premium</label>
+          <input type="radio" name="visual" id="v-b" value="b"><label for="v-b">B · Vinil</label>
+          <input type="radio" name="visual" id="v-c" value="c"><label for="v-c">C · TV</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Controle no celular</legend>
+        <div class="opcoes">
+          <input type="radio" name="controle" id="c-a" value="a" checked><label for="c-a">Metades</label>
+          <input type="radio" name="controle" id="c-b" value="b"><label for="c-b">Botões</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Gatilho da cortada lenta</legend>
+        <div class="opcoes">
+          <input type="radio" name="gatilho" id="g-novo" value="novo" checked><label for="g-novo">Toque novo no ar</label>
+          <input type="radio" name="gatilho" id="g-segura" value="segura"><label for="g-segura">Segurar o pulo</label>
+        </div>
+      </fieldset>
+    </div>
+    <a class="jogar" id="jogar" href="jogo-aa-novo.html">Jogar ▶</a>
+    <p class="atual" id="atual"><b>A · Gel Premium</b> com <b>Metades</b> e <b>toque novo no ar</b>.</p>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-dir">
+    <span class="rotulo">Mesma semente, mesmos quadros</span>
+    <h2 id="t-dir">As três direções</h2>
+    <p>O GIF mostra 3 s de rali e uma cortada lenta. Os quadros: desktop 836×470 no rali, retrato 390×844 na festa completa ("BOMBA!"), paisagem 844×390 na mira em gotas.</p>
+  </section>
+  <div class="direcoes">
+    <article class="direcao">
+      <div class="cab"><span class="letra">A</span><h3>Gel Premium</h3></div>
+      <img src="modelos/a.gif" alt="Rali e cortada lenta na direção A" width="480" height="222" loading="lazy">
+      <div class="quadros"><img src="modelos/a-desktop.jpg" alt="Desktop" loading="lazy"><img src="modelos/a-retrato.jpg" alt="Retrato" loading="lazy"><img src="modelos/a-paisagem.jpg" alt="Paisagem" loading="lazy"></div>
+      <p>Gelatina brilhante sobre uma praia pintada em tons pastel (fundo distante do Grok, desfocado de propósito). Contorno fino, luz do alto à esquerda.</p>
+      <div class="dados"><span>fundo <b>27 KB</b></span><span>desenho <b>4,4 ms</b></span><span>headless <b>25 fps</b></span></div>
+      <a class="ir" href="jogo-aa-novo.html">Jogar a A →</a>
+    </article>
+    <article class="direcao">
+      <div class="cab"><span class="letra">B</span><h3>Brinquedo de Vinil</h3></div>
+      <img src="modelos/b.gif" alt="Rali e cortada lenta na direção B" width="480" height="222" loading="lazy">
+      <div class="quadros"><img src="modelos/b-desktop.jpg" alt="Desktop" loading="lazy"><img src="modelos/b-retrato.jpg" alt="Retrato" loading="lazy"><img src="modelos/b-paisagem.jpg" alt="Paisagem" loading="lazy"></div>
+      <p>Diorama de brinquedo: ondas de plástico, ilhas de massinha e coqueiros de vinil, com foco raso. Contorno mais grosso, placar de brinquedo.</p>
+      <div class="dados"><span>fundo <b>38 KB</b></span><span>desenho <b>4,3 ms</b></span><span>headless <b>24 fps</b></span></div>
+      <a class="ir" href="jogo-ba-novo.html">Jogar a B →</a>
+    </article>
+    <article class="direcao">
+      <div class="cab"><span class="letra">C</span><h3>Transmissão Esportiva</h3></div>
+      <img src="modelos/c.gif" alt="Rali e cortada lenta na direção C" width="480" height="222" loading="lazy">
+      <div class="quadros"><img src="modelos/c-desktop.jpg" alt="Desktop" loading="lazy"><img src="modelos/c-retrato.jpg" alt="Retrato" loading="lazy"><img src="modelos/c-paisagem.jpg" alt="Paisagem" loading="lazy"></div>
+      <p>Final noturna na praia, como na TV: refletores, faixa de LED que corre (sem texto), placar de transmissão. Tudo em código, sem arte gerada.</p>
+      <div class="dados"><span>fundo <b>0 KB</b></span><span>desenho <b>5,1 ms</b></span><span>headless <b>19 fps</b></span></div>
+      <a class="ir" href="jogo-ca-novo.html">Jogar a C →</a>
+    </article>
+  </div>
+  <p class="nota">O desenho foi medido com a CPU 4× mais lenta. O fps é do Chrome headless, com GPU por software: serve para comparar as direções entre si. O número de verdade sai do Android real no M6.</p>
+
+  <section class="duas" aria-label="Como jogar">
+    <div class="bloco">
+      <span class="rotulo">Celular</span>
+      <h2>Como jogar</h2>
+      <ul>
+        <li><b>Metades:</b> a metade esquerda é um stick que aparece onde você encosta; a direita pula na hora.</li>
+        <li><b>Botões:</b> ◀ ▶ embaixo à esquerda e PULO à direita.</li>
+        <li><b>Saque:</b> toque rápido manda um lob; segurar leva a bola mais fundo (de 0,55 a 0,70 s sai o saque "viagem", chapado).</li>
+        <li><b>Cortada lenta:</b> com o medidor em 1 segmento, pule e <b>toque de novo no ar e segure</b> perto da bola. O mundo vai a 6% da velocidade; arraste para mirar e solte para cortar.</li>
+      </ul>
+    </div>
+    <div class="bloco">
+      <span class="rotulo">Desktop</span>
+      <h2>Teclado e mouse</h2>
+      <ul>
+        <li><kbd>A</kbd>/<kbd>D</kbd> ou <kbd>←</kbd>/<kbd>→</kbd> anda; <kbd>W</kbd>, <kbd>↑</kbd> ou <kbd>Espaço</kbd> pula. Apertar de novo no ar e segurar é a cortada; as setas mexem a mira.</li>
+        <li>Mouse: o slime segue o cursor, o clique pula e, na mira, o cursor no piso é o alvo.</li>
+        <li><kbd>Esc</kbd> ou <kbd>P</kbd> pausa.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-lab">
+    <span class="rotulo">Medido no Blumgi Soccer, forma de gosma</span>
+    <h2 id="t-lab">Laboratório da cortada</h2>
+    <p>A câmera lenta vem da captura quadro a quadro do Blumgi Soccer (vídeo a 60 fps). Os números estão em <code>docs/referencias/</code>. O laboratório deixa ajustar tudo ao vivo; "Copiar ajuste" gera o JSON para colar aqui no chat.</p>
+    <div class="medidas">
+      <div class="medida"><div class="v">0,06</div><div class="n">mundo na mira (Blumgi: 0,04 a 0,10)</div></div>
+      <div class="medida"><div class="v">≤ 17 ms</div><div class="n">entrada e saída no Blumgi (aqui 60/40 ms)</div></div>
+      <div class="medida"><div class="v">230 ms</div><div class="n">anel de impacto (aqui coroa de gotas)</div></div>
+      <div class="medida"><div class="v">0,30</div><div class="n">defensor na mira (dá para reagir)</div></div>
+    </div>
+    <p><a class="ir" href="jogo-lab.html">Abrir o laboratório →</a> Toque em "Repetir" para armar a mira; arraste para mirar e toque de novo para soltar.</p>
+  </section>
+
+  <section class="perguntas" aria-labelledby="t-perg">
+    <h2 id="t-perg">O que preciso de você</h2>
+    <ol>
+      <li><b>Direção visual:</b> A, B ou C? Dá para trazer detalhes de uma para outra.</li>
+      <li><b>Controle padrão no celular:</b> Metades ou Botões? O outro fica como opção na pausa.</li>
+      <li><b>Gatilho da cortada:</b> toque novo no ar ou segurar o pulo? Se mexeu no laboratório, cole o JSON.</li>
+      <li><b>Bola fora:</b> só no ataque estourado (o lado que manda para trás bate na rede de proteção e segue). Fica assim, ou desligo o fora no começo do Circuito?</li>
+      <li><b>Nome</b> (em PT continua "Vôlei de Gosma"): <span class="nomes"><span class="nome">Goo Spike!</span><span class="nome">Jelly Spike!</span><span class="nome">Splat Volley!</span></span></li>
+      <li><b>Repositório:</b> posso criar <code>sabotageBR/slime-voley</code> (privado) e enviar os commits?</li>
+    </ol>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-clone">
+    <span class="rotulo">Seis dimensões</span>
+    <h2 id="t-clone">Por que não é clone</h2>
+    <div class="rolar">
+      <table>
+        <thead><tr><th>Dimensão</th><th>Vôlei de Gosma</th><th>Blumgi Soccer</th><th>Slime Volleyball (1999)</th><th>Blobby Volley</th></tr></thead>
+        <tbody>
+          <tr><th>Esporte e regra</th><td class="nosso">Vôlei 1×1, 3 toques, fora só no ataque estourado, vai-a-2</td><td>Futebol, gols em fases</td><td>Vôlei sem toques nem fora</td><td>Vôlei com 3 toques</td></tr>
+          <tr><th>Personagens</th><td class="nosso">Gosma de verdade (metaball, pigmento KM), rostos com expressão, plateia de slimes</td><td>Blumgis</td><td>Meia-lua lisa com um olho</td><td>Bolhas em gota</td></tr>
+          <tr><th>Mecânica central</th><td class="nosso">O amassado da cúpula muda o ângulo; cortada lenta com mira em gotas; supers no saque</td><td>Chute com mira lenta</td><td>Cúpula rígida</td><td>Corpo saltitante</td></tr>
+          <tr><th>Câmera e tempo</th><td class="nosso">Close e tremor no ponto; câmera lenta só na cortada (mundo a 0,06, defensor a 0,30)</td><td>Câmera lenta na mira de todo chute</td><td>Fixa</td><td>Fixa</td></tr>
+          <tr><th>Comemoração</th><td class="nosso">Coroa de respingo, confete de gotinhas, palavra de gosma que escorre, placar gigante</td><td>Clarão branco, confete pastel, "GOAL!" em blocos, "READY?"</td><td>Nenhuma</td><td>Simples</td></tr>
+          <tr><th>Progressão</th><td class="nosso">Circuito de 4 Copas, skins de futebol com evolução, editor, ginásios</td><td>Fases</td><td>Nenhuma</td><td>Nenhuma</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="nota">Slime Dunk!, Animals Volleyball e Pixel Volley ainda serão conferidos no catálogo da Poki antes do envio.</p>
+  </section>
+
+  <section class="duas" aria-label="Estado">
+    <div class="bloco">
+      <span class="rotulo">Já funciona</span>
+      <h2>Nesta build</h2>
+      <ul>
+        <li>Física da cúpula com amassado, bola, rede, placas e rede de proteção</li>
+        <li>Saque ativo (toque, fundo, viagem), 3 toques, fora, vai-a-2</li>
+        <li>IA com previsão exata do contato e personalidades</li>
+        <li>Cortada lenta com 3 relógios, mira em gotas, retícula e coroa</li>
+        <li>Festa curta e completa, plateia que reage, falas de slime</li>
+        <li>Retrato e paisagem, 2 esquemas de controle, teclado e mouse</li>
+      </ul>
+    </div>
+    <div class="bloco">
+      <span class="rotulo">Depois da sua escolha</span>
+      <h2>Próximos marcos</h2>
+      <ul>
+        <li><b>M2:</b> saques de Fogo, Raio e Jornada, power-ups, replay, onboarding completo, SDK e anúncios</li>
+        <li><b>M3:</b> Circuito, Gotas, vestiário, skins de futebol e evoluções, Escola</li>
+        <li><b>M3b:</b> build da Poki e o primeiro Player Fit Test</li>
+        <li><b>M4 a M8:</b> Rua e Arena, editor de skins, 2P, desempenho e lançamento</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const nomes = { visual: { a: 'A · Gel Premium', b: 'B · Vinil', c: 'C · TV' }, controle: { a: 'Metades', b: 'Botões' }, gatilho: { novo: 'toque novo no ar', segura: 'segurar o pulo' } };
+  const ler = () => { try { return JSON.parse(localStorage.getItem('volei.escolha') || '{}'); } catch { return {}; } };
+  const gravar = (o) => { try { localStorage.setItem('volei.escolha', JSON.stringify(o)); } catch { /* sem storage */ } };
+  const salvo = ler();
+  for (const k of ['visual', 'controle', 'gatilho']) {
+    if (salvo[k]) { const el = document.querySelector(`input[name="${k}"][value="${salvo[k]}"]`); if (el) el.checked = true; }
+  }
+  const atualizar = () => {
+    const o = {};
+    for (const k of ['visual', 'controle', 'gatilho']) o[k] = document.querySelector(`input[name="${k}"]:checked`).value;
+    document.getElementById('jogar').href = `jogo-${o.visual}${o.controle}-${o.gatilho}.html`;
+    document.getElementById('atual').innerHTML = `<b>${nomes.visual[o.visual]}</b> com <b>${nomes.controle[o.controle]}</b> e <b>${nomes.gatilho[o.gatilho]}</b>.`;
+    gravar(o);
+  };
+  for (const inp of document.querySelectorAll('.escolhas input')) inp.addEventListener('change', atualizar);
+  atualizar();
+})();
+</script>

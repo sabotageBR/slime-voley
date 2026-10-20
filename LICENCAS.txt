@@ -1,0 +1,14 @@
+Volei de Gosma - licencas de terceiros
+
+Fonte Fredoka (src/ui/fontes/fredoka-latin-700-normal.woff2): SIL Open Font License 1.1.
+
+Audio (src/som/arquivos/*.mp3): Kenney (kenney.nl), CC0 1.0 - Voiceover Pack, UI Audio, Casino Audio;
+versoes "Slime" (tom x1,35) geradas no slime-merge (tools/sons.mjs).
+
+Motor da gosma (campo P2G, composicao KM em WebGL2, rostos, receitas de som): do Slime Merge
+(sabotageBR/slime-merge 2.1.0), do mesmo autor.
+
+Arte de fundo (src/arte/ginasios/*.webp): gerada com o Grok Imagine (xAI) em 2026-10-20 e tratada a mao
+(docs/autoria.md). Termos: a pagina oficial (x.ai/legal/terms-of-service) nao abriu para leitura
+automatica (403); fontes secundarias dizem que, nos termos de consumidor, o usuario e dono do que gera e
+pode usar comercialmente, sem indenizacao. CONFERIR na conta usada antes do envio para a Poki.
