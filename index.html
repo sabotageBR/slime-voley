@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Goo Spike!</title>
+<link rel="preload" href="src/ui/fontes/fredoka-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="src/ui/estilo.css">
+<!-- Unico script externo permitido pela Poki. -->
+<script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"></script>
+</head>
+<body>
+<!-- tela de carregamento: so HTML e CSS (aparece antes de qualquer modulo; o main.js tira no 1o quadro) -->
+<div id="carregando" role="status" aria-label="Loading">
+  <div class="bolinha"><div class="sombra"></div><div class="bola"></div></div>
+</div>
+<div id="jogo">
+  <canvas id="cFundo"></canvas>
+  <canvas id="cSlime"></canvas>
+  <canvas id="cTopo"></canvas>
+  <canvas id="cTela"></canvas>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

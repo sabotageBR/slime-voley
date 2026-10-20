@@ -1,0 +1,72 @@
+/* Volei de Gosma: estilo da pagina, do HUD, dos controles e dos cartoes. Fredoka 700 (OFL). */
+@font-face { font-family: 'Fredoka'; src: url('fontes/fredoka-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+:root { --tinta: #17161c; --branco: #ffffff; --laranja: #ff8a2a; --azul: #2a62d6; --amarelo: #ffd23a; color-scheme: light; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd8ff; }
+html, body, #jogo, .controles, .hud {
+  touch-action: none; overscroll-behavior: none; user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+body { font-family: Fredoka, system-ui, sans-serif; color: var(--tinta); }
+#jogo { position: fixed; inset: 0; }
+#jogo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#cTela { pointer-events: none; z-index: 5; }
+
+/* carregando: bola que quica (CSS puro) */
+#carregando { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: linear-gradient(#53c3ff, #9fe0ff 60%, #f6d58e 60%); }
+#carregando .bolinha { position: relative; width: 80px; height: 120px; }
+#carregando .bola { position: absolute; left: 16px; top: 0; width: 48px; height: 48px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff 0 30%, #ffb02e 31% 55%, #2fb7e8 56%); border: 3px solid var(--tinta); animation: quica 0.7s cubic-bezier(.5,0,.5,1) infinite alternate; }
+#carregando .sombra { position: absolute; left: 14px; bottom: 0; width: 52px; height: 10px; border-radius: 50%; background: rgba(90,55,20,.3); animation: sombra 0.7s cubic-bezier(.5,0,.5,1) infinite alternate; }
+@keyframes quica { from { transform: translateY(0); } to { transform: translateY(60px) scaleY(.9); } }
+@keyframes sombra { from { transform: scale(.6); opacity: .5; } to { transform: scale(1); opacity: 1; } }
+
+/* HUD */
+.hud { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
+.hud .placar { position: absolute; left: 50%; top: var(--placarY, 0px); height: var(--placarH, 52px); transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; padding: 0 10px; max-width: calc(100vw - 120px); }
+.hud .lado { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 64px; }
+.hud .nome { font-size: 14px; -webkit-text-stroke: 3px var(--tinta); paint-order: stroke fill; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30vw; }
+.hud .pontos { display: flex; align-items: center; gap: 6px; background: #fff; border: 3px solid var(--tinta); border-radius: 14px; padding: 0 10px; box-shadow: 0 3px 0 var(--tinta); font-size: 26px; line-height: 38px; }
+.hud .pontos b { display: inline-block; min-width: 18px; text-align: center; }
+.hud .pontos b.rola { animation: rola .35s ease-out; }
+@keyframes rola { 0% { transform: translateY(-60%) scale(1.3); } 100% { transform: none; } }
+.hud .medidor { display: flex; gap: 3px; }
+.hud .medidor i { width: 18px; height: 8px; border-radius: 4px; border: 2px solid var(--tinta); background: linear-gradient(90deg, #ffd23a calc(var(--f, 0) * 100%), rgba(255,255,255,.65) calc(var(--f, 0) * 100%)); }
+.hud .medidor i.cheio { background: #ffd23a; box-shadow: 0 0 6px #ffd23a; }
+.hud .pausa { position: absolute; right: max(10px, env(safe-area-inset-right, 0px)); top: calc(var(--placarY, 0px) + 6px); width: 40px; height: 40px; border-radius: 12px;
+  border: 3px solid var(--tinta); background: #fff; box-shadow: 0 3px 0 var(--tinta); pointer-events: auto; padding: 6px; }
+.hud .pausa svg { fill: var(--tinta); width: 100%; height: 100%; }
+.hud .faixa { position: absolute; left: 50%; top: calc(var(--placarY, 0px) + var(--placarH, 52px) + 6px); transform: translateX(-50%); background: var(--amarelo);
+  border: 3px solid var(--tinta); border-radius: 12px; padding: 2px 14px; font-size: 16px; box-shadow: 0 3px 0 var(--tinta); white-space: nowrap; }
+.hud .faixa.entra { animation: faixa .4s ease-out; }
+@keyframes faixa { from { transform: translateX(-50%) scale(1.5); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+.hud .mao { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.hud .mao .dedo { position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.85); border: 3px solid var(--tinta);
+  animation: dedo 1s ease-in-out infinite; }
+.hud .mao[data-gesto="duplo"] .dedo { animation: duplo 1.2s ease-in-out infinite; }
+.hud .mao .texto { position: absolute; left: 50%; top: 34px; transform: translateX(-50%); white-space: nowrap; font-size: 15px; color: #fff; -webkit-text-stroke: 4px var(--tinta); paint-order: stroke fill; }
+@keyframes dedo { 0%, 100% { transform: scale(1); } 45% { transform: scale(.75); } }
+@keyframes duplo { 0%, 100% { transform: scale(1); } 20% { transform: scale(.75); } 40% { transform: scale(1); } 60%, 85% { transform: scale(.75) translateY(-6px); } }
+
+/* controles na tela */
+.controles { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.controles .stick { position: absolute; left: 0; top: 0; width: 112px; height: 112px; border-radius: 50%; border: 3px solid rgba(23,22,28,.35); background: rgba(255,255,255,.18); opacity: .3; }
+.controles .stick.uso { opacity: .6; }
+.controles .stick .alca { position: absolute; left: 32px; top: 32px; width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,.85); border: 3px solid var(--tinta); }
+.controles .bt { position: absolute; border-radius: 50%; background: rgba(255,255,255,.55); border: 3px solid var(--tinta); display: grid; place-items: center; font-size: 26px; color: var(--tinta); }
+.controles .bt.ativo { background: rgba(255,255,255,.9); transform: scale(.94); }
+.controles .bt-super { background: var(--amarelo); opacity: 0; transition: opacity .2s; }
+.controles .bt-super.visivel { opacity: 1; }
+
+/* cartao e menu */
+.cartao, .menuPausa { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: rgba(23,22,28,.35); }
+.cartao[hidden], .menuPausa[hidden] { display: none; }
+.cartao .caixa, .menuPausa .caixa { background: #fff; border: 4px solid var(--tinta); border-radius: 22px; box-shadow: 0 6px 0 var(--tinta); padding: 18px 22px; min-width: 260px; max-width: calc(100vw - 32px);
+  display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.cartao .titulo, .menuPausa .titulo { font-size: 30px; }
+.cartao .sub { font-size: 22px; }
+.cartao .botoes, .menuPausa .botoes { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.bt { font: 700 20px Fredoka, system-ui, sans-serif; min-height: 52px; border-radius: 16px; border: 3px solid var(--tinta); background: #fff; box-shadow: 0 4px 0 var(--tinta); cursor: pointer; pointer-events: auto; }
+.bt.principal { background: var(--laranja); color: #fff; -webkit-text-stroke: 3px var(--tinta); paint-order: stroke fill; font-size: 24px; }
+.bt:focus-visible { outline: 3px dashed var(--azul); outline-offset: 3px; }
+.bt:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--tinta); }

@@ -1,0 +1,5 @@
+dist/
+dist-poki/*.zip
+.tmp/
+assets/brutos/
+node_modules/

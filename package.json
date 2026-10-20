@@ -1,0 +1,14 @@
+{
+  "name": "slime-voley",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Volei de Gosma (Goo Spike!): volei 1x1 de slimes para a Poki (HTML + JavaScript puro).",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "servir": "node tools/servir.mjs",
+    "lan": "node tools/servir.mjs --lan",
+    "calibrar": "node tools/calibrar.mjs",
+    "shot": "node tools/shot.mjs"
+  }
+}
