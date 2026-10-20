@@ -33,8 +33,9 @@ export function lerDepuracao() {
     local = false;
   }
   const q = local ? new URLSearchParams(location.search || location.hash.slice(1)) : new URLSearchParams();
-  // gancho da build de modelos (Artifact): vale em qualquer host
-  const mod = /** @type {any} */ (globalThis).__voleiModelo;
+  // gancho da build de modelos (Artifact): vale em qualquer host; o empacotar corta a linha "// modelo"
+  let mod = null;
+  mod = /** @type {any} */ (globalThis).__voleiModelo || null; // modelo
   if (mod && typeof mod === 'object') {
     for (const [k, v] of Object.entries(mod)) if (!q.has(k)) q.set(k, String(v));
   }

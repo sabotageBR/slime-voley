@@ -9,6 +9,7 @@
     "servir": "node tools/servir.mjs",
     "lan": "node tools/servir.mjs --lan",
     "calibrar": "node tools/calibrar.mjs",
+    "empacotar": "node tools/empacotar.mjs",
     "shot": "node tools/shot.mjs"
   }
 }

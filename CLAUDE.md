@@ -13,20 +13,42 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
 **Leia antes de mexer:**
 - o desenho completo, em `docs/desenho.md`;
 - o plano aprovado, no início do desenho;
-- as referências medidas do Blumgi, em `docs/referencias/`.
+- as referências medidas do Blumgi, em `docs/referencias/`;
+- o que cada marco entregou e o que ficou para depois, em `docs/marcos/`.
+
+**O desenho vai além do código.** Ele descreve o jogo inteiro, até o M5. Muitos módulos, testes e ferramentas citados nele ainda não existem (`poderes.js`, `powerups.js`, `layout.test`, `fluxo.test`, `calibrar`, `thumb`, `sdkcheck`, `npm run poki`...). Antes de supor que algo existe, confira em `docs/marcos/`. Os comentários dos arquivos portados de projetos irmãos também citam coisas que não estão aqui, como `tools/pigmentos.mjs` e `test/cor.test.js`.
+
+## Rodar e testar
+- `npm run servir` abre o jogo em http://127.0.0.1:5380/. Os módulos ES não carregam por `file://`.
+- `npm run lan` faz o mesmo, aberto na rede local, para testar no celular pela Wi-Fi. Os parâmetros de teste também valem na LAN.
+- `npm test` roda todos os testes (`node --test test/*.test.js`, cerca de 2 s).
+- Um arquivo: `node --test test/fisica.test.js`. Um teste: `node --test --test-name-pattern="<regex>" test/*.test.js`.
+- `npm run calibrar` aponta para `tools/calibrar.mjs`, que ainda não existe (ficou para o M2).
+
+## Como um quadro anda
+1. O `core/laco.js` roda passos fixos de 1/120 s (a bola faz 2 subpassos de 1/240 s), no máximo 6 por quadro. Depois chama `desenhar(dtReal, alfa)` uma vez.
+2. A cada passo, o `passo()` do `main.js`:
+   - lê os controles, chama `P.intencao()` e depois `P.passo()`;
+   - esvazia `P.eventos[]`, entregando cada evento ao `TRATADORES[e.tipo]` (som, VFX, vibração e telemetria).
+   A lógica nunca toca em som nem em DOM: um tipo de evento novo precisa de tratador no `TRATADORES`.
+3. A câmera lenta vem do `jogo/tempo.js`. Os canais `mundo`, `defensor` e `bola` têm cada um a sua escala em milésimos e um acumulador inteiro. Com tudo em 1000, o `hash()` da partida é igual ao de rodar sem relógio, e isso mantém o determinismo.
+4. O `render/vista.js` interpola os snapshots de cada slime pelo canal dele e monta o proxy lido por `campo.js`, `rostos.js` e `slime2d.js`. O contrato está no cabeçalho do arquivo, e o `slime2d.js` é a reserva sem WebGL2 (`?render=2d`).
+5. A `cena.js` desenha, nesta ordem: `cFundo`, `cSlime` (WebGL2), `cTopo` e `cTela`. O HUD em DOM fica por cima.
 
 ## Estrutura
 - `src/fisica/volei.js` é pura e determinística:
   - cúpula elíptica com o amassado σ (`a = R(1+0,18σ)`, `b = R(1−0,22σ)`);
   - bola, rede, placas, rede de proteção e `prever()`.
 - `src/jogo/` também é pura (sem DOM, relógio ou `Math.random`; sorteio só pelo `core/rng.js`):
-  - `partida.js`: estados, rali, saque ativo, pontos, cortada lenta e assistências;
+  - `partida.js`: estados, rali, saque ativo, pontos, cortada lenta, assistências e os roteiros de teste;
   - `tempo.js`: os 3 relógios e os canais de escala da câmera lenta;
   - `pele.js`: as partículas só de desenho;
   - `ia.js`: plano exato do contato, simulando a trajetória;
   - `cortada.js`: a máquina de estados, a mira e o resolvedor do tiro;
   - `regras.js`: a tabela única de tempos;
-  - `medidor.js`, `rivais.js` e `skins.js`.
+  - `humor.js`, `medidor.js`, `rivais.js` e `skins.js`.
+- `src/core/`: laço, `rng.js`, save, áudio, vibração, o SDK (`poki.js`) e `depuracao.js`.
+- `src/cor/km.js`: a mistura de pigmentos Kubelka-Munk, que roda igual no shader da `composicao.js`. O `pigmentos.js` é gerado e não se edita à mão.
 - `src/render/`:
   - `cena.js`: os 4 canvases;
   - `vista.js`: o proxy que o campo e os rostos leem;
@@ -35,6 +57,7 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
   - `ginasios/praia.js`.
 - `src/ui/`: `controles.js` (Metades e Botões, teclado e mouse), `hud.js` e `lab.js` (o laboratório da cortada).
 - `src/som/mesa.js`: os eventos tocam receitas e as 19 falas `*Slime`. Não há música.
+- `src/i18n/textos.js`: todo texto visível.
 - `src/main.js` liga tudo e é o **único** dono do SDK (`core/poki.js`), do áudio, do save e do DOM.
 
 ## Regras que os testes vigiam (`test/estilo.test.js`)
@@ -43,10 +66,14 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
   - nenhum ouvinte em captura (exceto o destrave do áudio);
   - `preventDefault` só em touchmove, wheel, contextmenu, setas e Espaço;
   - `pointermove` nunca dispara `gameplayStart`.
-- **Pureza:** `jogo/` e `fisica/` são puros. `render/` não importa `ui/`, `som/` nem o SDK.
-- **Externo:** nenhuma URL externa além do SDK da Poki.
-- **Conteúdo:**
-  - nenhum IP de futebol nem de Star Trek (FIFA, clubes, marcas, "Jornada nas Estrelas"...);
+- **Pureza:**
+  - `jogo/` e `fisica/` não usam `Math.random`, `Date`, `performance.now`, `document.` nem `window.`;
+  - de fora, eles só importam `core/rng.js` e `cor/*`;
+  - `render/` não importa `ui/`, `som/` nem o SDK, e só o `main.js` importa `core/poki.js`;
+  - nenhum caractere não-ASCII no código de `src/jogo/`, fora dos comentários (texto com acento vai para o `i18n/textos.js`).
+- **Externo:** nenhuma URL externa além do SDK da Poki, também no `index.html` e no `estilo.css`.
+- **Conteúdo** (o grep vale também nos comentários):
+  - nenhum IP de futebol nem de Star Trek: FIFA, Copa do Mundo, Libertadores, clubes, marcas como Nike, Mikasa e Molten, "Jornada nas Estrelas"...;
   - o super se chama "Saque Jornada" / "Sky Serve".
 
 ## Fluxo do SDK
@@ -56,22 +83,34 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
 - `commercialBreak` só no toque em Próxima/Revanche (a partir da 3ª partida) e ao despausar; nunca no rali.
 
 ## Ferramentas
-Portas: 5380 (servir), 4380–4385, CDP 9380–9382.
+Portas: 5380 (servir), 4380–4385, CDP 9380–9382. É um Chrome por vez: o `shot` usa 4380/9380, e o `gif` e o `medir` usam 4385/9382. Evite as portas 9222, 9503 e 9666.
 
 | Comando | O que faz |
 |---|---|
-| `npm test` | testes com `node:test` |
 | `node tools/shot.mjs "<query>" 390x844 saida.png [ms] --toque` | print pelo CDP, com os erros do console |
 | `node tools/gif.mjs saida.gif 844x390 480 "<query>@ms" ...` | GIF da partida |
 | `node tools/medir.mjs 4` | custo por quadro com a CPU limitada (relativo: GPU por software) |
 | `node tools/midia-m1.mjs` | quadros e GIFs das 3 direções |
+| `npm run empacotar` | build da Poki: `dist/` e `dist-poki/slime-voley-<versão>.zip` + `.sha256` (`--thumb` quando a thumb existir) |
 | `node tools/artifact.mjs` | monta o checkpoint em `.tmp/artifact` |
 | `node tools/grok.mjs gerar <id> 16:9 "<prompt>"` | arte do Grok (headless, só `image_gen`/`image_edit`, pasta própria) |
 | `python3 -I tools/recortar.py <id>` | trata a arte para `src/arte/ginasios/` |
 
-Parâmetros de teste: `?semente ?roteiro=cortada|ponto|ponto-curto|saque ?visual=a|b|c ?controle=a|b ?gatilho=novo|segura ?lab ?auto ?primeira ?semblur ?semanuncio`.
+**Parâmetros de teste:**
+- Só valem em loopback e na LAN, ou pelo `window.__voleiModelo` da build de modelos.
+- O `core/depuracao.js` é o único módulo que lê a URL, e o cabeçalho dele tem a lista completa.
+- Os mais usados: `?semente ?roteiro=cortada|ponto|ponto-curto|saque ?visual=a|b|c ?controle=a|b ?gatilho=novo|segura ?lab ?auto ?primeira ?semblur ?semanuncio ?debug`.
+- Os outros roteiros listados nesse cabeçalho (`jornada`, `fogo`, `raio`...) ainda não existem na `partida.js`.
 
 O headless perde o foco sozinho: as ferramentas passam `?semblur`.
+
+**Build da Poki:**
+- O `empacotar` corta de todo `.js` as linhas que terminam em `// modelo`. Todo código que lê o `__voleiModelo` precisa dessa marca, senão a build falha.
+- Ele também tira a arte que nenhum código cita.
+- Ele falha com URL externa, `console.log`, import quebrado ou se passar dos tetos do §4.9.
+
+## Git
+Faça um commit no fim de cada marco, com as notas em `docs/marcos/M<n>.md`. Push só com o OK do usuário.
 
 ## Calibragem atual (bot contra bot, 2026-10-20)
 - **Constantes:** `E_SLIME` 0,9, `G_BOLA` 28, `V_MIN` 8, `SOMA_Y` 0,7.

@@ -60,12 +60,12 @@ export function criarHud(raiz, T, cb) {
   el.revanche.addEventListener('click', () => { cb.som('botao'); cb.aoRevanche(); });
   el.opControle.addEventListener('click', () => { cb.som('botao'); cb.aoOpcao('controle'); });
   el.opSom.addEventListener('click', () => { cb.som('botao'); cb.aoOpcao('som'); });
-  const opModelos = $('[data-op="modelos"]');
-  // build de modelos (Artifact): volta para o hub
-  if (/** @type {any} */ (globalThis).__voleiModelo) {
-    opModelos.hidden = false;
-    opModelos.addEventListener('click', () => { if (history.length > 1) history.back(); else location.href = 'index.html'; });
-  }
+  // build de modelos (Artifact): volta para o hub (o empacotar corta as linhas "// modelo")
+  const opModelos = $('[data-op="modelos"]'); // modelo
+  if (/** @type {any} */ (globalThis).__voleiModelo) { // modelo
+    opModelos.hidden = false; // modelo
+    opModelos.addEventListener('click', () => { if (history.length > 1) history.back(); else location.href = 'index.html'; }); // modelo
+  } // modelo
 
   // teclado nos menus (fase de bolha, sem stopPropagation)
   window.addEventListener('keydown', (e) => {
