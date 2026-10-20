@@ -26,7 +26,7 @@ export const PALETA = Object.freeze([
 
 /** Catalogo (o M3 completa: 16 skins com kit casa e fora). */
 export const SKINS = Object.freeze([
-  { id: 'laranjinha', pig: [0, 0.42, 0.95, 0], hex: '#ff8a2a' },
+  { id: 'laranjinha', pig: [0, 0.08, 1.0, 0], hex: '#f28c3f' },
   { id: 'listrado', pig: [0.02, 0.05, 0.92, 0], hex: '#ffd23a', proc: 2, cor2: '#2b3a9c' },
   { id: 'faixa', pig: [0, 0, 0, 0.02], hex: '#f2f2f2', proc: 6, cor2: '#ee3b45' },
   { id: 'metades', pig: [0.7, 0.1, 0, 0], hex: '#3b8cf2', proc: 6, cor2: '#ffffff' },

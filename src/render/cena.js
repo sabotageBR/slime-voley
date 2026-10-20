@@ -164,6 +164,7 @@ export function criarCena(el, o = {}) {
       bola: P.estado !== 'ponto' || (F && F.t < 0.6) ? b : null,
       alvoSaque: o2.alvoSaque,
     });
+    if (L.plateia) plateia.desenharFaixa(ctxFundo, dpr, L.plateia, est, 0.8);
     aplicar(ctxFundo, cam, dpr);
     desenharBiruta(ctxFundo, -11.6, 3.2, 0, t, Math.max(0.03, est.traco / cam.s));
     // ---------------- slimes

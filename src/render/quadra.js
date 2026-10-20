@@ -22,7 +22,7 @@ export const ESTILOS = Object.freeze({
   }),
   c: Object.freeze({
     id: 'c', traco: 1.5, brilhoSlime: 1, contornoBola: 0.9, sombra: 'rgba(10, 20, 50, 0.3)',
-    linha: '#ffffff', piso: ['#3b7dd8', '#2f6bc4', '#2459a8'], placa: ['#11214a', '#ffd23a'], rede: '#ffffff', poste: '#dfe6f5', faixa: '#ffd23a',
+    linha: '#ffffff', piso: ['#ecc883', '#cf9f5a', '#8f6a35'], placa: ['#11214a', '#ffd23a'], rede: '#ffffff', poste: '#dfe6f5', faixa: '#ffd23a',
     bola: { base: '#ffffff', gomos: ['#ffd23a', '#1e66d0'], brilho: 0.9, sombraInterna: 0.14 }, fundoRede: 'rgba(255,255,255,0.4)',
   }),
 });
@@ -56,7 +56,17 @@ export function desenharPiso(ctx, cam, dpr, W, H, t, est, vis) {
   g.addColorStop(1, est.piso[2]);
   ctx.fillStyle = g;
   ctx.fillRect(0, y0, W, H - y0 + 1);
-  if (est.id !== 'c') {
+  if (est.id === 'c') {
+    // refletores: dois cones de luz na areia
+    for (const fx of [0.25, 0.75]) {
+      const rg = ctx.createRadialGradient(W * fx, y0 + (H - y0) * 0.2, 4, W * fx, y0 + (H - y0) * 0.2, Math.max(W, H) * 0.45);
+      rg.addColorStop(0, 'rgba(255,248,220,0.35)');
+      rg.addColorStop(1, 'rgba(255,248,220,0)');
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, y0, W, H - y0);
+    }
+  }
+  {
     // graos de areia (um caminho so)
     ctx.fillStyle = est.id === 'b' ? 'rgba(150, 90, 30, 0.22)' : 'rgba(160, 110, 40, 0.2)';
     const u = cam.s;
@@ -73,12 +83,6 @@ export function desenharPiso(ctx, cam, dpr, W, H, t, est, vis) {
       }
     }
     ctx.fill();
-  } else {
-    // quadra de TV: faixas de luz e a area de ataque mais clara
-    const [xa] = paraTela(cam, -3, 0);
-    const [xb] = paraTela(cam, 3, 0);
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    ctx.fillRect(xa, y0, xb - xa, H - y0);
   }
   ctx.restore();
 

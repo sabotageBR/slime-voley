@@ -12,6 +12,8 @@
 export const LARG_MUNDO = 25.5;
 export const JANELA_Y = 21;
 export const JANELA_Y_MIN = 17;
+/** Paisagem: janela vertical menor (os slimes ficam maiores; a camera segue a bola alta). */
+export const JANELA_Y_PAISAGEM = 18;
 /** Chao do mundo dentro da janela: o piso fica PISO_U acima da borda de baixo. */
 export const PISO_U = 1.6;
 /** Pilula da Poki (celular): canto superior esquerdo, a partir de y = 24 px. */
@@ -104,9 +106,9 @@ function paisagemL(W, H, sg, toque, esquema, escalaUi, tablet) {
     s = Math.min(W / LARG_MUNDO, (H - placarH * 0.3) / 15.5);
   } else if (esquema === 'b') {
     margem = Math.max(sg.l, sg.r) + 24 + 136 + 8;
-    s = Math.min(H / JANELA_Y, (W - 2 * margem) / LARG_MUNDO);
+    s = Math.min(H / JANELA_Y_PAISAGEM, (W - 2 * margem) / LARG_MUNDO);
   } else {
-    s = Math.min(H / JANELA_Y, W / LARG_MUNDO);
+    s = Math.min(H / JANELA_Y_PAISAGEM, W / LARG_MUNDO);
     if (tablet) s = Math.min(H / (JANELA_Y * 0.85), W / (LARG_MUNDO + 4));
   }
   const janelaW = W / s;

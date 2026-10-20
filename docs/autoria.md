@@ -1,0 +1,9 @@
+# Autoria dos assets
+
+Arte gerada com o Grok Imagine (headless, so image_gen/image_edit) e depois tratada a mao (recorte, curvas de cor, desfoque de profundidade). Nada de pessoas, texto, logos ou marcas.
+
+| id | modo | data | sessao | prompt | passe manual |
+|---|---|---|---|---|---|
+| arena-a1 | gerar | 2026-10-20 | 9eed3a31-3b23-4197-8459-6e20f90c21fe | Distant background of an indoor sports arena seen from courtside, tiered stands with empty colorful seats, big LED ribbon boards glowing with abstract color gradients, bright stadium spotlights, glossy polished floor reflecting light, purple and teal palette, soft focus depth of field, no people, no text, no letters, no numbers, no logos | pendente |
+| praia-b1 | gerar | 2026-10-20 | 45c4f99c-9283-4062-8987-5856f59f0965 | Toy diorama background, miniature plastic beach scene photographed with tilt-shift, glossy vinyl toy palm trees only at the far left and far right edges, chunky plastic waves in a turquoise sea, rounded toy islands far away, painted backdrop sky with cotton clouds, bright saturated colors, soft studio light from the upper left, shallow depth of field, the bottom 30 percent is empty smooth sand, no people, no animals, no text, no letters, no logos | pendente |
+| praia-a1 | gerar | 2026-10-20 | eb93369a-641d-49cf-b1c6-1df82bb51234 | Distant background for a 2D side-view beach volleyball game, wide panorama, horizon line at 40 percent from the top, calm turquoise sea with soft glossy highlights, two small tropical islands far away, a few palm trees only at the far left and far right edges, warm golden afternoon light from the upper left, soft pastel sky with fluffy clouds, painterly glossy candy style, soft focus depth of field, the bottom 30 percent is plain empty smooth beach sand, no people, no animals, no text, no letters, no logos | pendente |

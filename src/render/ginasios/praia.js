@@ -38,7 +38,7 @@ function nuvem(ctx, x, y, r, tr, cor = '#ffffff') {
  * @param {import('../camera.js').Camera} cam
  * @param {number} dpr @param {number} W @param {number} H @param {number} t
  * @param {{ id: string }} est
- * @param {{ arte?: CanvasImageSource|null, vento?: number, lotacao?: number }} o
+ * @param {{ arte?: CanvasImageSource|null, ancora?: number, vento?: number, lotacao?: number }} o
  */
 export function desenharFundo(ctx, cam, dpr, W, H, t, est, o = {}) {
   ctx.save();
@@ -49,16 +49,19 @@ export function desenharFundo(ctx, cam, dpr, W, H, t, est, o = {}) {
   const yH = paraTela(cam, 0, 7.2)[1];
   const tr = est.id === 'c' ? 0 : Math.max(1.4, Math.min(2.6, u * 0.07));
   if (o.arte) {
-    // fundo distante em paralaxe 0,25 (cobre a tela ate o chao)
+    // fundo distante em paralaxe 0,25: a linha da areia da arte (ANCORA da altura) fica um
+    // pouco acima do chao do mundo; a escala cobre a largura e o ceu ate o alto da tela
     const img = /** @type {any} */ (o.arte);
     const iw = img.width || 1;
     const ih = img.height || 1;
-    const alvoH = Math.max(yChao + u * 0.6, H * 0.55);
-    const esc = Math.max(W * 1.15 / iw, alvoH / ih);
+    const ancora = o.ancora || 0.8;
+    const yAncora = yChao - u * 0.4;
+    const esc = Math.max((W * 1.12) / iw, (yAncora + u * 2) / (ih * ancora));
     const w = iw * esc;
     const hh = ih * esc;
-    const px = (W - w) / 2 - (cam.cx * u) * 0.25;
-    const py = yChao + u * 0.6 - hh + (cam.cy - 8) * u * 0.25 * 0.4;
+    // paralaxe: a camera que segue a bola para cima ou dá close mexe o fundo 25%
+    const px = (W - w) / 2 - cam.cx * u * 0.25;
+    const py = yAncora - hh * ancora;
     ctx.drawImage(img, px, py, w, hh);
     if (py > 0) {
       ctx.fillStyle = P.ceu[0];
@@ -149,7 +152,22 @@ export function desenharArquibancada(ctx, cam, dpr, W, t, est) {
   const tr = est.id === 'c' ? 1 : Math.max(1.2, Math.min(2.4, u * 0.065));
   const degraus = 3;
   const alt = u * 0.9;
-  const cor = est.id === 'c' ? ['#13285a', '#183268'] : est.id === 'b' ? ['#ff9f5a', '#ffb877'] : ['#c98a52', '#dba06a'];
+  const cor = est.id === 'c' ? ['#0c1838', '#111f45'] : est.id === 'b' ? ['#ff9f5a', '#ffb877'] : ['#c98a52', '#dba06a'];
+  if (est.id === 'c') {
+    // transmissao: faixa de LED no alto da arquibancada (gradientes que correm, nunca texto)
+    const yL = yChao - alt * degraus - u * 0.15 - u * 0.55;
+    const g = ctx.createLinearGradient(-((t * 120) % W), 0, W - ((t * 120) % W), 0);
+    const cs = ['#ff3d8b', '#ffd23a', '#36e0c2', '#3b8cf2', '#ff3d8b'];
+    cs.forEach((c, i) => g.addColorStop(i / (cs.length - 1), c));
+    ctx.fillStyle = '#05091a';
+    ctx.fillRect(0, yL - 3, W, u * 0.55 + 6);
+    ctx.fillStyle = g;
+    ctx.globalAlpha = 0.9;
+    ctx.fillRect(0, yL, W, u * 0.55);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    for (let x = 0; x < W; x += 4) ctx.fillRect(x, yL, 1, u * 0.55);
+  }
   for (let k = degraus - 1; k >= 0; k--) {
     const y = yChao - alt * (k + 1) - u * 0.15;
     ctx.fillStyle = cor[k % 2];

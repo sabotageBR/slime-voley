@@ -391,7 +391,6 @@ export function criarPartida(o = {}) {
     tCortadaSolta = T.tMundo;
     bola.colide[outroI(i)] = true;
     T.hitstop = Cort.CORTADA.hitstop;
-    escalarTudo(T, 1000);
     novaJogadaIAs();
     caretar(i, 'feliz', 0.8);
     const quick = c.tTotal < Cort.CORTADA.devolucao + Cort.CORTADA.entrada && c.mexido < 1;
@@ -439,13 +438,13 @@ export function criarPartida(o = {}) {
       const soltou = humano[c.i] ? !Jm.it.botao : c.t >= (c.cpuSegura || 0.5);
       if (soltou || c.t >= c.tMax) soltarCortada();
     } else if (c.fase === 'soltando') {
-      if (c.t >= Cort.CORTADA.hitstop + 0.08) terminarCortada();
+      if (c.t >= Cort.CORTADA.hitstop + Math.max(0.08, Cort.CORTADA.saida)) terminarCortada();
     }
     if (cortada) {
       const e = Cort.escalas(cortada, lenta);
       T.escala.mundo = e.mundo;
       T.escala.defensor = e.defensor;
-      T.escala.bola = cortada.fase === 'soltando' ? 1000 : 0;
+      T.escala.bola = e.bola === 1000 ? 1000 : 0;
     }
   }
 
@@ -875,6 +874,46 @@ export function criarPartida(o = {}) {
       mix(bola.x); mix(bola.y); mix(bola.vx); mix(bola.vy);
       mix(placar[0]); mix(placar[1]);
       return h >>> 0;
+    },
+    /**
+     * Roteiros de teste (prints, GIFs, laboratorio): poe a partida num estado conhecido.
+     * cortada: o jogador no ar sob a bola alta, medidor cheio, a mira armada.
+     * ponto | ponto-curto: o ponto acabou de sair (festa completa ou curta). saque: segurando.
+     * @param {string} nome
+     */
+    roteiro(nome) {
+      esperaToque = false;
+      primeiroToque = true;
+      if (nome === 'cortada' || nome === 'mira') {
+        J[0].med.v = 300;
+        estado = 'jogo';
+        const s = slimes[0];
+        s.x = -3.2; s.y = 2.6; s.vy = 6; s.noChao = false; s.tAr = 0.2;
+        bola.solta = true; bola.x = -2.9; bola.y = 6.4; bola.vx = 0.4; bola.vy = -2;
+        rali.lado = -1; rali.toques = 1; rali.ultimoLado = -1; rali.recepcaoSaque = false;
+        slimes[1].x = 7; slimes[1].y = 0;
+        assentar(peles[0], s);
+        assentar(peles[1], slimes[1]);
+        tentarCortada(0, true);
+        J[0].it.botao = true;
+        return !!cortada;
+      }
+      if (nome === 'ponto' || nome === 'ponto-curto') {
+        estado = 'jogo';
+        if (nome === 'ponto-curto') pontoN = 5;
+        bola.solta = true; bola.x = 6.2; bola.y = RB + 0.05; bola.vx = 2; bola.vy = -14;
+        rali.ultimoLado = -1; rali.recepcaoSaque = false; rali.ultimaCortada = nome === 'ponto';
+        ponto(-1, nome === 'ponto' ? 'bomba' : 'ponto', 6.2);
+        return true;
+      }
+      if (nome === 'saque') {
+        prepararSaque(0);
+        saque.segurando = true;
+        saque.tSeg = 0.62;
+        J[0].it.botao = true;
+        return true;
+      }
+      return false;
     },
     /** Reassenta a pele (troca de qualidade, replay). */
     assentarPeles() { for (const i of [0, 1]) assentar(peles[i], slimes[i]); },

@@ -11,8 +11,11 @@
 
 import { prever, eixos, limitesX, RB, REDE_H, REDE_R, LARG, G_BOLA, limitar } from '../fisica/volei.js';
 
-/** Parametros (o laboratorio do M1 ajusta; os valores medidos estao em docs/referencias). */
-export const CORTADA = Object.freeze({
+/**
+ * Parametros (os valores medidos estao em docs/referencias). Mutavel de proposito: o
+ * laboratorio do M1 (src/ui/lab.js) ajusta ao vivo; o jogo nunca escreve aqui.
+ */
+export const CORTADA = {
   /** escala do mundo na mira (milesimos): medido 0,06 no Blumgi */
   escalaMundo: 60,
   /** o defensor anda mais rapido que o mundo: a telegrafia funciona e a cortada nao e ponto certo */
@@ -41,13 +44,16 @@ export const CORTADA = Object.freeze({
   bote: 2.0,
   vCortada: 29,
   pushIn: 1.04,
-  /** desenho (medidos: pontos de ~0,8% da tela, espacamento 1,7x, ponta 2x; anel 1,7x-2,5x da bola, 230 ms) */
+  /** desenho (medidos: pontos de ~0,8% da tela = raio 0,13-0,28 u, espacamento 1,7x, ponta 2x; anel 1,7x-2,5x da bola, 230 ms) */
   gotas: 9,
-  coroa: Object.freeze({ r0: 0.5, r1: 2.8, dur: 0.23 }),
-  rastro: Object.freeze({ cada: 0.03, max: 8, vida: 0.24 }),
+  coroa: { r0: 0.5, r1: 2.8, dur: 0.23 },
+  rastro: { cada: 0.03, max: 8, vida: 0.24 },
+  /** raio das gotas da mira (u): a primeira e a ultima antes da gota que aponta */
+  gotaMin: 0.13,
+  gotaMax: 0.28,
   /** a variante "segura": soltar em menos de 200 ms sem mexer a mira devolve os 100 */
   devolucao: 0.2,
-});
+};
 
 /**
  * @typedef {Object} Cortada
@@ -224,7 +230,7 @@ export function mirarEm(c, lado, x, vento = 0) {
 
 /**
  * Escala do mundo (milesimos) na fase atual, com as rampas.
- * @param {Cortada} c @param {{ escalaMundo?: number, escalaDefensor?: number, entrada?: number, saida?: number }} [aj]
+ * @param {any} c @param {{ escalaMundo?: number, escalaDefensor?: number, entrada?: number, saida?: number }} [aj]
  * @returns {{ mundo: number, defensor: number, bola: number }}
  */
 export function escalas(c, aj = {}) {
@@ -238,7 +244,10 @@ export function escalas(c, aj = {}) {
     return { mundo: Math.round(1000 + (em - 1000) * e), defensor: Math.round(1000 + (ed - 1000) * e), bola: 0 };
   }
   if (c.fase === 'mirando') return { mundo: em, defensor: ed, bola };
-  return { mundo: 1000, defensor: 1000, bola: 1000 };
+  // soltando: depois do hitstop, o mundo volta ao normal em `saida` s
+  const sai = aj.saida ?? CORTADA.saida;
+  const k = sai > 0 ? Math.max(0, Math.min(1, (c.t - CORTADA.hitstop) / sai)) : 1;
+  return { mundo: Math.round(em + (1000 - em) * k), defensor: Math.round(ed + (1000 - ed) * k), bola: 1000 };
 }
 
 /** Os pontos das gotas ao longo da trajetoria: [x, y, r] x n (a ultima e a gota maior que aponta). */
@@ -261,7 +270,7 @@ export function gotasDaMira(c) {
     py = y;
     if (acum >= passo * (k + 1)) {
       const f = (k + 1) / n;
-      out.push(x, y, 0.07 + (0.24 - 0.07) * f);
+      out.push(x, y, CORTADA.gotaMin + (CORTADA.gotaMax - CORTADA.gotaMin) * f);
       k++;
     }
   }

@@ -48,6 +48,19 @@ const cena = criarCena({ fundo: /** @type {any} */ ($('cFundo')), slime: /** @ty
   visual: /** @type {any} */ (D.visual || 'a'),
 });
 if (D.qualidade >= 0) cena.definirQualidade(D.qualidade);
+/** Fundo distante (arte tratada do Grok) por direcao visual; a C (transmissao) e so codigo. */
+const ARTE = { a: 'src/arte/ginasios/praia-a1.webp', b: 'src/arte/ginasios/praia-b1.webp' };
+function carregarArte(v) {
+  const url = ARTE[v];
+  cena.definirArte(null);
+  if (!url) return;
+  const img = new Image();
+  img.decoding = 'async';
+  img.onload = () => { if (cena.visual === v) cena.definirArte(img); };
+  img.src = url;
+}
+carregarArte(cena.visual);
+document.body.dataset.visual = cena.visual;
 const esquema = /** @type {'a'|'b'} */ (D.controle || perfil.controle || 'a');
 cena.definirToque(toque, esquema);
 
@@ -59,6 +72,7 @@ const controles = criarControles(raiz, {
   layout: () => cena.layout,
   aoInteragir: (e) => interagir(e),
   ativo: () => !pausado && !emAnuncio && !hud.cartaoAberto,
+  toque,
 });
 controles.definirEsquema(esquema);
 const hud = criarHud(raiz, T, {
@@ -120,6 +134,11 @@ function novaPartida(revanche = false) {
   nomes = [T('ui.voce'), T('rival.' + riv.id)];
   inicio = null;
   tMao = 0;
+  if (D.roteiro) {
+    primeiraInteracao = true;
+    jogando = true;
+    P.roteiro(D.roteiro);
+  }
   void revanche;
 }
 
@@ -279,6 +298,7 @@ const TRATADORES = {
 
 // ------------------------------------------------------------------ laco
 let tReal = 0;
+let labSegura = false;
 let tFesta = 0;
 
 function passo(dt) {
@@ -288,6 +308,13 @@ function passo(dt) {
   if (inicio) inicio.t += dt;
   // intencoes do jogador (uma vez por passo: as bordas acumulam no controle)
   const its = controles.ler(P.slimes);
+  // roteiro da mira: a acao fica segurada (prints e laboratorio)
+  if ((D.roteiro === 'cortada' || D.roteiro === 'mira') && !D.lab) its[0].botao = true;
+  // laboratorio: a mira fica segurada ate o proximo toque (que solta)
+  if (labSegura) {
+    if (its[0].borda) { labSegura = false; its[0].borda = false; its[0].botao = false; } else its[0].botao = true;
+    if (!P.cortada) labSegura = false;
+  }
   if (!D.auto) P.intencao(0, its[0]);
   P.passo();
   for (const e of P.eventos) {
@@ -365,7 +392,8 @@ function desenharMao(dt) {
   const L = cena.layout;
   const W = window.innerWidth;
   let m = null;
-  const acao = L.painel ? { x: W * 0.75, y: L.painel.y + L.painel.h * 0.45 } : { x: W * 0.78, y: window.innerHeight * 0.72 };
+  const pulo = controles.esquema === 'b' ? (L.botoes || []).find((b) => b.id === 'pulo') : null;
+  const acao = pulo ? { x: pulo.x, y: pulo.y } : L.painel ? { x: W * 0.75, y: L.painel.y + L.painel.h * 0.45 } : { x: W * 0.78, y: window.innerHeight * 0.72 };
   if (!primeiraInteracao) m = { ...acao, texto: toque ? T('dica.toque') : T('dica.teclas'), gesto: 'toque' };
   else if (P.estado === 'saque' && P.sacador === 0 && !P.saque.segurando && P.saque.t >= TEMPOS.pulsoSaque) m = { ...acao, texto: toque ? T('dica.toque') : T('dica.clique'), gesto: 'toque' };
   else if (P.tutorialCortada === 'oferecida' && P.estado === 'jogo' && !P.cortada) m = { ...acao, texto: T('dica.cortada'), gesto: 'duplo' };
@@ -396,6 +424,18 @@ if (D.filme > 0) {
   laco.iniciar();
   // reserva do loading: 1,5 s
   setTimeout(() => { if (!carregouEnviado) { carregouEnviado = true; $('carregando')?.remove(); poki.gameLoadingFinished(); } }, 1500);
+}
+
+// laboratorio da cortada (?lab)
+if (D.lab) {
+  import('./ui/lab.js').then(({ criarLab }) => {
+    let gat = D.gatilho || 'novo';
+    criarLab(raiz, {
+      repetir: () => { partidaN = 1; novaPartida(); primeiraInteracao = true; jogando = true; P.roteiro('cortada'); labSegura = true; },
+      gatilho: () => gat,
+      definirGatilho: (g) => { gat = g; D.gatilho = g; },
+    });
+  });
 }
 
 // ganchos de teste (loopback e build de modelos)

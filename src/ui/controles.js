@@ -25,13 +25,13 @@ const PREVENIR = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Sp
 
 /**
  * @param {HTMLElement} raiz  area de toque (a tela inteira)
- * @param {{ paraMundo: (px: number, py: number) => number[]|null, layout: () => any, aoInteragir: (e: Event) => void, ativo: () => boolean }} o
+ * @param {{ paraMundo: (px: number, py: number) => number[]|null, layout: () => any, aoInteragir: (e: Event) => void, ativo: () => boolean, toque?: boolean }} o
  */
 export function criarControles(raiz, o) {
   let esquema = 'a';
   let dois = false;
   /** ultimo tipo de ponteiro (os controles na tela aparecem quando foi toque) */
-  let via = 'teclado';
+  let via = o.toque ? 'toque' : 'teclado';
   const jog = [novoJog(), novoJog()];
   /** @type {Map<number, { zona: string, x0: number, y0: number, x: number, y: number, jog: number }>} */
   const dedos = new Map();

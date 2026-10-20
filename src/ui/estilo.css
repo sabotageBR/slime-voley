@@ -70,3 +70,28 @@ body { font-family: Fredoka, system-ui, sans-serif; color: var(--tinta); }
 .bt.principal { background: var(--laranja); color: #fff; -webkit-text-stroke: 3px var(--tinta); paint-order: stroke fill; font-size: 24px; }
 .bt:focus-visible { outline: 3px dashed var(--azul); outline-offset: 3px; }
 .bt:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--tinta); }
+
+/* laboratorio da cortada (so na build de modelos) */
+.lab { position: absolute; left: 8px; top: 64px; z-index: 9; width: min(300px, calc(100vw - 16px)); max-height: calc(100vh - 80px); overflow: auto; background: rgba(255,255,255,.94);
+  border: 3px solid var(--tinta); border-radius: 14px; box-shadow: 0 4px 0 var(--tinta); font-size: 13px; pointer-events: auto; touch-action: pan-y; }
+.lab .labTopo { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 2px solid var(--tinta); }
+.lab .labFechar { font: inherit; border: 2px solid var(--tinta); border-radius: 8px; background: #fff; width: 28px; }
+.lab .labRep2 { min-height: 30px; font-size: 14px; padding: 0 10px; margin-left: auto; margin-right: 6px; }
+.lab.fechado .labCorpo { display: none; }
+.lab .labCorpo { padding: 6px 10px 10px; display: flex; flex-direction: column; gap: 4px; }
+.lab label { display: grid; grid-template-columns: 1fr 120px 44px; align-items: center; gap: 6px; }
+.lab label:has(select) { grid-template-columns: 1fr 1.4fr; }
+.lab output { text-align: right; font-variant-numeric: tabular-nums; }
+.lab .labBotoes { display: flex; gap: 6px; margin-top: 6px; }
+.lab .labBotoes .bt { min-height: 40px; font-size: 16px; flex: 1; }
+.lab textarea { width: 100%; font: 11px monospace; margin-top: 6px; }
+
+/* direcao C (transmissao esportiva): placar de TV */
+body[data-visual="c"] .hud .pontos { background: #0b1533; color: #fff; border-color: #ffd23a; box-shadow: 0 3px 0 #05091a; border-radius: 8px; }
+body[data-visual="c"] .hud .nome { -webkit-text-stroke: 0; color: #fff !important; background: #0b1533; padding: 0 8px; border-radius: 6px; font-size: 13px; }
+body[data-visual="c"] .hud .lado.l0 .nome { border-bottom: 3px solid #ff8a2a; }
+body[data-visual="c"] .hud .lado.l1 .nome { border-bottom: 3px solid #3fd6c8; }
+body[data-visual="c"] .hud .pausa { background: #0b1533; border-color: #ffd23a; }
+body[data-visual="c"] .hud .pausa svg { fill: #fff; }
+/* direcao B (vinil): placar de brinquedo, mais grosso */
+body[data-visual="b"] .hud .pontos { border-width: 4px; border-radius: 18px; background: #fff6e0; box-shadow: 0 5px 0 var(--tinta); }
