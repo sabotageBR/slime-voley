@@ -163,8 +163,10 @@ async function intervalo() {
 poki.onAdStart = () => { audio.mudoParaAnuncio(); };
 poki.onAdEnd = () => { audio.voltarDoAnuncio(); };
 
-function pausar(v) {
+let motivoPausa = '';
+function pausar(v, motivo = 'botao') {
   if (v === pausado || emAnuncio) return;
+  motivoPausa = motivo;
   if (v) {
     if (hud.cartaoAberto) return;
     pausado = true;
@@ -190,9 +192,9 @@ async function proximaPartida(revanche) {
 
 document.addEventListener('visibilitychange', () => {
   audio.pausarAba(document.hidden);
-  if (document.hidden && !emAnuncio && P && P.estado === 'jogo') pausar(true);
+  if (document.hidden && !emAnuncio && P && P.estado === 'jogo') pausar(true, 'oculta');
 });
-window.addEventListener('blur', () => { if (!emAnuncio && P && P.estado === 'jogo' && jogando) pausar(true); });
+window.addEventListener('blur', () => { if (!D.semBlur && !emAnuncio && P && P.estado === 'jogo' && jogando) pausar(true, 'blur'); });
 
 // ------------------------------------------------------------------ eventos -> som, vfx, vibracao
 const vibrar = (p) => { if (perfil.vibrar) haptico.vibrar(p); };
@@ -401,6 +403,10 @@ if (D.ganchos) {
   globalThis.__volei = {
     get partida() { return P; },
     get cena() { return cena; },
+    get pausado() { return pausado; },
+    get emAnuncio() { return emAnuncio; },
+    get jogando() { return jogando; },
+    get motivoPausa() { return motivoPausa; },
     passo,
     desenhar,
     interagir: () => interagir(null),

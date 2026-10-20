@@ -60,14 +60,14 @@ export function criarIA(p, rng, o = {}) {
   /** Sorteia o erro e as intencoes da jogada (alguem tocou, ou saque). */
   function sortear(ctx, reage) {
     const v = Math.hypot(ctx.bola.vx, ctx.bola.vy);
-    ia.erro = (rng() * 2 - 1) * p.erro * (0.3 + v / 40);
-    ia.vaiPular = rng() < p.pulo;
-    ia.corte = rng() < (p.corta || 0);
+    ia.erro = (rng() * 2 - 1) * ia.p.erro * (0.3 + v / 40);
+    ia.vaiPular = rng() < ia.p.pulo;
+    ia.corte = rng() < (ia.p.corta || 0);
     ia.desvio = (rng() * 2 - 1) * 0.12;
     ia.lob = perso.includes('lob') ? rng() < 0.6 : rng() < 0.2;
     // falha: o erro inteiro vai para a posicao (toque torto); senao o erro so muda onde cai
-    ia.falha = rng() < p.erro / 6;
-    ia.t = reage ? p.reacao : 0;
+    ia.falha = rng() < ia.p.erro / 6;
+    ia.t = reage ? ia.p.reacao : 0;
   }
 
   /**
@@ -86,9 +86,9 @@ export function criarIA(p, rng, o = {}) {
     const cam = trajetoria(bola, ctx);
     const fraca = ctx.meus >= 1 && bola.vx * bola.vx + bola.vy * bola.vy < 110;
     const quer = ia.vaiPular || fraca || ia.corte;
-    let fundo = 6.5 + ia.desvio * 20 + (ia.falha ? 0 : ia.erro * 2.2);
-    if (perso.includes('mira')) fundo = Math.abs(ctx.outro.x) < 6 ? 10 : 3.5;
-    const xT = -lado * limitar(fundo, 2.5, 10.8);
+    let fundo = 7.5 + ia.desvio * 14 + (ia.falha ? 0 : ia.erro * 1.6);
+    if (perso.includes('mira')) fundo = Math.abs(ctx.outro.x) < 6 ? 10 : 4.5;
+    const xT = -lado * limitar(fundo, 4, 10.8);
     const pr = cam.n ? cam.x[cam.n - 1] : bola.x;
     const levanta = ctx.meus < 2 && pr * lado > 0 && Math.abs(pr) < 2.4;
     const xLev = lado * 4.2;
@@ -104,7 +104,7 @@ export function criarIA(p, rng, o = {}) {
         // velocidade do slime no contato: parado se chega antes, andando se chega no limite
         const tDisp0 = c.t - Math.max(0, ia.t) - (pula ? tp : 0);
         const dist0 = xs - eu.x;
-        const vEst = tDisp0 > 0.05 && Math.abs(dist0) > (tDisp0 - 0.12) * p.vel * 0.85 ? Math.sign(dist0) * Math.min(p.vel, Math.abs(dist0) / Math.max(0.05, tDisp0)) : 0;
+        const vEst = tDisp0 > 0.05 && Math.abs(dist0) > (tDisp0 - 0.12) * ia.p.vel * 0.85 ? Math.sign(dist0) * Math.min(ia.p.vel, Math.abs(dist0) / Math.max(0.05, tDisp0)) : 0;
         const ux = vEst * SOMA_X;
         // reflexo como na fisica
         let rvx = c.vx - ux;
@@ -124,12 +124,13 @@ export function criarIA(p, rng, o = {}) {
           custo = Math.abs(q.x - xT);
           if (q.x * lado > 0) custo += 40;
           if (q.yRede < REDE_H + RB + 0.25) custo += 50;
+          else custo += Math.max(0, REDE_H + RB + 1.0 - q.yRede) * 6;
           if (Math.abs(q.x) > 12) custo += 30;
           if (ia.lob) custo += Math.max(0, 8.5 - q.apice) * 0.8;
         }
         // da tempo de chegar? (o pulo precisa sair tp antes)
         const tDisp = c.t - Math.max(0, ia.t) - (pula ? tp : 0);
-        const alc = Math.max(0, tDisp) * p.vel * 0.85 + 0.15;
+        const alc = Math.max(0, tDisp) * ia.p.vel * 0.85 + 0.15;
         const dist = Math.abs(xs - eu.x);
         if (dist > alc) custo += 6 + (dist - alc) * 8;
         if (tDisp < 0) custo += 30;
@@ -178,7 +179,7 @@ export function criarIA(p, rng, o = {}) {
       return { eixo: irPara(eu.x, ia.alvo, 11, eu.vx), pulo: false };
     }
     if (ia.t <= 0) {
-      ia.t = p.reacao;
+      ia.t = ia.p.reacao;
       planejar(ctx);
     }
     let pulo = false;
@@ -191,10 +192,12 @@ export function criarIA(p, rng, o = {}) {
     /** alguem tocou (ou saque): nova jogada, replaneja depois da reacao */
     jogada() { ia.novaJogada = true; },
     get estado() { return ia; },
+    /** troca os parametros (o elastico do placar: entre pontos, nunca no meio do rali) */
+    definirParams(np) { ia.p = np; },
     /** a CPU quer a cortada lenta agora? (no ar, na janela: a partida confere a elegibilidade) */
     querCortar() { return ia.corte; },
     /** sorteia o tempo de segurar o saque */
-    segurarSaque() { return rng() < p.saqueSegura ? 0.2 + rng() * 0.6 : 0; },
+    segurarSaque() { return rng() < ia.p.saqueSegura ? 0.2 + rng() * 0.6 : 0; },
   };
 }
 

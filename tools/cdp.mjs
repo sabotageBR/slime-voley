@@ -81,6 +81,15 @@ export async function abrirChrome({ largura = 390, altura = 844, porta = 9380, t
       await espera(ms);
       await cmd('Input.dispatchKeyEvent', { type: 'keyUp', code: codigo, key, windowsVirtualKeyCode: kc });
     },
+    /** Toque (multitoque pelo id). tipo: touchStart | touchMove | touchEnd */
+    async dedo(tipo, pontos) {
+      await cmd('Input.dispatchTouchEvent', { type: tipo, touchPoints: tipo === 'touchEnd' ? [] : pontos.map((p) => ({ x: p.x, y: p.y, id: p.id || 0, radiusX: 8, radiusY: 8, force: 1 })) });
+    },
+    async tocar(x, y, ms = 60) {
+      await cmd('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 1 }] });
+      await espera(ms);
+      await cmd('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    },
     async tamanho(w, h) { await cmd('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: toque }); },
     async print() {
       const r = await cmd('Page.captureScreenshot', { format: 'png' });

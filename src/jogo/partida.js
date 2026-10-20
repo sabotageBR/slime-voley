@@ -79,6 +79,7 @@ export function criarPartida(o = {}) {
   const peles = slimes.map((s) => criarPele(s, passoPeleQ));
   const bola = criarBola();
 
+  let placar = [0, 0];
   const humano = [modo !== 'demo', modo === 'dois'];
   const params = () => paramsIA(riv, { placarCpu: placar[1], placarHumano: placar[0], partida: o.partidaN || 1 });
   const ias = [
@@ -107,7 +108,6 @@ export function criarPartida(o = {}) {
     cortadaGratis: false,
   }));
 
-  let placar = [0, 0];
   /** @type {'saque'|'jogo'|'ponto'|'fim'} */
   let estado = 'saque';
   let sacador = o.sacaPrimeiro ?? (o.primeira ? 1 : 0);
@@ -290,6 +290,8 @@ export function criarPartida(o = {}) {
     T.hitstop = completa ? TEMPOS.hitstopCompleta : TEMPOS.hitstopCurta;
     estado = 'ponto';
     sacador = iv;
+    // elastico: a CPU ajusta entre pontos (funcao continua do placar, mesmo nivel)
+    if (ias[1] && modo === 'cpu') ias[1].definirParams(params());
     ganhar(J[iv].med, 'ganhou');
     ganhar(J[ip].med, 'perdeu');
     caretar(iv, 'feliz', 1.6);

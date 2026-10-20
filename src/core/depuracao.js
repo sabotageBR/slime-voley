@@ -13,6 +13,7 @@
 //   ?fora=0               desliga a bola fora (a rede de fundo segura tudo)
 //   ?assist=0             desliga as assistencias (ima e devolucao)
 //   ?qualidade=0..3 ?render=2d ?lang=pt ?semhud ?semanuncio ?debug ?auto ?primeira
+//   ?semblur              o blur nao pausa (o Chrome headless das ferramentas perde o foco sozinho)
 //
 // Fora disso, a build de modelos (tools/artifact.mjs) liga window.__voleiModelo = { visual,
 // controle, gatilho, ... } antes do main.js: vale fora do loopback e o empacotar apaga o gancho.
@@ -21,7 +22,7 @@ export function lerDepuracao() {
   const base = {
     local: false, ganchos: false, modelo: false, debug: false, semente: 0, roteiro: '', quadro: -1, filme: 0, cada: 4,
     ginasio: '', skin: '', rival: '', nivel: '', controle: '', visual: '', gatilho: '', defensor: 0, lenta: 0, fora: true, assist: true,
-    qualidade: -1, render: '', lang: '', semHud: false, semAnuncio: false, auto: false, primeira: null,
+    qualidade: -1, render: '', lang: '', semHud: false, semAnuncio: false, semBlur: false, auto: false, primeira: null,
   };
   let local = false;
   try {
@@ -64,6 +65,7 @@ export function lerDepuracao() {
     lang: q.get('lang') || '',
     semHud: q.has('semhud'),
     semAnuncio: q.has('semanuncio'),
+    semBlur: q.has('semblur'),
     auto: q.has('auto'),
     primeira: q.has('primeira') ? q.get('primeira') !== '0' : null,
   });

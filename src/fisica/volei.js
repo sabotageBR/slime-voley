@@ -5,9 +5,10 @@
 //   saque), negativo estica (impulso do pulo, pose da cortada). Mola de 6 Hz, zeta 0,35. Na
 //   colisao sigma vale entre -0,6 e +0,6; o desenho (a pele) usa o valor cru, ate +-1.
 // - A cupula achatada tem a normal mais vertical (a bola levanta); a esticada, mais deitada (a
-//   bola sai rasante). Toque em x = 0,5a com a bola caindo na vertical e E = 0,80: normal de
-//   30/24/36 graus e saida de 66/54/79 graus (redonda/achatada/esticada), conferido no
-//   test/fisica.test.js.
+//   bola sai rasante). Toque em x = 0,5a com a bola caindo na vertical: normal de 30/24/36 graus
+//   (redonda/achatada/esticada); a saida sai da formula do reflexo com E_SLIME (com 0,80 seria
+//   66/54/79 graus; com 0,90, calibrado no bot contra bot de 2026-10-20 para ralis de 5 a 9 s,
+//   63/51/77), conferido no test/fisica.test.js.
 // - Bola: circulo rigido com gravidade propria, 2 subpassos por passo de 1/120 s, limite de
 //   velocidade pelo estado (VMAX), vento horizontal opcional.
 // - Rede: poste em x = 0 ate REDE_H (capsula de raio REDE_R) para a bola; para os slimes, a rede
@@ -30,7 +31,7 @@ export const FUNDO_X = 12.6;
 export const RAIO = 2.0;
 /** Bola. */
 export const RB = 0.75;
-export const G_BOLA = 30;
+export const G_BOLA = 28;
 /** Slime: gravidade, pulo (apice de 3,89 u, 0,68 s no ar), velocidade e aceleracoes. */
 export const G_SLIME = 68;
 export const PULO = 23;
@@ -39,8 +40,8 @@ export const ACEL_CHAO = 85;
 export const FREIO = 130;
 export const ACEL_AR = 45;
 /** Restituicao e saida minima contra o slime; rede, placa e rede de fundo. */
-export const E_SLIME = 0.8;
-export const V_MIN = 7;
+export const E_SLIME = 0.9;
+export const V_MIN = 8;
 export const E_REDE = 0.45;
 export const E_PLACA = 0.7;
 export const E_FUNDO = 0.7;
