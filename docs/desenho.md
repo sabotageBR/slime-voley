@@ -39,7 +39,7 @@ Este plano junta as 3 propostas (jogabilidade, arquitetura, conteúdo/Poki), os 
 - **Transcrição de hoje:** o endereço direto do jogo na Poki ficou bloqueado, e a ferramenta de mouse não manteve o clique. O vídeo do YouTube `DS4mSolMfUE` aceitou busca por `currentTime`.
 - **Matemática do σ:** com toque em x = 0,5a, a fórmula `atan(0,577·b/a)` dá o ângulo da NORMAL (30°/21°/41°), e não o ângulo de saída da bola.
 
-**Abreviações:** `$PAC` = `/home/evandro/Downloads/Cinco Jogos de Gosma (2)/src`; `$SV` = `/home/evandro/git/em_tech/slime_voley`; `$EM` = `/home/evandro/git/em_tech`.
+**Abreviações:** `$PAC` = `~/Downloads/Cinco Jogos de Gosma (2)/src`; `$SV` = `~/git/em_tech/slime_voley`; `$EM` = `~/git/em_tech`.
 
 ---
 
@@ -1387,8 +1387,8 @@ O OK para o `git fetch` saiu das pendências.
 ---
 
 ### Critical Files for Implementation
-- /home/evandro/Downloads/Cinco Jogos de Gosma (2)/src/jogo/modos/volei.js (`meiaLua`, `preverQueda`, `planejar`, `RIVAIS`, constantes por quadro a converter; o protótipo usa `criarMundo`, que sai)
-- /home/evandro/Downloads/Cinco Jogos de Gosma (2)/src/core/laco.js (base do laço de 1/120 com alfa, dos 3 relógios e dos canais de escala da câmera lenta)
-- /home/evandro/Downloads/Cinco Jogos de Gosma (2)/src/render/campo.js (contrato do proxy que `render/vista.js` precisa sintetizar; import de `N_PIG` a trocar)
-- /home/evandro/Downloads/Cinco Jogos de Gosma (2)/src/core/poki.js (fluxo do SDK: `emAnuncio`, `jogando`, `idioma`, novos repasses `shareableURL`/`getURLParam`)
-- /home/evandro/git/em_tech/stringcut/src/render/transicoes.js (base de `render/celebracao.js`: soco, palavra com extrusão, confete com semente)
+- ~/Downloads/Cinco Jogos de Gosma (2)/src/jogo/modos/volei.js (`meiaLua`, `preverQueda`, `planejar`, `RIVAIS`, constantes por quadro a converter; o protótipo usa `criarMundo`, que sai)
+- ~/Downloads/Cinco Jogos de Gosma (2)/src/core/laco.js (base do laço de 1/120 com alfa, dos 3 relógios e dos canais de escala da câmera lenta)
+- ~/Downloads/Cinco Jogos de Gosma (2)/src/render/campo.js (contrato do proxy que `render/vista.js` precisa sintetizar; import de `N_PIG` a trocar)
+- ~/Downloads/Cinco Jogos de Gosma (2)/src/core/poki.js (fluxo do SDK: `emAnuncio`, `jogando`, `idioma`, novos repasses `shareableURL`/`getURLParam`)
+- ~/git/em_tech/stringcut/src/render/transicoes.js (base de `render/celebracao.js`: soco, palavra com extrusão, confete com semente)
