@@ -4,7 +4,7 @@
 <body><canvas id="c"></canvas><pre id="medidas"></pre>
 <script type="module">
 // Thumb da Poki feita com o proprio jogo (porte do slime-merge): a partida monta a cena pelo
-// roteiro da cortada (a Laranjinha no ar, a mira em gotas e a reticula no piso do rival) e a cena
+// roteiro da cortada (a Laranjinha no ar, a mira em setas e a reticula no piso do rival) e a cena
 // do jogo desenha os quatro canvases (fundo da praia com a arte, plateia, piso, gosma em WebGL2,
 // rostos, bola, mira e respingos), com a camera presa num quadro fixo. Direcao A, skin padrao.
 // Regras (developers.poki.com/guide/game-thumbnail, as mesmas do slime-merge):
@@ -14,7 +14,8 @@
 //   - um assunto principal, com pose dinamica, o personagem na skin padrao;
 //   - parecida com o jogo de verdade; contraste alto e nada perto do #83FFE7 do site;
 //   - legivel nos tiles pequenos (ver ?grade).
-// Desenho (§3.11): a Laranjinha no ar na pose da cortada; linha de gotas, reticula no piso e
+// Desenho (§3.11): a Laranjinha no ar na pose da cortada; linha de gotas (aqui setas, pedido
+// do usuario: o jogo segue com gotas), reticula no piso e
 // respingos na cor do time (sem anel branco); plateia desfocada; sem texto. A Arena ainda nao
 // existe como ginasio: vai a Praia, a do jogo.
 //   ?opcao=quadra&s=1256  a thumb no tamanho s (o canvas #c; a janela pode ter qualquer tamanho)
@@ -23,14 +24,16 @@
 //   ?opcao=quadra&perto   a thumb de 628 px com os pixels perto do #83FFE7 em magenta
 import { criarPartida } from '../src/jogo/partida.js';
 import { assentar } from '../src/jogo/pele.js';
-import { resolver } from '../src/jogo/cortada.js';
+import { resolver, gotasDaMira, CORTADA } from '../src/jogo/cortada.js';
 import { skin } from '../src/jogo/skins.js';
 import { rival } from '../src/jogo/rivais.js';
 import { hexDaMistura } from '../src/cor/km.js';
 import { criarVista } from '../src/render/vista.js';
 import { criarCena, QUALIDADES } from '../src/render/cena.js';
 import { tonalidade } from '../src/render/celebracao.js';
-import { paraTela } from '../src/render/camera.js';
+import { paraTela, aplicar } from '../src/render/camera.js';
+import { ESTILOS } from '../src/render/quadra.js';
+import { TINTA } from '../src/render/fundo.js';
 import { REDE_H } from '../src/fisica/volei.js';
 
 const q = new URLSearchParams(location.search);
@@ -51,6 +54,8 @@ const OPCOES = {
   meia: { centro: [0.2, 4.7], lado: 12, x: -3.0, y: 3.2, rivalX: 5.2, alvoX: 3.6, caras: ['feliz', 'susto'] },
 };
 const O = { ...(OPCOES[OPCAO] || OPCOES.quadra) };
+/** Quantas setas na mira (as gotas do jogo sao 9; setas maiores pedem menos). */
+const SETAS = 6;
 // ?caras=feliz,susto troca as expressoes (para comparar)
 if (q.has('caras')) O.caras = q.get('caras').split(',');
 
@@ -108,6 +113,11 @@ P.bola.x = C.bx;
 P.bola.y = C.by;
 C.alvoX = O.alvoX;
 resolver(C, s0.lado);
+// setas no lugar das gotas da mira (pedido do usuario): os pontos sao os das gotas, com menos
+// delas; a cena desenha so a reticula (sem gotas) e as setas vao por cima no fim
+CORTADA.gotas = SETAS;
+const setas = gotasDaMira(C);
+CORTADA.gotas = 0;
 // o quadro anterior igual ao atual: a vista nao interpola nada
 const A = P.anterior;
 for (const i of [0, 1]) {
@@ -170,6 +180,49 @@ function thumb(cv, n) {
   vinheta(g, n);
   g.drawImage(el.slime, 0, 0, n, n);
   g.drawImage(el.topo, 0, 0);
+  desenharSetas(g, cam);
+}
+
+/**
+ * A mira em setas: cada uma aponta pela trajetoria (do ponto anterior para o seu), crescendo
+ * como as gotas (a ultima maior); laranja do time, contorno de tinta e o brilho das gotas.
+ */
+function desenharSetas(g, cam) {
+  aplicar(g, cam, 1);
+  const tr = Math.max(0.03, ESTILOS.a.traco / cam.s) * 1.1;
+  const m = setas.length / 3;
+  g.lineJoin = 'round';
+  for (let k = 0; k < m; k++) {
+    const x = setas[k * 3];
+    const y = setas[k * 3 + 1];
+    const px = k ? setas[(k - 1) * 3] : C.bx;
+    const py = k ? setas[(k - 1) * 3 + 1] : C.by;
+    const r = (0.34 + 0.24 * (m > 1 ? k / (m - 1) : 1)) * (k === m - 1 ? 1.3 : 1);
+    g.save();
+    g.translate(x, y);
+    g.rotate(Math.atan2(y - py, x - px));
+    g.beginPath();
+    g.moveTo(r, 0);
+    g.lineTo(-r * 0.75, r * 0.88);
+    g.lineTo(-r * 0.22, 0);
+    g.lineTo(-r * 0.75, -r * 0.88);
+    g.closePath();
+    g.fillStyle = cores[0];
+    g.fill();
+    g.lineWidth = tr;
+    g.strokeStyle = TINTA;
+    g.stroke();
+    // brilho: um risco claro na aba de cima
+    g.lineCap = 'round';
+    g.lineWidth = r * 0.16;
+    g.strokeStyle = 'rgba(255,255,255,0.85)';
+    g.beginPath();
+    g.moveTo(-r * 0.45, r * 0.42);
+    g.lineTo(r * 0.25, r * 0.12);
+    g.stroke();
+    g.restore();
+  }
+  g.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 /**
