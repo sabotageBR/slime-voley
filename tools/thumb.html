@@ -179,26 +179,28 @@ function thumb(cv, n) {
 
 /**
  * Riscos de impulso embaixo da Laranjinha (no lugar dos respingos de chao, pedido do usuario):
- * tracos verticais soltos do corpo (com um vao, comecos e comprimentos desencontrados, os do
- * meio mais longos), brancos com contorno de tinta como o resto do traco do jogo. Colados na
- * cupula e afinando, pareciam tentaculos.
+ * tracos finos soltos do corpo, que afinam e somem para baixo (branco sem contorno), com comecos
+ * e comprimentos desencontrados, os do meio mais longos. Colados na cupula pareciam tentaculos;
+ * grossos e contornados, grosseiros.
  */
 function desenharImpulso(g, cam) {
   aplicar(g, cam, 1);
   const base = P.slimes[0].y;
-  const tr = Math.max(0.03, ESTILOS.a.traco / cam.s);
-  const w = 0.14;
-  const riscos = [[-1.15, 0.5, 0.9], [-0.42, 0.32, 1.55], [0.36, 0.55, 1.15], [1.1, 0.38, 0.75]];
-  g.lineCap = 'round';
-  for (const [cor, larg] of [[TINTA, w + tr * 2], ['#ffffff', w]]) {
-    g.strokeStyle = cor;
-    g.lineWidth = larg;
+  const riscos = [[-1.3, 0.42, 0.75], [-0.78, 0.3, 1.2], [-0.25, 0.48, 1.55], [0.28, 0.34, 1.35], [0.8, 0.52, 1.0], [1.28, 0.4, 0.65]];
+  for (const [dx, vao, l] of riscos) {
+    const x = O.x + dx;
+    const y0 = base - vao;
+    const y1 = y0 - l;
+    const w = 0.055;
+    const gr = g.createLinearGradient(x, y0, x, y1);
+    gr.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+    gr.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    g.fillStyle = gr;
     g.beginPath();
-    for (const [dx, vao, l] of riscos) {
-      g.moveTo(O.x + dx, base - vao);
-      g.lineTo(O.x + dx, base - vao - l);
-    }
-    g.stroke();
+    g.arc(x, y0, w, 0, Math.PI);
+    g.lineTo(x, y1);
+    g.closePath();
+    g.fill();
   }
   g.setTransform(1, 0, 0, 1, 0, 0);
 }
