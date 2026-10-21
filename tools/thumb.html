@@ -6,7 +6,8 @@
 // Thumb da Poki feita com o proprio jogo (porte do slime-merge): a partida monta a cena pelo
 // roteiro da cortada (a Laranjinha no ar, a mira em setas e a reticula no piso do rival) e a cena
 // do jogo desenha os quatro canvases (fundo da praia com a arte, plateia, piso, gosma em WebGL2,
-// rostos, bola, mira e respingos), com a camera presa num quadro fixo. Direcao A, skin padrao.
+// rostos, bola e reticula), com a camera presa num quadro fixo; as setas da mira e os riscos de
+// impulso vao por cima. Direcao A, skin padrao.
 // Regras (developers.poki.com/guide/game-thumbnail, as mesmas do slime-merge):
 //   - quadrado 1:1 de no minimo 628 px, sangrado: sem borda, margem nem tarja (a Poki
 //     arredonda os cantos);
@@ -15,8 +16,8 @@
 //   - parecida com o jogo de verdade; contraste alto e nada perto do #83FFE7 do site;
 //   - legivel nos tiles pequenos (ver ?grade).
 // Desenho (§3.11): a Laranjinha no ar na pose da cortada; linha de gotas (aqui setas, pedido
-// do usuario: o jogo segue com gotas), reticula no piso e
-// respingos na cor do time (sem anel branco); plateia desfocada; sem texto. A Arena ainda nao
+// do usuario: o jogo segue com gotas), reticula no piso e respingos na cor do time (aqui riscos
+// de impulso embaixo da Laranjinha, pedido do usuario); plateia desfocada; sem texto. A Arena ainda nao
 // existe como ginasio: vai a Praia, a do jogo.
 //   ?opcao=quadra&s=1256  a thumb no tamanho s (o canvas #c; a janela pode ter qualquer tamanho)
 //   ?opcao=quadra&grade   folha de conferencia: tiles de 314 a 94 px sobre o #83FFE7
@@ -30,7 +31,6 @@ import { rival } from '../src/jogo/rivais.js';
 import { hexDaMistura } from '../src/cor/km.js';
 import { criarVista } from '../src/render/vista.js';
 import { criarCena, QUALIDADES } from '../src/render/cena.js';
-import { tonalidade } from '../src/render/celebracao.js';
 import { paraTela, aplicar } from '../src/render/camera.js';
 import { ESTILOS } from '../src/render/quadra.js';
 import { TINTA } from '../src/render/fundo.js';
@@ -130,10 +130,6 @@ P.jogadores[0].expr = O.caras[0];
 P.jogadores[1].expr = O.caras[1];
 
 const o2 = { cores, festa: null, inicio: null, saque: null, pulsoSaque: 0, alvoSaque: null };
-// respingos na cor do time no piso, onde a Laranjinha pulou (a coroa de chao no comeco: as
-// gotas abrindo, antes do anel fino aparecer; nada de anel branco nem circulo-fantasma). Em volta
-// da bola as gotas pareciam enfeite na cabeca dela.
-cena.coroa(O.x, 0.15, cores[0], { chao: true, miolo: tonalidade(cores[0], 0.6), r0: 1.1, r1: 2.3, n: 11, esc: 1.05, dur: 2 });
 
 /** Camera presa no quadro da opcao (o diretor sem tempo nao mexe no estado). */
 function prender(n) {
@@ -147,9 +143,6 @@ function prender(n) {
 /** Desenha a cena em n x n e compoe as camadas em cv. */
 function thumb(cv, n) {
   lado = n;
-  // os efeitos andam um pouco (a coroa abre, as gotas voam) e o quadro final sai sem tempo
-  prender(n);
-  for (let k = 0; k < 4; k++) cena.desenhar(P, vista, 1, 0.05, o2);
   prender(n);
   cena.desenhar(P, vista, 1, 0, o2);
   cv.width = n;
@@ -178,9 +171,36 @@ function thumb(cv, n) {
   g.restore();
   afastarDaPoki(g, n);
   vinheta(g, n);
+  desenharImpulso(g, cam);
   g.drawImage(el.slime, 0, 0, n, n);
   g.drawImage(el.topo, 0, 0);
   desenharSetas(g, cam);
+}
+
+/**
+ * Riscos de impulso embaixo da Laranjinha (no lugar dos respingos de chao, pedido do usuario):
+ * tracos verticais soltos do corpo (com um vao, comecos e comprimentos desencontrados, os do
+ * meio mais longos), brancos com contorno de tinta como o resto do traco do jogo. Colados na
+ * cupula e afinando, pareciam tentaculos.
+ */
+function desenharImpulso(g, cam) {
+  aplicar(g, cam, 1);
+  const base = P.slimes[0].y;
+  const tr = Math.max(0.03, ESTILOS.a.traco / cam.s);
+  const w = 0.14;
+  const riscos = [[-1.15, 0.5, 0.9], [-0.42, 0.32, 1.55], [0.36, 0.55, 1.15], [1.1, 0.38, 0.75]];
+  g.lineCap = 'round';
+  for (const [cor, larg] of [[TINTA, w + tr * 2], ['#ffffff', w]]) {
+    g.strokeStyle = cor;
+    g.lineWidth = larg;
+    g.beginPath();
+    for (const [dx, vao, l] of riscos) {
+      g.moveTo(O.x + dx, base - vao);
+      g.lineTo(O.x + dx, base - vao - l);
+    }
+    g.stroke();
+  }
+  g.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 /**
