@@ -8,7 +8,7 @@
 // Durante a mira do outro lado, le a reticula (vai para o ponto de queda); no saque, le a sombra.
 
 import { prever, passoBola, pertoCupula, eixos, limitesX, RB, E_SLIME, V_MIN, PULO, G_SLIME, G_BOLA, REDE_H, LARG, SOMA_X, SOMA_Y, PASSO, FREIO, limitar } from '../fisica/volei.js';
-import { TOQUES } from './regras.js';
+import { TOQUES, profundidadeSaque } from './regras.js';
 
 /** Contatos do pulo tentados, s depois de sair do chao (0,2 s: base a 3,24 u, subindo a 9,4 u/s). */
 const TEMPOS_PULO = [0.2, 0.12, 0.07];
@@ -196,8 +196,18 @@ export function criarIA(p, rng, o = {}) {
     definirParams(np) { ia.p = np; },
     /** a CPU quer a cortada lenta agora? (no ar, na janela: a partida confere a elegibilidade) */
     querCortar() { return ia.corte; },
-    /** sorteia o tempo de segurar o saque */
-    segurarSaque() { return rng() < ia.p.saqueSegura ? 0.2 + rng() * 0.6 : 0; },
+    /**
+     * Plano do saque: erro de tempo da batida (s, perto de uma normal com desvio p.saqueErro) e a
+     * profundidade (a mira foge do receptor; o lob prefere o curto).
+     * @param {number} outroX x do receptor
+     */
+    planoSaque(outroX) {
+      const erro = (rng() + rng() + rng() - 1.5) * 2 * (ia.p.saqueErro ?? 0.08);
+      let rumo = rng() * 2 - 1;
+      if (perso.includes('mira')) rumo = Math.abs(outroX) > 8 ? -1 : 1;
+      else if (perso.includes('lob')) rumo = -0.6;
+      return { erro, prof: profundidadeSaque(rumo) };
+    },
   };
 }
 

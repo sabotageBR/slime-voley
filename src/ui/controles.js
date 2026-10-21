@@ -71,6 +71,8 @@ export function criarControles(raiz, o) {
   function baixo(e) {
     if (!o.ativo()) return;
     o.aoInteragir(e);
+    // toque na barra de reacoes: conta como interacao, mas nao pula
+    if (e.target instanceof Element && e.target.closest('.reacoes')) return;
     via = e.pointerType === 'mouse' ? 'mouse' : 'toque';
     if (via === 'mouse') {
       mouse.ativo = true;

@@ -4,16 +4,17 @@
 
 /**
  * Niveis: velocidade (u/s), reacao (s), erro de posicao (u), chance de pular na bola, de cortar
- * (cortada lenta), de usar o super no saque e de acertar a manchete perfeita.
+ * (cortada lenta), de usar o super no saque e de acertar a manchete perfeita; saqueErro e o desvio
+ * (s) do tempo da batida no saque "levantar e bater".
  */
 export const NIVEIS = Object.freeze({
-  T0: Object.freeze({ vel: 7.0, reacao: 0.45, erro: 1.8, pulo: 0, corta: 0, super: 0, perfeita: 0, saqueSegura: 0.1 }),
-  T1: Object.freeze({ vel: 7.5, reacao: 0.4, erro: 1.6, pulo: 0.1, corta: 0, super: 0, perfeita: 0.05, saqueSegura: 0.25 }),
-  'T1+': Object.freeze({ vel: 8.0, reacao: 0.32, erro: 1.4, pulo: 0.2, corta: 0.05, super: 0, perfeita: 0.1, saqueSegura: 0.35 }),
-  T2: Object.freeze({ vel: 9.0, reacao: 0.24, erro: 1.1, pulo: 0.35, corta: 0.15, super: 0.3, perfeita: 0.15, saqueSegura: 0.5 }),
-  T3: Object.freeze({ vel: 10.0, reacao: 0.16, erro: 0.8, pulo: 0.5, corta: 0.35, super: 0.6, perfeita: 0.25, saqueSegura: 0.6 }),
-  T4: Object.freeze({ vel: 10.5, reacao: 0.12, erro: 0.65, pulo: 0.55, corta: 0.45, super: 0.75, perfeita: 0.35, saqueSegura: 0.7 }),
-  T5: Object.freeze({ vel: 11, reacao: 0.08, erro: 0.45, pulo: 0.6, corta: 0.55, super: 0.9, perfeita: 0.5, saqueSegura: 0.8 }),
+  T0: Object.freeze({ vel: 7.0, reacao: 0.45, erro: 1.8, pulo: 0, corta: 0, super: 0, perfeita: 0, saqueErro: 0.15 }),
+  T1: Object.freeze({ vel: 7.5, reacao: 0.4, erro: 1.6, pulo: 0.1, corta: 0, super: 0, perfeita: 0.05, saqueErro: 0.12 }),
+  'T1+': Object.freeze({ vel: 8.0, reacao: 0.32, erro: 1.4, pulo: 0.2, corta: 0.05, super: 0, perfeita: 0.1, saqueErro: 0.1 }),
+  T2: Object.freeze({ vel: 9.0, reacao: 0.24, erro: 1.1, pulo: 0.35, corta: 0.15, super: 0.3, perfeita: 0.15, saqueErro: 0.08 }),
+  T3: Object.freeze({ vel: 10.0, reacao: 0.16, erro: 0.8, pulo: 0.5, corta: 0.35, super: 0.6, perfeita: 0.25, saqueErro: 0.06 }),
+  T4: Object.freeze({ vel: 10.5, reacao: 0.12, erro: 0.65, pulo: 0.55, corta: 0.45, super: 0.75, perfeita: 0.35, saqueErro: 0.045 }),
+  T5: Object.freeze({ vel: 11, reacao: 0.08, erro: 0.45, pulo: 0.6, corta: 0.55, super: 0.9, perfeita: 0.5, saqueErro: 0.035 }),
 });
 
 /** O jogador automatico do ?auto, dos prints e do humano simulado de base. */

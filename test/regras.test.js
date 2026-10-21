@@ -1,7 +1,10 @@
-// Regras: alvo, vai-a-2, saque ativo e a partida (rali, 3 toques, fora so no ataque estourado).
+// Regras: alvo, vai-a-2, saque ativo e a partida (rali, 3 toques, parede de fundo; o fora antigo so com { fora: true }).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alvoDaPartida, vencedor, pontoDaPartida, profundidadeSaque, SAQUE } from '../src/jogo/regras.js';
+import { alvoDaPartida, vencedor, pontoDaPartida, profundidadeSaque, qualidadeSaque, temposSaque, SAQUE } from '../src/jogo/regras.js';
+import { criarIA } from '../src/jogo/ia.js';
+import { NIVEIS } from '../src/jogo/rivais.js';
+import { criarRng } from '../src/core/rng.js';
 import { criarPartida } from '../src/jogo/partida.js';
 
 test('alvo: 1a da vida 5 imperdivel; rivais 7 vai-a-2 teto 9; chefes das Copas 2-4 9 teto 11', () => {
@@ -18,12 +21,87 @@ test('vai-a-2 ate o teto', () => {
   assert.equal(pontoDaPartida([6, 3], r), -1);
 });
 
-test('saque: toque, fundo, viagem; na Copa 1 segurar 3 s nunca da fora', () => {
-  assert.equal(profundidadeSaque(0.05).tipo, 'toque');
-  assert.equal(profundidadeSaque(0.6).tipo, 'viagem');
-  const longo = profundidadeSaque(3, 1);
-  assert.ok(longo.prof <= SAQUE.profMax && longo.auto);
-  assert.equal(profundidadeSaque(1.1, 2).tipo, 'vermelho');
+test('saque: qualidade pelo erro de tempo e profundidade pela mira', () => {
+  assert.equal(qualidadeSaque(0.05), 'perfeito');
+  assert.equal(qualidadeSaque(-0.1), 'bom');
+  assert.equal(qualidadeSaque(0.1, true), 'perfeito');
+  assert.equal(qualidadeSaque(0.3), 'fraco');
+  assert.equal(profundidadeSaque(1), SAQUE.prof.fundo);
+  assert.equal(profundidadeSaque(0), SAQUE.prof.medio);
+  assert.equal(profundidadeSaque(-1), SAQUE.prof.curto);
+  const ts = temposSaque({ g: 28, gSlime: 68, pulo: 23, rb: 0.75 });
+  assert.ok(ts.ideal > ts.apice && ts.ideal < ts.pega, 'o 2o toque ideal fica logo depois do apice');
+  assert.ok(ts.pega - ts.ideal > SAQUE.janela.bom, 'a janela do bom cabe antes da bola voltar');
+});
+
+/** Partida com o humano sacando, ja liberada. */
+function humanoSacando() {
+  const p = criarPartida({ modo: 'cpu', semente: 4, sacaPrimeiro: 0 });
+  p.interacao();
+  p.passo();
+  return p;
+}
+
+test('saque: sem o 2o toque a bola volta para a mao (sem falta, sem saque automatico)', () => {
+  const p = humanoSacando();
+  p.intencao(0, { borda: true, botao: true });
+  p.passo();
+  assert.equal(p.saque.fase, 'levantada');
+  p.intencao(0, { botao: false });
+  const tipos = [];
+  for (let k = 0; k < 120 * 5; k++) { p.passo(); for (const e of p.eventos) tipos.push(e.tipo); p.eventos.length = 0; }
+  assert.equal(p.estado, 'saque');
+  assert.equal(p.saque.fase, 'pronto');
+  assert.ok(tipos.includes('saque-pega'));
+  assert.ok(!tipos.includes('saque') && !tipos.includes('ponto'));
+});
+
+test('saque: o perfeito sai chapado, passa a rede e cai na profundidade pedida', () => {
+  for (const rumo of [-1, 0, 1]) {
+    const p = humanoSacando();
+    p.intencao(0, { borda: true, botao: true });
+    p.passo();
+    // mira pelo stick (rumo ao rival = +x para o jogador da esquerda) ate o instante ideal
+    let saiu = null;
+    const ts = p.temposSaque;
+    for (let k = 0; k < 240 && !saiu; k++) {
+      const borda = p.saque.fase === 'levantada' && p.saque.tL >= ts.ideal - 1 / 240;
+      p.intencao(0, { eixo: rumo, borda, botao: borda });
+      p.passo();
+      for (const e of p.eventos) if (e.tipo === 'saque') saiu = e;
+      p.eventos.length = 0;
+    }
+    assert.ok(saiu, 'sacou');
+    assert.equal(saiu.tipoSaque, 'perfeito');
+    assert.ok(Math.abs(saiu.alvo - profundidadeSaque(rumo)) < 1e-9, `alvo ${saiu.alvo}`);
+    // voo: apice baixo e a bola cai do lado de la, perto do alvo (o rival pode tocar antes)
+    let apice = 0;
+    let queda = null;
+    for (let k = 0; k < 120 * 3 && queda === null; k++) {
+      apice = Math.max(apice, p.bola.y);
+      p.passo();
+      for (const e of p.eventos) if (e.tipo === 'chao' || e.tipo === 'toque' || e.tipo === 'rede') queda = e;
+      p.eventos.length = 0;
+    }
+    assert.ok(apice <= saiu.y + SAQUE.subidaViagem + 0.15, `apice ${apice.toFixed(2)} (contato em ${saiu.y.toFixed(2)})`);
+    assert.ok(queda && queda.tipo !== 'rede', `passou a rede (${queda && queda.tipo})`);
+    if (queda.tipo === 'chao') assert.ok(Math.abs(queda.x - saiu.alvo) < 0.4, `caiu em ${queda.x.toFixed(2)}`);
+  }
+});
+
+test('saque da CPU: mais perfeitos no T4 que no T0', () => {
+  const taxa = (nivel) => {
+    let perf = 0;
+    let n = 0;
+    for (let sem = 1; sem <= 60; sem++) {
+      const ia = criarIA({ ...NIVEIS[nivel] }, criarRng(sem), {});
+      const pl = ia.planoSaque(6.5);
+      n++;
+      if (qualidadeSaque(pl.erro) === 'perfeito') perf++;
+    }
+    return perf / n;
+  };
+  assert.ok(taxa('T4') > taxa('T0') + 0.3, `T0 ${taxa('T0')} T4 ${taxa('T4')}`);
 });
 
 test('partida bot contra bot: deterministica, termina e nunca passa de 3 toques sem falta', () => {
@@ -66,4 +144,49 @@ test('primeira partida: imperdivel (a CPU nunca fecha)', () => {
     }
     assert.ok(p.placar[1] < 5, `semente ${sem}: ${p.placar}`);
   }
+});
+
+/** Roda a partida ate o rali comecar e devolve-a (bot contra bot). */
+function ateORali(o) {
+  const p = criarPartida({ modo: 'demo', semente: 5, ...o });
+  p.interacao();
+  for (let k = 0; k < 120 * 10 && p.estado !== 'jogo'; k++) { p.passo(); p.eventos.length = 0; }
+  return p;
+}
+
+/** Bola chapada por cima da placa direita, mandada pela esquerda. */
+function atacarPorCima(p) {
+  Object.assign(p.bola, { solta: true, x: 9, y: 6, vx: 30, vy: 2, estado: 'normal' });
+  p.rali.ultimoLado = -1;
+  const tipos = [];
+  for (let k = 0; k < 60; k++) { p.passo(); for (const e of p.eventos) tipos.push(e.tipo); p.eventos.length = 0; }
+  return tipos;
+}
+
+test('a bola nunca sai: por cima da placa ela bate na parede de fundo e volta', () => {
+  const p = ateORali();
+  assert.equal(p.estado, 'jogo');
+  const tipos = atacarPorCima(p);
+  assert.ok(tipos.includes('fundo'), 'bateu na parede');
+  assert.ok(!tipos.includes('fora'), 'nada de fora');
+  assert.ok(p.bola.x < 12.4, `voltou (x = ${p.bola.x.toFixed(2)})`);
+});
+
+test('bot contra bot: nenhum ponto por fora com a parede; com { fora: true } a regra antiga vale', () => {
+  const motivos = (o) => {
+    const m = [];
+    for (const sem of [1, 2, 3, 4, 5, 6]) {
+      const p = criarPartida({ modo: 'demo', semente: sem, ...o });
+      p.interacao();
+      for (let k = 0; k < 120 * 400 && p.estado !== 'fim'; k++) {
+        p.passo();
+        for (const e of p.eventos) if (e.tipo === 'ponto') m.push(e.motivo);
+        p.eventos.length = 0;
+      }
+    }
+    return m;
+  };
+  assert.equal(motivos({}).filter((x) => x === 'fora').length, 0);
+  const antigo = ateORali({ fora: true });
+  assert.ok(atacarPorCima(antigo).includes('fora'), 'regra antiga: fora');
 });

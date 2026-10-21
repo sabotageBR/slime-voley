@@ -31,40 +31,69 @@ export const TEMPOS = Object.freeze({
   fimPartida: 2.6,
 });
 
-/** Saque ativo: tempos do segurar (s) e profundidades (|x| do alvo no lado de la). */
+/**
+ * Saque "levantar e bater" (decisao de 2026-10-21): o 1o toque levanta a bola, um anel fecha ate o
+ * instante ideal (a bola comecando a cair) e o 2o toque pula; a batida acontece no contato da
+ * cupula com a bola. A qualidade vem do erro de tempo do 2o toque; sem ele a bola volta para a
+ * mao, sem falta e sem saque automatico. Distancias em u, tempos em s de mundo; profundidade =
+ * |x| do alvo no lado de la.
+ */
 export const SAQUE = Object.freeze({
-  toque: 0.15,
-  fimCarga: 0.9,
-  viagem: [0.55, 0.7],
-  vermelho: [0.9, 1.2],
-  profToque: 6.5,
-  profMin: 3.0,
+  /** a bola parada fica isto acima do topo da cupula */
+  folga: 1.7,
+  /** quanto a bola sobe no levantamento */
+  subida: 5.0,
+  /** o 2o toque nao conta neste comeco do levantamento (toque duplo sem querer) */
+  ignora: 0.15,
+  /** meia janela de cada qualidade em volta do ideal */
+  janela: Object.freeze({ perfeito: 0.07, perfeitoPrimeira: 0.12, bom: 0.18 }),
+  /** alvo pela mira: para tras = curto, neutro = medio, rumo ao rival = fundo */
+  prof: Object.freeze({ curto: 4.5, medio: 8, fundo: 11 }),
+  profMin: 3.5,
   profMax: 11.5,
-  profViagem: 10.5,
-  profVermelho: [12.0, 13.2],
+  /** o fraco sai em lob alto e curto */
+  profFraco: 6,
   apice: 9.5,
-  apiceViagem: 5.2,
+  /** o perfeito (VIAGEM) sobe so isto acima do contato: chapado e rapido */
+  subidaViagem: 0.6,
+  apiceFraco: 11,
   /** o sacador fica entre estes |x| no proprio lado */
   zona: [6.5, 10],
 });
 
 /**
- * Profundidade e tipo do saque pelo tempo segurado.
- * @param {number} t  s segurando (0 = toque rapido)
- * @param {number} copa 1..4 (a Copa 1 nunca sai)
- * @returns {{ prof: number, tipo: 'toque'|'fundo'|'viagem'|'vermelho', auto: boolean }}
+ * Tempos do levantamento (s depois do 1o toque): o apice da bola, o 2o toque ideal (o pulo encontra
+ * a bola com o slime no alto do pulo), o contato ideal e a volta para a mao.
+ * @param {{ g: number, gSlime: number, pulo: number, rb: number }} f gravidades, pulo e raio da bola
  */
-export function profundidadeSaque(t, copa = 1) {
-  if (t <= SAQUE.toque) return { prof: SAQUE.profToque, tipo: 'toque', auto: false };
-  if (t >= SAQUE.viagem[0] && t <= SAQUE.viagem[1]) return { prof: SAQUE.profViagem, tipo: 'viagem', auto: false };
-  if (t < SAQUE.fimCarga) {
-    const k = (t - SAQUE.toque) / (SAQUE.fimCarga - SAQUE.toque);
-    return { prof: SAQUE.profMin + (SAQUE.profMax - SAQUE.profMin) * k, tipo: 'fundo', auto: false };
-  }
-  if (copa <= 1) return { prof: SAQUE.profMax, tipo: 'fundo', auto: true };
-  const k = Math.min(1, (t - SAQUE.vermelho[0]) / (SAQUE.vermelho[1] - SAQUE.vermelho[0]));
-  const [p0, p1] = SAQUE.profVermelho;
-  return { prof: p0 + (p1 - p0) * k, tipo: 'vermelho', auto: t >= SAQUE.vermelho[1] };
+export function temposSaque(f) {
+  const apice = Math.sqrt((2 * SAQUE.subida) / f.g);
+  const hPulo = (f.pulo * f.pulo) / (2 * f.gSlime);
+  const queda = Math.max(0.2, SAQUE.folga + SAQUE.subida - hPulo - f.rb);
+  const contato = apice + Math.sqrt((2 * queda) / f.g);
+  return { vy: f.g * apice, apice, ideal: contato - f.pulo / f.gSlime, contato, pega: 2 * apice };
+}
+
+/**
+ * Qualidade da batida pelo erro de tempo em relacao ao ideal.
+ * @param {number} erro s (negativo = cedo) @param {boolean} [primeira] janela maior na 1a partida
+ * @returns {'perfeito'|'bom'|'fraco'}
+ */
+export function qualidadeSaque(erro, primeira = false) {
+  const a = Math.abs(erro);
+  if (a <= (primeira ? SAQUE.janela.perfeitoPrimeira : SAQUE.janela.perfeito)) return 'perfeito';
+  if (a <= SAQUE.janela.bom) return 'bom';
+  return 'fraco';
+}
+
+/**
+ * Profundidade pela mira.
+ * @param {number} rumo -1 (para tras) .. 1 (rumo ao rival)
+ */
+export function profundidadeSaque(rumo) {
+  const { curto, medio, fundo } = SAQUE.prof;
+  const e = Math.max(-1, Math.min(1, rumo));
+  return e >= 0 ? medio + (fundo - medio) * e : medio + (medio - curto) * e;
 }
 
 /**

@@ -1,30 +1,40 @@
 // HUD do Volei de Gosma (DOM): placar no centro do alto (a pilula da Poki, no canto superior
-// esquerdo, fica livre), medidor de gosma (3 segmentos), botao de pausa a direita, mao fantasma
-// das dicas, o cartao unico entre partidas e o menu de pausa. Teclado nos menus: setas e
+// esquerdo, fica livre), medidor de gosma (3 segmentos), chips dos power-ups ativos embaixo de
+// cada lado, botao de pausa a direita, mao fantasma
+// das dicas, a barra de reacoes (emoji) depois do ponto, o cartao unico entre partidas e o menu
+// de pausa. A barra tambem responde as teclas 1 a 9 e 0 no desktop. Teclado nos menus: setas e
 // WASD movem o foco, Enter/Espaco acionam, Esc volta; o foco inicial e sempre o botao normal.
 
 /**
  * @param {HTMLElement} raiz
  * @param {(k: string) => string} T
- * @param {{ aoPausar: () => void, aoContinuar: () => void, aoProxima: () => void, aoRevanche: () => void, aoOpcao: (id: string, v?: any) => void, som: (id: string) => void }} cb
+ * @param {{ aoPausar: () => void, aoContinuar: () => void, aoProxima: () => void, aoRevanche: () => void, aoOpcao: (id: string, v?: any) => void, som: (id: string) => void, icone: (ctx: CanvasRenderingContext2D, id: string, lado: number) => void, carinha: (ctx: CanvasRenderingContext2D, id: string, lado: number) => void, aoReagir: (id: string) => void,
+ *   premio: (ctx: CanvasRenderingContext2D, pr: any, lado: number) => void, aoPremiado: () => void }} cb
  */
 export function criarHud(raiz, T, cb) {
   raiz.insertAdjacentHTML('beforeend', `
     <div class="hud" id="hud">
       <div class="placar">
-        <div class="lado l0"><span class="nome"></span><div class="medidor"><i></i><i></i><i></i></div></div>
+        <div class="lado l0"><span class="nome"></span><div class="medidor"><i></i><i></i><i></i></div><div class="chips"></div></div>
         <div class="pontos"><b class="p0">0</b><span>·</span><b class="p1">0</b></div>
-        <div class="lado l1"><span class="nome"></span><div class="medidor"><i></i><i></i><i></i></div></div>
+        <div class="lado l1"><span class="nome"></span><div class="medidor"><i></i><i></i><i></i></div><div class="chips"></div></div>
       </div>
       <button class="pausa" aria-label="pause"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg></button>
       <div class="faixa" hidden></div>
+      <div class="reacoes" hidden></div>
       <div class="mao" hidden><div class="dedo"></div><div class="texto"></div></div>
     </div>
     <div class="cartao" id="cartao" hidden>
       <div class="caixa">
         <div class="titulo"></div>
         <div class="sub"></div>
-        <div class="botoes"><button class="bt principal proxima"></button><button class="bt revanche"></button></div>
+        <div class="progresso" hidden>
+          <div class="ganhos"><span class="gotas"><canvas class="icGota" width="44" height="44"></canvas><b class="gTotal">0</b><em class="gMais"></em></span><span class="xpMais"></span></div>
+          <div class="nivel"><span class="nNum"></span><div class="barraXp"><i></i></div><span class="nXp"></span></div>
+          <div class="subiu" hidden><b class="subiuTit"></b><div class="subiuPremios"></div></div>
+          <div class="trilha"></div>
+        </div>
+        <div class="botoes"><button class="bt principal proxima"></button><button class="bt revanche"></button><button class="bt premiado" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18v11H3z" fill="#fff" stroke="#17161c" stroke-width="2"/><path d="M3 9l2-5 16 0-2 5z" fill="#17161c"/><path d="M8 4l-2 5M13 4l-2 5M18 4l-2 5" stroke="#fff" stroke-width="1.6"/><path d="M10 12.5v5l4.5-2.5z" fill="#17161c"/></svg><span></span></button></div>
       </div>
     </div>
     <div class="menuPausa" id="menuPausa" hidden>
@@ -41,23 +51,39 @@ export function criarHud(raiz, T, cb) {
   const $ = (s) => /** @type {HTMLElement} */ (raiz.querySelector(s));
   const el = {
     hud: $('#hud'), nome0: $('.l0 .nome'), nome1: $('.l1 .nome'), p0: $('.p0'), p1: $('.p1'),
-    med0: $('.l0 .medidor'), med1: $('.l1 .medidor'), pausa: $('.pausa'), faixa: $('.faixa'),
-    mao: $('.mao'), maoTexto: $('.mao .texto'), cartao: $('#cartao'), cTitulo: $('#cartao .titulo'), cSub: $('#cartao .sub'),
-    proxima: $('#cartao .proxima'), revanche: $('#cartao .revanche'), menu: $('#menuPausa'), mTitulo: $('#menuPausa .titulo'),
+    med0: $('.l0 .medidor'), med1: $('.l1 .medidor'), chips0: $('.l0 .chips'), chips1: $('.l1 .chips'), pausa: $('.pausa'), faixa: $('.faixa'),
+    reacoes: $('.reacoes'), mao: $('.mao'), maoTexto: $('.mao .texto'), cartao: $('#cartao'), cTitulo: $('#cartao .titulo'), cSub: $('#cartao .sub'),
+    proxima: $('#cartao .proxima'), revanche: $('#cartao .revanche'), premiado: $('#cartao .premiado'),
+    prog: $('#cartao .progresso'), gTotal: $('#cartao .gTotal'), gMais: $('#cartao .gMais'), xpMais: $('#cartao .xpMais'),
+    nNum: $('#cartao .nNum'), barraXp: $('#cartao .barraXp i'), nXp: $('#cartao .nXp'), subiu: $('#cartao .subiu'),
+    subiuTit: $('#cartao .subiuTit'), subiuPremios: $('#cartao .subiuPremios'), trilha: $('#cartao .trilha'), menu: $('#menuPausa'), mTitulo: $('#menuPausa .titulo'),
     continuar: $('#menuPausa .continuar'), opControle: $('[data-op="controle"]'), opSom: $('[data-op="som"]'),
   };
   el.proxima.textContent = T('ui.proxima');
   el.revanche.textContent = T('ui.revanche');
+  /** @type {HTMLElement} */ (el.premiado.querySelector('span')).textContent = T('ui.premio2');
+  const ctxGota = /** @type {HTMLCanvasElement} */ (el.cartao.querySelector('.icGota')).getContext('2d');
+  if (ctxGota) cb.premio(ctxGota, { tipo: 'gotas' }, 44);
   el.continuar.textContent = T('ui.continuar');
   el.mTitulo.textContent = T('ui.pausa');
-  let ultimo = { p0: -1, p1: -1, m0: -1, m1: -1 };
+  let ultimo = { p0: -1, p1: -1, m0: -1, m1: -1, c0: '', c1: '' };
   let menuAberto = false;
+  /** @type {string[]|null} */
+  let barra = null;
+  let chaveBarra = '';
   let cartaoAberto = false;
 
   el.pausa.addEventListener('click', () => { cb.som('botao'); cb.aoPausar(); });
+  el.reacoes.addEventListener('click', (e) => {
+    const b = e.target instanceof Element ? e.target.closest('button[data-id]') : null;
+    if (b) cb.aoReagir(/** @type {HTMLElement} */ (b).dataset.id || '');
+  });
   el.continuar.addEventListener('click', () => { cb.som('botao'); cb.aoContinuar(); });
   el.proxima.addEventListener('click', () => { cb.som('botao'); cb.aoProxima(); });
   el.revanche.addEventListener('click', () => { cb.som('botao'); cb.aoRevanche(); });
+  el.premiado.addEventListener('click', () => { cb.som('botao'); el.premiado.disabled = true; cb.aoPremiado(); });
+  // um toque no cartao pula a contagem (Gotas e barra de XP)
+  el.cartao.addEventListener('pointerdown', () => { anim.fim = 0; });
   el.opControle.addEventListener('click', () => { cb.som('botao'); cb.aoOpcao('controle'); });
   el.opSom.addEventListener('click', () => { cb.som('botao'); cb.aoOpcao('som'); });
   // build de modelos (Artifact): volta para o hub (o empacotar corta as linhas "// modelo")
@@ -72,6 +98,11 @@ export function criarHud(raiz, T, cb) {
     const box = menuAberto ? el.menu : cartaoAberto ? el.cartao : null;
     if (!box) {
       if (e.code === 'Escape' || e.code === 'KeyP') cb.aoPausar();
+      else if (barra && /^(Digit|Numpad)[0-9]$/.test(e.code)) {
+        const n = Number(e.code.slice(-1));
+        const id = barra[n === 0 ? 9 : n - 1];
+        if (id) cb.aoReagir(id);
+      }
       return;
     }
     const bts = [...box.querySelectorAll('button:not([hidden])')];
@@ -91,9 +122,102 @@ export function criarHud(raiz, T, cb) {
     }
   }
 
+  /** Animacao do cartao: Gotas contando e a barra de XP enchendo (pulavel com um toque). */
+  const anim = { ini: 0, fim: 0, g0: 0, g1: 0, k0: 0, k1: 0, voltas: 0, nivelFinal: 1, xpFinal: '', req: 1 };
+  function animar() {
+    if (!cartaoAberto) return;
+    const agora = performance.now();
+    const u = anim.fim <= anim.ini ? 1 : Math.min(1, (agora - anim.ini) / (anim.fim - anim.ini));
+    const e = 1 - (1 - u) * (1 - u);
+    el.gTotal.textContent = String(Math.round(anim.g0 + (anim.g1 - anim.g0) * e));
+    // a barra percorre as voltas de nivel (cheia -> zera) ate o ponto final
+    const total = anim.voltas + anim.k1 - anim.k0;
+    const pos = anim.k0 + total * e;
+    const volta = Math.min(anim.voltas, Math.floor(pos));
+    const k = u >= 1 ? anim.k1 : pos - volta;
+    el.barraXp.style.setProperty('--k', Math.max(0, Math.min(1, k)).toFixed(3));
+    if (u >= 1) { el.nXp.textContent = anim.xpFinal; el.nNum.textContent = `${T('ui.nivel')} ${anim.nivelFinal}`; return; }
+    requestAnimationFrame(animar);
+  }
+
+  /** Nome curto de um premio da trilha. */
+  function nomePremio(pr) {
+    if (pr.tipo === 'gotas') return `+${pr.gotas} ${T('ui.gotas')}`;
+    return T((pr.tipo === 'reacao' ? 'reacao.' : pr.tipo === 'powerup' ? 'pwn.' : 'skin.') + pr.id);
+  }
+
+  /** Um premio (canvas + nome). */
+  function premioEl(pr, classe, px) {
+    const d = document.createElement('div');
+    d.className = classe;
+    const cv = document.createElement('canvas');
+    const lado = Math.round(px * Math.min(2, window.devicePixelRatio || 1));
+    cv.width = lado;
+    cv.height = lado;
+    const ctx = cv.getContext('2d');
+    if (ctx) cb.premio(ctx, pr, lado);
+    d.append(cv);
+    const s = document.createElement('span');
+    s.textContent = nomePremio(pr);
+    d.append(s);
+    return d;
+  }
+
+  /**
+   * Progresso no cartao: Gotas, XP, subida de nivel com os premios e os proximos marcos.
+   * @param {any} p { antes, depois, subiu, ganho, gotasAntes, gotasTotal, marcos, dobrado }
+   */
+  function progresso(p) {
+    el.prog.hidden = !p;
+    if (!p) return;
+    el.gMais.textContent = `+${p.ganho.gotas}`;
+    el.xpMais.textContent = `+${p.ganho.xp} XP${p.dobrado ? ' · ' + T('ui.dobrado') : ''}`;
+    el.subiu.hidden = !p.subiu.length;
+    if (p.subiu.length) {
+      el.subiuTit.textContent = T('ui.nivelN').replace('{n}', String(p.depois.nivel));
+      el.subiuPremios.replaceChildren(...p.subiu.flatMap((s) => s.premios).map((pr) => premioEl(pr, 'premio', 44)));
+    }
+    el.trilha.replaceChildren(...p.marcos.map((m) => {
+      const d = document.createElement('div');
+      d.className = 'marco';
+      const n = document.createElement('b');
+      n.textContent = String(m.nivel);
+      d.append(n, ...m.premios.slice(0, 1).map((pr) => premioEl(pr, 'mini', 30)));
+      return d;
+    }));
+    const agora = performance.now();
+    Object.assign(anim, {
+      ini: agora, fim: agora + 1100, g0: p.gotasAntes, g1: p.gotasTotal,
+      k0: p.antes.xp / p.antes.req, k1: p.depois.xp / p.depois.req, voltas: p.depois.nivel - p.antes.nivel,
+      nivelFinal: p.depois.nivel, xpFinal: `${p.depois.xp}/${p.depois.req}`,
+    });
+    el.nNum.textContent = `${T('ui.nivel')} ${p.antes.nivel}`;
+    el.nXp.textContent = `${p.antes.xp}/${p.antes.req}`;
+    requestAnimationFrame(animar);
+  }
+
+  /** Chips dos power-ups: "id:pontos" (sem pontos: espera o uso). */
+  function chips(box, lista) {
+    box.replaceChildren();
+    for (const c of lista) {
+      const [id, n] = c.split(':');
+      const d = document.createElement('div');
+      d.className = 'chip';
+      const cv = document.createElement('canvas');
+      const lado = Math.round(22 * Math.min(2, window.devicePixelRatio || 1));
+      cv.width = lado;
+      cv.height = lado;
+      const ctx = cv.getContext('2d');
+      if (ctx) cb.icone(ctx, id, lado);
+      d.append(cv);
+      if (n && Number(n) > 1) { const b = document.createElement('b'); b.textContent = n; d.append(b); }
+      box.append(d);
+    }
+  }
+
   return {
     /**
-     * @param {{ nomes: string[], cores: string[], placar: number[], medidor: number[], esconder?: boolean }} s
+     * @param {{ nomes: string[], cores: string[], placar: number[], medidor: number[], chips?: string[][], esconder?: boolean }} s
      */
     atualizar(s) {
       el.hud.hidden = !!s.esconder;
@@ -106,6 +230,38 @@ export function criarHud(raiz, T, cb) {
       if (ultimo.p1 !== s.placar[1]) { el.p1.textContent = String(s.placar[1]); el.p1.classList.remove('rola'); void el.p1.offsetWidth; el.p1.classList.add('rola'); ultimo.p1 = s.placar[1]; }
       if (ultimo.m0 !== s.medidor[0]) { medidor(el.med0, s.medidor[0]); ultimo.m0 = s.medidor[0]; }
       if (ultimo.m1 !== s.medidor[1]) { medidor(el.med1, s.medidor[1]); ultimo.m1 = s.medidor[1]; }
+      const c0 = (s.chips?.[0] || []).join(',');
+      const c1 = (s.chips?.[1] || []).join(',');
+      if (ultimo.c0 !== c0) { chips(el.chips0, s.chips?.[0] || []); ultimo.c0 = c0; }
+      if (ultimo.c1 !== c1) { chips(el.chips1, s.chips?.[1] || []); ultimo.c1 = c1; }
+    },
+    /**
+     * Barra de reacoes: a lista de ids liberados (ou null para esconder); teclas mostra os numeros.
+     * @param {string[]|null} lista @param {boolean} [teclas]
+     */
+    reacoes(lista, teclas = false) {
+      const chave = lista ? lista.join(',') + (teclas ? '#' : '') : '';
+      if (chave === chaveBarra) return;
+      chaveBarra = chave;
+      barra = lista;
+      el.reacoes.hidden = !lista;
+      if (!lista) return;
+      el.reacoes.replaceChildren();
+      lista.forEach((id, k) => {
+        const b = document.createElement('button');
+        b.dataset.id = id;
+        b.setAttribute('aria-label', T('reacao.' + id));
+        b.style.animationDelay = `${k * 0.025}s`;
+        const cv = document.createElement('canvas');
+        const lado = Math.round(40 * Math.min(2, window.devicePixelRatio || 1));
+        cv.width = lado;
+        cv.height = lado;
+        const ctx = cv.getContext('2d');
+        if (ctx) cb.carinha(ctx, id, lado);
+        b.append(cv);
+        if (teclas && k < 10) { const i = document.createElement('i'); i.textContent = String((k + 1) % 10); b.append(i); }
+        el.reacoes.append(b);
+      });
     },
     /** posiciona o placar (faixa do layout) */
     posicionar(L) {
@@ -132,7 +288,16 @@ export function criarHud(raiz, T, cb) {
       el.cSub.textContent = c.sub || '';
       el.proxima.hidden = !c.proxima;
       el.revanche.hidden = !c.revanche;
+      el.premiado.hidden = !c.premiado;
+      el.premiado.disabled = false;
+      progresso(c.progresso || null);
       requestAnimationFrame(() => (c.proxima ? el.proxima : el.revanche).focus());
+    },
+    /** depois do premiado: o progresso dobrado (ou null: o video nao rendeu) */
+    cartaoPremiado(p) {
+      el.premiado.hidden = true;
+      if (p) progresso(p);
+      requestAnimationFrame(() => (el.proxima.hidden ? el.revanche : el.proxima).focus());
     },
     menu(aberto, ops = {}) {
       menuAberto = aberto;

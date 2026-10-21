@@ -123,7 +123,8 @@ export function amassar(s, d) {
  * @param {Slime} s
  * @param {{ eixo: number, pular: boolean }} it  eixo -1..1 (o stick), pular = pulo nesse passo
  * @param {number} dt
- * @param {{ vel?: number }} [o]  vel: velocidade maxima (IA mais lenta)
+ * @param {{ vel?: number, atrito?: number }} [o]  vel: velocidade maxima (IA mais lenta, Turbo, Cola);
+ *   atrito: fracao da aceleracao no chao (o escorregao do gelo)
  * @returns {null | 'pulo' | 'pouso'} o que aconteceu
  */
 export function passoSlime(s, it, dt, o = {}) {
@@ -136,7 +137,7 @@ export function passoSlime(s, it, dt, o = {}) {
   const vmax = o.vel ?? VEL;
   const alvo = limitar(it.eixo, -1, 1) * vmax;
   let acc;
-  if (s.noChao) acc = alvo === 0 || alvo * s.vx < 0 || Math.abs(alvo) < Math.abs(s.vx) ? FREIO : ACEL_CHAO;
+  if (s.noChao) acc = (alvo === 0 || alvo * s.vx < 0 || Math.abs(alvo) < Math.abs(s.vx) ? FREIO : ACEL_CHAO) * (o.atrito ?? 1);
   else acc = ACEL_AR;
   const dv = alvo - s.vx;
   const passo = acc * dt;
@@ -182,6 +183,7 @@ export function passoSlime(s, it, dt, o = {}) {
  * @property {boolean[]} fundo  rede de protecao ativa [esquerda, direita]
  * @property {boolean} solta    false: parada (saque esperando), sem gravidade
  * @property {boolean[]} colide  colide com cada slime (a mira desliga)
+ * @property {number} [gMult]  gravidade da bola x isto (power-up Bola Pesada; 1 = normal)
  */
 
 /** @returns {Bola} */
@@ -329,7 +331,7 @@ export function passoBola(b, slimes, dt, o = {}, ev = [], passaSlime = null) {
   const ePlaca = o.eAlambrado ?? E_PLACA;
   for (let k = 0; k < SUB_BOLA; k++) {
     const x0 = b.x;
-    b.vy -= G_BOLA * h;
+    b.vy -= G_BOLA * (b.gMult || 1) * h;
     b.vx += vento * h;
     b.x += b.vx * h;
     b.y += b.vy * h;
@@ -414,7 +416,7 @@ export function passoBola(b, slimes, dt, o = {}, ev = [], passaSlime = null) {
  * @returns {Previsao}
  */
 export function prever(b0, o = {}) {
-  const b = { x: b0.x, y: b0.y, vx: b0.vx, vy: b0.vy, ang: 0, angV: 0, estado: b0.estado || 'normal', semLimite: !!(o.semVmax || b0.semLimite), fundo: b0.fundo ? [...b0.fundo] : [true, true], solta: true, colide: [false, false] };
+  const b = { x: b0.x, y: b0.y, vx: b0.vx, vy: b0.vy, ang: 0, angV: 0, estado: b0.estado || 'normal', semLimite: !!(o.semVmax || b0.semLimite), fundo: b0.fundo ? [...b0.fundo] : [true, true], solta: true, colide: [false, false], gMult: b0.gMult || 1 };
   const yAlvo = o.yAlvo ?? RB;
   const tMax = o.tMax ?? 4;
   const cada = o.cada || 1;

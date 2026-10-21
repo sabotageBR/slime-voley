@@ -18,6 +18,8 @@ import { desenharFundo, desenharArquibancada, desenharBiruta } from './ginasios/
 import { cameraFesta, desenharFesta, desenharInicio } from './celebracao.js';
 import { paraMundo, paraTela, aplicar } from './camera.js';
 import { CORTADA } from '../jogo/cortada.js';
+import { BOLHA } from '../jogo/powerups.js';
+import { REACAO } from '../jogo/reacoes.js';
 
 /** Raio do nucleo do campo e limiar da superficie (os do motor da gosma). */
 export const RAIO_CAMPO = 0.48;
@@ -125,7 +127,7 @@ export function criarCena(el, o = {}) {
    * @param {ReturnType<typeof import('./vista.js').criarVista>} vista
    * @param {number} alfa fracao do passo real
    * @param {number} dtR s de jogo-real desde o ultimo quadro
-   * @param {{ textos: (k: string) => string, cores: string[], festa?: any, inicio?: { t: number, txt: string }|null, pulsoSaque?: number, arcoSaque?: number[]|null, alvoSaque?: number|null, mao?: any }} o2
+   * @param {{ textos: (k: string) => string, cores: string[], festa?: any, inicio?: { t: number, txt: string }|null, pulsoSaque?: number, saque?: { k: number, q: string, alvo: number, depois: boolean }|null, alvoSaque?: number|null, mao?: any }} o2
    */
   function desenhar(P, vista, alfa, dtR, o2) {
     medir();
@@ -189,9 +191,21 @@ export function criarCena(el, o = {}) {
     desenharRostos(ctxTopo, m, cam, dpr, t, { olhar: [b.x, b.y], estilo: 'classico' });
     const mira = C && (C.fase === 'entrando' || C.fase === 'mirando') ? { c: C, cor: o2.cores[C.i], final: C.fase === 'mirando' && C.tMax - C.t < 0.3 } : null;
     const bolaAlfa = P.estado === 'ponto' && F ? (F.t < 0.5 ? 1 : F.t < 0.8 ? 1 - (F.t - 0.5) / 0.3 : 0) : 1;
+    // power-ups: gelo e avisos sobre cada slime
+    const gelos = [];
+    const avisos = [];
+    const baloes = [];
+    for (const i of [0, 1]) {
+      const Jx = P.jogadores[i];
+      const s = vista.slimes[i];
+      if (Jx.gelo) gelos.push({ x: s.x, y: s.y, a: s.a, b: s.b, fase: Jx.gelo.fase, t: Jx.gelo.t });
+      if (Jx.pendente) avisos.push({ x: s.x, y: s.y + s.b + 1.3, id: Jx.pendente.id });
+      if (Jx.reacao) baloes.push({ id: Jx.reacao.id, x: s.x, y: s.y + s.b, t: Jx.reacao.t, dur: REACAO.dur });
+    }
     desenharTopo(ctxTopo, cam, dpr, t, est, {
       bola: b, rastro: ef.rastro, coroas: ef.coroas, mira, contagem: ef.contagem,
       saque: o2.saque || null, pulsoSaque: o2.pulsoSaque || 0, bolaAlfa,
+      bolha: P.bolha, vidaBolha: BOLHA.vida, gelos, avisos, baloes, bolaFogo: P.bola.estado === 'fogo' && P.estado === 'jogo',
     });
     vfx.desenhar(ctxTopo, cam, dpr);
     // ---------------- tela (por cima do HUD)
@@ -222,6 +236,12 @@ export function criarCena(el, o = {}) {
         ef.tRastro = 0;
         ef.rastro.push({ x: vista.bola.x, y: vista.bola.y, vx: -b.vx, vy: -b.vy, idade: 0, vida: CORTADA.rastro.vida, gota: true, cor: ef.corCortada || '#ff8a2a' });
         if (ef.rastro.length > CORTADA.rastro.max * 2) ef.rastro.shift();
+      } else if (b.estado === 'fogo' && ef.tRastro >= 0.03) {
+        // Bola de Fogo: gotas de chama alternando laranja e amarelo
+        ef.tRastro = 0;
+        ef.semente++;
+        ef.rastro.push({ x: vista.bola.x, y: vista.bola.y, vx: -b.vx, vy: -b.vy, idade: 0, vida: 0.26, gota: true, cor: ef.semente % 2 ? '#ff6a1a' : '#ffd23a' });
+        if (ef.rastro.length > 24) ef.rastro.shift();
       } else if (v > 15 && ef.tRastro >= 0.035) {
         ef.tRastro = 0;
         ef.rastro.push({ x: vista.bola.x, y: vista.bola.y, vx: 0, vy: 0, idade: 0, vida: 0.18, gota: false });

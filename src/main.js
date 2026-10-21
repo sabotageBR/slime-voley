@@ -21,20 +21,24 @@ import { criarPartida } from './jogo/partida.js';
 import { rival as acharRival, COPAS } from './jogo/rivais.js';
 import { skin as acharSkin } from './jogo/skins.js';
 import { CUSTO } from './jogo/medidor.js';
-import { TEMPOS, SAQUE } from './jogo/regras.js';
+import { REACOES } from './jogo/reacoes.js';
+import { normalizarPerfil, rendimento, aplicarGanho, proximosMarcos } from './jogo/perfil.js';
+import { TEMPOS } from './jogo/regras.js';
 import { criarVista } from './render/vista.js';
 import { criarCena } from './render/cena.js';
 import { tonalidade } from './render/celebracao.js';
+import { desenharIconeTela, desenharPremioTela } from './render/icones.js';
+import { desenharCarinhaTela } from './render/carinhas.js';
 import { criarControles } from './ui/controles.js';
 import { criarHud } from './ui/hud.js';
 import { criarMesa } from './som/mesa.js';
 import { escolherIdioma, textos } from './i18n/textos.js';
-import { G_BOLA, RB } from './fisica/volei.js';
 
 const D = lerDepuracao();
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const save = criarArmazem();
-const perfil = Object.assign({ partidas: 0, vitorias: 0, fase: 0, controle: '', som: true, vibrar: true, gotas: 0 }, save.ler('perfil', {}) || {});
+/** perfil salvo: partidas, opcoes, nivel e XP, Gotas, skin e o que a trilha liberou (src/jogo/perfil.js) */
+const perfil = normalizarPerfil(save.ler('perfil', {}));
 let idioma = escolherIdioma(D.lang, poki.idioma);
 let T = textos(idioma);
 const audio = criarAudio();
@@ -95,6 +99,11 @@ const hud = criarHud(raiz, T, {
     hud.menu(true, { controle: controles.esquema, som: perfil.som });
   },
   som: (id) => mesa.tocar(id),
+  icone: desenharIconeTela,
+  carinha: desenharCarinhaTela,
+  aoReagir: (id) => { if (P && P.reagir(0, id)) hud.reacoes(null); },
+  premio: (ctx, pr, lado) => desenharPremioTela(ctx, pr, lado, pr.tipo === 'skin' ? acharSkin(pr.id).hex : undefined),
+  aoPremiado: () => premiado(),
 });
 audio.definirMudo(!perfil.som);
 
@@ -115,7 +124,8 @@ function novaPartida(revanche = false) {
   const copa = COPAS[0];
   const idRival = D.rival || (primeira ? 'gota' : copa.rivais[Math.min(copa.rivais.length - 1, perfil.fase)]);
   const riv = acharRival(idRival);
-  const sk = acharSkin(D.skin || 'laranjinha');
+  const sk = acharSkin(D.skin || perfil.skin || 'laranjinha');
+  reacoesLiberadas = REACOES.map((r) => r.id).filter((id) => perfil.liberados.reacoes.includes(id));
   P = criarPartida({
     semente: D.semente || ((Date.now() / 1000) | 0) + partidaN * 7919,
     modo: D.auto ? 'demo' : 'cpu',
@@ -124,6 +134,8 @@ function novaPartida(revanche = false) {
     partidaN: partidaN + 1,
     gatilho: /** @type {any} */ (D.gatilho || 'novo'),
     assist: { ima: D.assist, devolucao: D.assist },
+    fora: D.fora,
+    powerups: [...perfil.liberados.powerups],
     lenta: { ...(D.lenta ? { escalaMundo: Math.round(D.lenta * 1000) } : {}), ...(D.defensor ? { escalaDefensor: Math.round(D.defensor * 1000) } : {}) },
     qualidadeMinima: cena.nivelQualidade >= 3,
   });
@@ -202,6 +214,34 @@ async function continuar() {
   if (P) P.exigirToque();
 }
 
+/**
+ * Soma o ganho ao perfil (subindo de nivel pela trilha) e devolve o que o cartao mostra.
+ * @param {{ xp: number, gotas: number }} g @param {boolean} dobrado
+ */
+function ganhar(g, dobrado) {
+  const gotasAntes = perfil.gotas;
+  const r = aplicarGanho(perfil, g);
+  Object.assign(perfil, r.perfil);
+  for (const s of r.subiu) poki.measure('nivel', 'n' + s.nivel, 'subiu');
+  return { ...r, gotasAntes, gotasTotal: perfil.gotas, marcos: proximosMarcos(r.depois.nivel, 4), dobrado };
+}
+
+/** Premio x2 (video recompensado, so por escolha): dobra o XP e as Gotas da partida. */
+async function premiado() {
+  if (!ultimoGanho || emAnuncio) return;
+  premiadoNaPausa = true;
+  emAnuncio = true;
+  controles.soltarTudo();
+  const ok = await poki.rewardedBreak();
+  emAnuncio = false;
+  poki.measure('rewarded', 'dobrar', ok ? 'premio' : 'sem-premio');
+  if (!ok) { hud.cartaoPremiado(null); return; }
+  const p = ganhar(ultimoGanho, true);
+  ultimoGanho = null;
+  gravarPerfil();
+  hud.cartaoPremiado(p);
+}
+
 async function proximaPartida(revanche) {
   hud.cartao(null);
   partidaN++;
@@ -233,9 +273,23 @@ const TRATADORES = {
   'rede': (e) => mesa.tocar('rede', { forca: Math.min(1, e.v / 12) }),
   'placa': (e) => mesa.tocar('placa', { forca: Math.min(1, e.v / 12) }),
   'fundo': () => mesa.tocar('fundo'),
+  'teto': () => mesa.tocar('placa', { forca: 0.5 }),
+  'fora': () => {},
   'chao': (e) => { if (e.v > 3) mesa.tocar('chao', { forca: Math.min(1.2, e.v / 14) }); },
-  'saque': (e) => { mesa.tocar('comboSwoosh', {}, { max: 1 }); if (e.i === 0) vibrar(12); },
-  'saque-carga': () => {},
+  'saque': (e) => {
+    mesa.tocar('comboSwoosh', {}, { max: 1 });
+    if (e.tipoSaque === 'perfeito') {
+      mesa.tocar('perfeita', {}, { max: 1 });
+      cena.coroa(e.x, e.y, '#ffd23a', { r1: 1.5, n: 10, esc: 0.7 });
+      if (e.i === 0) cena.vfx.texto(e.x, e.y + 1.5, T('grito.saquePerfeito'), '#ffd23a', 1);
+    }
+    if (e.i === 0) {
+      vibrar(e.tipoSaque === 'perfeito' ? [16, 30, 16] : 12);
+      poki.measure('saque', e.tipoSaque, 'humano');
+    }
+  },
+  'saque-levanta': () => mesa.tocar('pulo', {}, { max: 1 }),
+  'saque-pega': () => mesa.tocar('toque', { forca: 0.3 }, { max: 1 }),
   'saque-valendo': () => { tMao = 0; },
   'saque-liberado': () => {},
   'cruzou': (e) => { if (e.n >= 6 && e.n % 2 === 0) { cena.plateia.animar(0.15); if (e.n <= 10) mesa.falar('vozCombo' + Math.min(10, e.n) + 'Slime'); } },
@@ -276,19 +330,54 @@ const TRATADORES = {
     if (e.matchPoint) hud.faixa(T('grito.matchPoint'));
     else hud.faixa('');
     if (e.motivo === 'fora') poki.measure('fora', e.lado < 0 ? 'esquerda' : 'direita', 'ponto');
+    if (!e.fim && !D.auto && P.humano[0]) barra = { de: tReal + 0.15, ate: tReal + 2.2, ponto: P.pontoN };
   },
   'match-point': () => {},
   'fim': (e) => {
     const venceu = e.humanoVenceu;
     perfil.partidas++;
     if (venceu) { perfil.vitorias++; perfil.fase = Math.min(2, perfil.fase + 1); }
+    // progresso: XP, nivel e Gotas (o ?auto nao mexe no perfil)
+    let progresso = null;
+    if (!D.auto) {
+      ultimoGanho = rendimento(P.resumo(0));
+      progresso = ganhar(ultimoGanho, false);
+    }
     gravarPerfil();
     mesa.falar(venceu ? 'vozVenceuSlime' : 'vozPerdeuSlime', { forcar: true });
     poki.measure('level', 'm' + perfil.partidas, venceu ? 'complete' : 'fail');
     hud.faixa('');
     setTimeout(() => {
-      hud.cartao({ titulo: venceu ? T('ui.venceu') : T('ui.perdeu'), sub: `${e.placar[0]} · ${e.placar[1]}`, proxima: venceu, revanche: !venceu });
+      hud.cartao({
+        titulo: venceu ? T('ui.venceu') : T('ui.perdeu'), sub: `${e.placar[0]} · ${e.placar[1]}`, proxima: venceu, revanche: !venceu,
+        progresso, premiado: !!progresso && poki.temAnuncios && !D.semAnuncio,
+      });
     }, 400);
+  },
+  // power-ups (bolhas)
+  'bolha-aviso': () => mesa.tocar('bolhaSobe', {}, { max: 1 }),
+  'bolha-nasce': () => mesa.tocar('pingoGota', {}, { max: 1 }),
+  'bolha-some': () => mesa.tocar('botaoPop', {}, { max: 1 }),
+  'bolha-pega': (e) => { mesa.tocar('estouroSplash', {}, { max: 1 }); cena.coroa(e.x, e.y, '#ffffff', { r1: 1.8, n: 12, esc: 0.8 }); },
+  'powerup': (e) => {
+    const s = P.slimes[e.alvo];
+    cena.vfx.texto(s.x, s.y + 4.2, T('pw.' + e.id), cores[e.i], 1);
+    if (e.humano && tReal - tVozPw > 20) { tVozPw = tReal; mesa.falar('vozPowerUpSlime'); }
+    if (e.alvo === 0 || e.i === 0) vibrar(e.alvo === 0 && e.i !== 0 ? [20, 30, 20] : 25);
+    poki.measure('powerup', e.id, e.humano ? 'humano' : 'cpu');
+  },
+  'powerup-vale': (e) => {
+    mesa.tocar(e.id === 'congelar' ? 'vidro' : e.id === 'cola' ? 'splat' : 'murcho', {}, { max: 1 });
+    if (e.id === 'congelar') cena.vfx.respingo(e.x, e.y + 1.2, '#bfeaff', 8, 5);
+  },
+  'powerup-fim': () => {},
+  'gelo-quebra': (e) => { mesa.tocar('gelatinaTreme', {}, { max: 1 }); cena.vfx.respingo(e.x, e.y + 1, '#dff6ff', 10, 6); },
+  'piso-mola': (e) => { mesa.tocar('pulo', {}, { max: 2 }); mesa.tocar('tilim', {}, { max: 1 }); cena.coroa(e.x, 0.15, '#2fc7a0', { chao: true, r1: 2.2, n: 10, esc: 0.8 }); },
+  'bola-poder': (e) => { mesa.tocar(e.id === 'fogo' ? 'missilZuum' : 'tum', {}, { max: 1 }); if (e.id === 'fogo') cena.diretor.tremer(0.25); },
+  'fogo-recepcao': (e) => { mesa.tocar('estouroSplash', {}, { max: 1 }); cena.vfx.respingo(e.x, e.y, '#ff8a2a', 10, 7); cena.diretor.tremer(0.4); if (e.i === 0) vibrar([30, 30, 50]); },
+  'reacao': (e) => {
+    mesa.tocar('botaoPop', {}, { max: 2 });
+    if (e.i === 0) { vibrar(10); poki.measure('reacao', e.id, 'humano'); }
   },
   'tutorial-cortada': () => { tMao = 0; },
   'texto': () => {},
@@ -298,6 +387,13 @@ const TRATADORES = {
 
 // ------------------------------------------------------------------ laco
 let tReal = 0;
+let tVozPw = -99;
+/** barra de reacoes depois do ponto: aparece de `de` ate `ate` (jogo-real) */
+let barra = { de: 0, ate: 0, ponto: -1 };
+/** @type {string[]} */
+let reacoesLiberadas = [];
+/** o que a ultima partida rendeu (o premiado dobra) */
+let ultimoGanho = null;
 let labSegura = false;
 let tFesta = 0;
 
@@ -325,21 +421,20 @@ function passo(dt) {
   tFesta = P.estado === 'ponto' || P.estado === 'fim' ? P.festa.t : 0;
 }
 
-/** Arco previsto do saque segurado (mini-arco de pontinhos). */
-function arcoSaque() {
-  const ps = P.previsaoSaque();
+/** Power-ups ativos de um jogador para o HUD: "id:pontos" (sem pontos: espera o uso). */
+function chipsDe(Jx) {
+  const l = Object.entries(Jx.efeitos).map(([id, n]) => `${id}:${n}`);
+  if (Jx.cortadaGratis) l.push('cortadaGratis:');
+  if (Jx.bolaPoder) l.push(`${Jx.bolaPoder}:`);
+  if (Jx.pendente) l.push(`${Jx.pendente.id}:`);
+  return l;
+}
+
+/** Levantamento do saque humano: anel de tempo e o marcador de onde a bola vai cair. */
+function saqueVis() {
+  const ps = P.sacador === 0 ? P.previsaoSaque() : null;
   if (!ps) return null;
-  const b = P.bola;
-  const H = ps.tipo === 'viagem' ? SAQUE.apiceViagem : SAQUE.apice;
-  const vy = Math.sqrt(Math.max(0.5, 2 * G_BOLA * Math.max(0.3, H - b.y)));
-  const tv = (vy + Math.sqrt(vy * vy + 2 * G_BOLA * Math.max(0, b.y - RB))) / G_BOLA;
-  const vx = (ps.alvo - b.x) / tv;
-  const pts = [];
-  for (let k = 0; k <= 40; k++) {
-    const t = (k / 40) * tv * 0.55;
-    pts.push(b.x + vx * t, b.y + vy * t - (G_BOLA * t * t) / 2);
-  }
-  return { k: ps.k, tipo: ps.tipo, arco: pts };
+  return { k: ps.k, q: ps.q, alvo: ps.alvo, depois: ps.erro > 0 };
 }
 
 function desenhar(dtReal, alfa) {
@@ -358,10 +453,10 @@ function desenhar(dtReal, alfa) {
     };
     if (f.fim) festa.cor = venceu ? cores[0] : '#7a7f95';
   }
-  // saque: anel de carga, mini-arco e pulso da espera
-  const sq = P.estado === 'saque' && P.sacador === 0 && P.saque.segurando ? arcoSaque() : null;
+  // saque: anel de tempo, marcador e pulso da espera
+  const sq = P.estado === 'saque' ? saqueVis() : null;
   let pulso = 0;
-  if (P.estado === 'saque' && P.sacador === 0 && !P.saque.segurando) pulso = P.saque.t >= TEMPOS.pulsoSaque ? 1 : 0;
+  if (P.estado === 'saque' && P.sacador === 0 && P.saque.fase === 'pronto') pulso = P.saque.t >= TEMPOS.pulsoSaque ? 1 : 0;
   // marca de queda do saque para quem recebe
   let alvoSaque = null;
   if (P.estado === 'jogo' && P.rali.recepcaoSaque && P.rali.saqueDeQuem === 1) {
@@ -372,7 +467,11 @@ function desenhar(dtReal, alfa) {
   // HUD
   const L = cena.layout;
   if (L) hud.posicionar(L);
-  hud.atualizar({ nomes, cores, placar: P.placar, medidor: [P.jogadores[0].med.v, P.jogadores[1].med.v], esconder: D.semHud });
+  hud.atualizar({ nomes, cores, placar: P.placar, medidor: [P.jogadores[0].med.v, P.jogadores[1].med.v], chips: P.jogadores.map(chipsDe), esconder: D.semHud });
+  // barra de reacoes: depois do ponto, ate o saque ser levantado (1 por ponto)
+  const comBarra = !D.semHud && tReal >= barra.de && tReal < barra.ate && barra.ponto === P.pontoN && P.jogadores[0].reagiuEm !== P.pontoN
+    && (P.estado === 'ponto' || (P.estado === 'saque' && P.saque.fase === 'pronto'));
+  hud.reacoes(comBarra ? reacoesLiberadas : null, !toque);
   controles.desenhar();
   controles.mostrarSuper(false);
   desenharMao(dt);
@@ -395,7 +494,9 @@ function desenharMao(dt) {
   const pulo = controles.esquema === 'b' ? (L.botoes || []).find((b) => b.id === 'pulo') : null;
   const acao = pulo ? { x: pulo.x, y: pulo.y } : L.painel ? { x: W * 0.75, y: L.painel.y + L.painel.h * 0.45 } : { x: W * 0.78, y: window.innerHeight * 0.72 };
   if (!primeiraInteracao) m = { ...acao, texto: toque ? T('dica.toque') : T('dica.teclas'), gesto: 'toque' };
-  else if (P.estado === 'saque' && P.sacador === 0 && !P.saque.segurando && P.saque.t >= TEMPOS.pulsoSaque) m = { ...acao, texto: toque ? T('dica.toque') : T('dica.clique'), gesto: 'toque' };
+  else if (D.auto) m = null;
+  else if (P.estado === 'saque' && P.sacador === 0 && P.saque.fase === 'pronto' && (P.saque.t >= TEMPOS.pulsoSaque || perfil.partidas < 2)) m = { ...acao, texto: toque ? T('dica.sacar') : T('dica.sacarTecla'), gesto: 'toque' };
+  else if (P.estado === 'saque' && P.sacador === 0 && P.saque.fase === 'levantada' && perfil.partidas < 3) m = { ...acao, texto: T('dica.bater'), gesto: 'toque' };
   else if (P.tutorialCortada === 'oferecida' && P.estado === 'jogo' && !P.cortada) m = { ...acao, texto: T('dica.cortada'), gesto: 'duplo' };
   else if (P.esperaToque && P.estado === 'saque' && P.sacador === 1) m = { ...acao, texto: T('dica.receber'), gesto: 'toque' };
   hud.mao(m);

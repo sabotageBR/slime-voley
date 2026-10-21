@@ -326,27 +326,36 @@ O slime subindo soma vy (×1,0) e verticaliza a saída. O teste mede a normal e 
 | Chefes das Copas 2–4 | 9 | sim | 11 |
 | Rápida e 2P | 5, 7 ou 9 | — | — |
 
-**Saque ativo** (sem saque automático):
-- O sacador anda entre |x| 6,5 e 10. A trajetória é determinística, e o receptor vê a sombra.
+**Saque "levantar e bater"** (decisão do usuário de 2026-10-21; substitui o segurar e soltar; sem saque automático):
+- O sacador anda entre |x| 6,5 e 10. A bola fica 1,7 u acima da cúpula.
+- **1º toque:** levanta a bola, que sobe 5 u numa parábola sem colisão. O sacador fica parado, e o stick ou o arrasto mira:
+  - para trás = curto (±4,5); neutro = médio (±8); rumo ao rival = fundo (±11);
+  - no mouse, vale o x do cursor no lado do rival.
+  Um marcador no piso do rival mostra a queda.
+- **Anel:** fecha em volta da bola até o 2º toque ideal, cerca de 0,64 s depois, com a bola começando a cair. Ele fica dourado na janela do perfeito.
+- **2º toque:** o slime pula, e a batida acontece no **contato da cúpula com a bola**. Por 0,2 s, a bola não colide com o sacador.
 
-| Ação | Resultado |
+| Erro do 2º toque | Saque |
 |---|---|
-| Toque (até 0,15 s) | Bola em ±6,5, ápice de 9,5 u, cerca de 1,3 s de voo |
-| Segurar de 0,15 a 0,9 s | Profundidade de ±3,0 a ±11,5; anel de carga e mini-arco |
-| Zona "VIAGEM" (0,55–0,70 s) | ±10,5, chapado, +25% de velocidade |
-| **Chegar a 0,9 s** | **Na Copa 1, o saque sai sozinho em ±11,5 com uma tremida (nunca fora).** Da Copa 2 em diante, a faixa vermelha de 0,9–1,2 s alcança ±12,0–13,2 (arriscado) e o saque sai sozinho aos 1,2 s |
+| ±70 ms (±120 ms na 1ª partida) | **PERFEITO** (viagem): sobe só 0,6 u acima do contato, chapado e rápido |
+| ±180 ms | **BOM**: ápice de 9,5 |
+| fora disso (o 2º toque não conta nos primeiros 0,15 s) | **FRACO**: lob alto, no máximo ±6 |
+| sem 2º toque | a bola volta para a mão em cerca de 1,2 s, **sem falta** |
 
+- **CPU:** levanta de 0,5 a 0,8 s depois do saque valer. O erro de tempo é quase normal, com desvio `saqueErro` por nível, de 0,15 s no T0 a 0,035 s no T5. A mira foge do receptor; a personalidade `lob` prefere o curto. Na 1ª partida, a CPU saca sempre o bom e nunca fecha a partida no saque (erra na rede).
+- **Telemetria:** `saque/<perfeito|bom|fraco>/humano`.
 - Esperando o saque humano: aos 4 s a bola pulsa e a mão fantasma aparece. **O jogo espera sem limite.**
 - **Saque da CPU:** de 0,5 a 0,8 s depois do "saque valendo". Nunca antes da 1ª interação do humano. Se o portão de interação estiver ativo (30 s sem `pointerdown`/`keydown`), a CPU espera um toque ("toque para receber").
 - A tabela única de tempos é exportada de `jogo/regras.js`.
 
 **Três toques:** pontinhos (●●○); o 4º toque é falta ("4 TOQUES!"). A cortada conta como toque.
 
-**Bola fora**
-- É fora quando o centro da bola passa de |x| > 12,4, por cima da placa, **do lado oposto ao do último toque**. O FORA é marcado no cruzamento, antes de a bola chegar à rede de fundo.
-- Saque por cima da placa do receptor = ponto do receptor.
-- A bola que o próprio lado manda para trás bate na rede de proteção e segue em jogo.
-- Telemetria (só de humanos): meta de 6% a 12% dos pontos.
+**Bola nunca sai** (decisão do usuário de 2026-10-21, que fecha a pergunta 4 do checkpoint M1)
+- As duas paredes de fundo (`FUNDO_X` 12,6, e = 0,7, sem teto) seguram a bola o tempo todo. A bola volta em jogo, inclusive no saque.
+- O desenho é um painel translúcido do chão ao alto, atrás das placas.
+- Medido no bot contra bot: a mediana do rali foi de 6,1 s para 6,6 s (antes, 16% dos pontos eram fora).
+- A regra antiga (fora por cima da placa do lado oposto ao do último toque) ficou atrás de `criarPartida({ fora: true })` e de `?fora=1`, só para comparar.
+- Na 1ª partida, o erro visível da CPU, que antes mandava a bola para fora, agora morre na rede do próprio lado.
 
 **Modos:** Circuito Gosma (4 Copas), Amistoso, 2P local e Vestiário.
 
@@ -478,20 +487,36 @@ Evolução, Gotas contando e replay podem ser pulados com um toque. **Meta medid
 
 ### 2.7 Power-ups na quadra (a partir da 2ª partida)
 
+Catálogo aprovado pelo usuário em 2026-10-21. O código está em `src/jogo/powerups.js` (puro e com rng próprio, `semente ^ hashTexto('bolhas')`). A `partida.js` aplica os efeitos e o `render/icones.js` desenha os ícones.
+
 **Aparição e captura:**
-- 1 por vez. O 1º aos 20 s, depois a cada 22 ± 4 s de rali.
-- Aviso de 0,8 s; vive 8 s.
-- Bolha sem texto, em x entre 2,5 e LARG − 2 e y entre 6 e 10.
-- **Quem pega é a bola.** O bônus vai para quem tocou por último. No saque a bolha não pode ser pega.
+- 1 por vez. O 1º aos 20 s de rali, depois a cada 22 ± 4 s. O relógio só anda no rali e para na câmera lenta.
+- Aviso de 0,8 s (fantasma tracejado, que não pega) e vida de 8 s, piscando nos últimos 2 s.
+- Bolha com ícone e sem texto, em |x| entre 2,5 e LARG − 2 e y entre 6 e 10.
+- **Quem pega é a bola.** O bônus vai para quem tocou por último. A bola do saque não pega.
+- Todo efeito contra o rival pisca 0,5 s sobre a cabeça dele antes de valer.
+- Os efeitos com duração vencem por ponto, e o ponto em que o poder foi pego conta.
+- No HUD, os chips embaixo de cada lado mostram os poderes ativos.
 
-| Power-up | Peso | Efeito |
-|---|---|---|
-| Cortada grátis | 35% | Próxima cortada lenta sem gastar medidor |
-| Pulo Mola | 25% | Pulo ×1,3 por 2 pontos |
-| Gosmão | 20% | R ×1,25 por 2 pontos |
-| +1 segmento | 20% | Enche um segmento |
+| Power-up | Tipo | Peso | Libera | Efeito |
+|---|---|---|---|---|
+| Cortada Grátis | seu | 14 | início | a próxima cortada lenta não gasta medidor |
+| Pulo Mola | seu | 9 | início | pulo ×1,3 por 2 pontos |
+| Gosmão | seu | 8 | início | R ×1,25 por 2 pontos (o raio muda aos poucos e a pele acompanha) |
+| +1 Segmento | seu | 8 | início | +100 de medidor |
+| **Congelar** | rival | 9 | início | aviso de 0,5 s; **0,6 s preso no gelo** (sem andar nem pular, a gravidade continua); depois 1,5 s escorregando (aceleração no chão a 30%) |
+| **Bola de Fogo** | bola | 10 | início | o seu próximo toque que cruza a rede é re-mirado para a mesma queda, chapado e até 1,5× mais rápido, com rastro de chama. Quem recebe é empurrado (vx 7, σ +0,6) e a bola sai fraca (×0,4), a não ser na manchete perfeita |
+| Turbo | seu | 8 | nível 4 | anda ×1,35 por 2 pontos |
+| Ímã | seu | 6 | nível 7 | +0,6 u de ímã quando a bola desce no seu lado, por 1 ponto (vale também para a CPU) |
+| Encolher | rival | 6 | nível 7 | R ×0,8 por 2 pontos |
+| Piso Mola | seu | 6 | nível 10 | a 1ª bola no seu chão quica a 14 u/s em vez de virar ponto (1 vez, por até 2 pontos) |
+| Cola | rival | 6 | nível 10 | pulo ×0,75 e velocidade ×0,8 por 1 ponto |
+| Bola Pesada | bola | 5 | nível 13 | o seu próximo toque que cruza a rede cai com gravidade ×1,5 (`bola.gMult`, que o `prever()` respeita); é re-mirado para a mesma queda |
 
-**Distribuição:** contra a CPU, com diferença de 2 ou mais pontos, 60% vão para o lado de quem perde. No 2P, os lados alternam.
+- Ficou de fora a Bola Gigante (raio da bola ×1,6), porque o `RB` é constante na física inteira; a recomendação foi aceita.
+- Os pesos são sorteados só entre os liberados.
+
+**Distribuição:** contra a CPU, com diferença de 2 ou mais pontos, 60% vão para o lado de quem perde. No 2P, os lados alternam (ainda não implementado).
 
 **Prova grátis de super (roteirizada, sem anúncio):**
 - Partida 2: no 3º saque do humano, o SUPER acende com **"Jornada grátis"**.
@@ -625,6 +650,24 @@ Evolução, Gotas contando e replay podem ser pulados com um toque. **Meta medid
 **Outros:**
 - Faixa "PONTO DA PARTIDA" antes do saque de match point.
 - **`regras.test`:** tempo morto médio entre pontos ≤ 1,4 s em 100 pontos de bot, sem contar a espera do saque humano.
+
+### 2.10 Reações (emoji) depois do ponto (decisão do usuário de 2026-10-21)
+
+- **Onde estão:** o catálogo em `src/jogo/reacoes.js`, as carinhas em `src/render/carinhas.js` (uma gota amarela com rosto, desenhada em código e sem os emoji do sistema) e a barra no `hud.js`.
+- **Catálogo:** 6 da base (Rindo, Gargalhada, Convencido, Bravo, Chorando e Coração) e 4 da trilha (Óculos escuros no nível 2, Sono no 5, Pegando fogo no 8 e Coroa no 11). Não há texto livre.
+- **Barra:**
+  - fica embaixo do placar; aparece 150 ms depois de **cada** ponto e some aos 2,2 s, quando o saque é levantado ou quando o jogador reage;
+  - no desktop, aceita as teclas 1 a 9 e 0, com o número em cada botão; no retrato, quebra em até 2 linhas;
+  - o toque na barra conta como interação, mas não pula (`controles.js` usa `closest('.reacoes')`, sem `stopPropagation`).
+- **Reação:**
+  - vale 1 por ponto, só fora do rali (estados `ponto`, `saque` e `fim`);
+  - o rosto do slime faz a expressão junto (`caretar`), e um balão de gosma sobe sobre ele por 1,6 s.
+- **CPU:**
+  - reage sozinha com 35% de chance (20% se for distraída, 50% se for chefe), de 0,5 a 0,9 s depois do ponto;
+  - responde ao jogador com 35% de chance, 0,6 s depois;
+  - usa um rng próprio (`hashTexto('reacoes')`);
+  - quando ganha o ponto, fica convencida ou ri; quando perde, fica brava ou chora; e responde coração com coração.
+- **Telemetria:** `reacao/<id>/humano`.
 
 ---
 
@@ -781,6 +824,35 @@ Os chefes usam o nível igual ao índice da Copa. No 2P, tudo fica no nível 1. 
 - 3 desafios sempre ativos.
 - Proibido: segunda moeda, caixa aleatória, recompensa diária.
 
+### 3.7.1 Nível do jogador e trilha (decisão do usuário de 2026-10-21)
+
+- **Onde está:** `src/jogo/perfil.js`, puro. O `main.js` grava a chave `perfil`. Um save antigo, sem nível, continua valendo, e o que a trilha já deu até o nível atual volta a ficar liberado.
+- **XP por partida:** vitória +30, derrota +12, ponto +2, ace +3, bomba +3, rali de 10 ou mais +5. Do nível n para o n+1 são 50 + 25·(n−1) XP.
+- **Gotas:** seguem a tabela acima. Ficam guardadas para o Vestiário e a loja, que ainda não existem.
+- **Trilha:** o prêmio de cada nível é conhecido antes de chegar, e a skin liberada já é equipada.
+
+| Nível | Prêmio |
+|---|---|
+| 2 | emoji Óculos escuros |
+| 3 | skin Listrado |
+| 4 | Turbo |
+| 5 | emoji Sono |
+| 6 | skin Faixa |
+| 7 | Ímã + Encolher |
+| 8 | emoji Pegando fogo |
+| 9 | skin Metades |
+| 10 | Piso Mola + Cola |
+| 11 | emoji Coroa |
+| 12 | skin Xadrez |
+| 13 | Bola Pesada |
+| 14+ | 60 Gotas por nível |
+
+- **Cartão de fim:**
+  - mostra as Gotas contando (+N), a barra de XP enchendo (volta a zero a cada nível), "NÍVEL N!" com os prêmios e os 4 próximos marcos;
+  - um toque pula a contagem;
+  - tem **Próxima/Revanche** e o **Prêmio ×2** (vídeo, dobra o XP e as Gotas da partida; §3.8).
+- **Telemetria:** `nivel/n<N>/subiu` e `rewarded/dobrar/<premio|sem-premio>`.
+
 ### 3.8 Anúncio premiado, intervalos e `measure()`
 
 **Regras gerais:**
@@ -793,8 +865,7 @@ Os chefes usam o nível igual ao índice da Copa. No 2P, tudo fica no nível 1. 
 
 | Cartão | Normal | Premiado | `measure` |
 |---|---|---|---|
-| Fim (vitória) | Próxima ▶ | Gotas ×2 (ou "Testar [super bloqueado]", alternando, quando há super não provado) | `rewarded/dobrar`, `rewarded/testar-super` |
-| Fim (derrota) | Revanche | Revanche com 1 segmento | `rewarded/super-inicio` |
+| Fim (vitória e derrota) | Próxima ▶ / Revanche | **Prêmio ×2** (XP e Gotas da partida; o "Testar [super]" e a "Revanche com 1 segmento" voltam quando os supers existirem) | `rewarded/dobrar` |
 | Vestiário | Comprar | Liberar agora | `rewarded/liberar-skin` |
 
 **`commercialBreak`:**

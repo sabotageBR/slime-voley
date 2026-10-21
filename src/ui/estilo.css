@@ -10,6 +10,8 @@ html, body, #jogo, .controles, .hud {
 body { font-family: Fredoka, system-ui, sans-serif; color: var(--tinta); }
 #jogo { position: fixed; inset: 0; }
 #jogo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* os icones do HUD e do cartao sao canvases pequenos, no fluxo (nao camadas) */
+#jogo .hud canvas, #jogo .cartao canvas { position: static; }
 #cTela { pointer-events: none; z-index: 5; }
 
 /* carregando: bola que quica (CSS puro) */
@@ -24,7 +26,20 @@ body { font-family: Fredoka, system-ui, sans-serif; color: var(--tinta); }
 .hud { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
 .hud .placar { position: absolute; left: 50%; top: var(--placarY, 0px); height: var(--placarH, 52px); transform: translateX(-50%);
   display: flex; align-items: center; gap: 10px; padding: 0 10px; max-width: calc(100vw - 120px); }
-.hud .lado { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 64px; }
+.hud .lado { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 64px; position: relative; }
+.hud .reacoes { position: absolute; left: 50%; top: calc(var(--placarY, 0px) + var(--placarH, 52px) + 30px); transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: max-content; max-width: calc(100vw - 32px); }
+.hud .reacoes[hidden] { display: none; }
+.hud .reacoes button { pointer-events: auto; position: relative; width: 48px; height: 48px; padding: 3px; border-radius: 50%; background: rgba(255,255,255,.94); border: 3px solid var(--tinta); box-shadow: 0 3px 0 var(--tinta); cursor: pointer; animation: reacaoEntra .22s ease-out both; }
+.hud .reacoes button:active { transform: translateY(2px) scale(.94); box-shadow: 0 1px 0 var(--tinta); }
+#jogo .hud .reacoes canvas { width: 100%; height: 100%; }
+.hud .reacoes i { position: absolute; right: -5px; top: -7px; font-style: normal; font-size: 11px; line-height: 15px; min-width: 15px; color: #fff; background: var(--tinta); border-radius: 8px; }
+@keyframes reacaoEntra { from { transform: translateY(-10px) scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (max-width: 520px) { .hud .reacoes { max-width: 280px; gap: 5px; } .hud .reacoes button { width: 46px; height: 46px; } }
+.hud .chips { position: absolute; top: 100%; display: flex; gap: 3px; margin-top: 4px; }
+.hud .chip { position: relative; width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 2px solid var(--tinta); box-shadow: 0 2px 0 var(--tinta); animation: chipEntra 0.25s ease-out; }
+#jogo .hud .chip canvas { width: 100%; height: 100%; }
+.hud .chip b { position: absolute; right: -6px; bottom: -6px; font-size: 10px; line-height: 13px; min-width: 13px; text-align: center; color: #fff; background: var(--tinta); border-radius: 7px; }
+@keyframes chipEntra { from { transform: scale(0.3); } 60% { transform: scale(1.2); } to { transform: scale(1); } }
 .hud .nome { font-size: 14px; -webkit-text-stroke: 3px var(--tinta); paint-order: stroke fill; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30vw; }
 .hud .pontos { display: flex; align-items: center; gap: 6px; background: #fff; border: 3px solid var(--tinta); border-radius: 14px; padding: 0 10px; box-shadow: 0 3px 0 var(--tinta); font-size: 26px; line-height: 38px; }
 .hud .pontos b { display: inline-block; min-width: 18px; text-align: center; }
@@ -65,6 +80,47 @@ body { font-family: Fredoka, system-ui, sans-serif; color: var(--tinta); }
   display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .cartao .titulo, .menuPausa .titulo { font-size: 30px; }
 .cartao .sub { font-size: 22px; }
+.cartao .caixa { max-height: calc(100vh - 16px); overflow-y: auto; }
+.cartao .progresso { display: grid; gap: 8px; width: min(340px, calc(100vw - 80px)); }
+.cartao .progresso[hidden] { display: none; }
+.cartao .ganhos { display: flex; justify-content: center; align-items: center; gap: 14px; font-size: 18px; }
+.cartao .gotas { display: inline-flex; align-items: center; gap: 5px; }
+#jogo .cartao .icGota { width: 22px; height: 22px; }
+.cartao .gMais { font-style: normal; color: #1f9d55; font-size: 15px; }
+.cartao .xpMais { color: #7a4cff; font-size: 15px; }
+.cartao .nivel { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.cartao .nNum { white-space: nowrap; }
+.cartao .barraXp { flex: 1; height: 14px; border: 3px solid var(--tinta); border-radius: 9px; background: #ecebf2; overflow: hidden; }
+.cartao .barraXp i { display: block; height: 100%; width: calc(var(--k, 0) * 100%); background: linear-gradient(90deg, #8f6bff, #d16bff); }
+.cartao .nXp { font-size: 13px; min-width: 56px; text-align: right; }
+.cartao .subiu { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.cartao .subiu[hidden] { display: none; }
+.cartao .subiuTit { font-size: 22px; color: var(--laranja); -webkit-text-stroke: 3px var(--tinta); paint-order: stroke fill; animation: subiu .5s ease-out both; }
+.cartao .subiuPremios { display: flex; justify-content: center; gap: 12px; }
+.cartao .premio { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; max-width: 84px; text-align: center; animation: subiu .5s .15s ease-out both; }
+#jogo .cartao .premio canvas { width: 44px; height: 44px; }
+.cartao .trilha { display: flex; justify-content: center; gap: 6px; }
+.cartao .marco { display: flex; flex-direction: column; align-items: center; min-width: 58px; padding: 3px 4px; border-radius: 12px; border: 2px dashed rgba(23,22,28,.35); font-size: 11px; }
+.cartao .marco b { font-size: 11px; }
+.cartao .mini { display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 64px; line-height: 1.1; }
+#jogo .cartao .mini canvas { width: 30px; height: 30px; }
+.bt.premiado { font-size: 16px; min-height: 44px; background: #e3f3ff; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; }
+.bt.premiado svg { width: 22px; height: 22px; }
+.bt.premiado[disabled] { opacity: .5; }
+.bt.premiado[hidden] { display: none; }
+@keyframes subiu { from { transform: scale(.3); opacity: 0; } 70% { transform: scale(1.15); } to { transform: none; opacity: 1; } }
+@media (max-height: 460px) {
+  .cartao .caixa { padding: 10px 18px; gap: 6px; }
+  .cartao .titulo { font-size: 24px; }
+  .cartao .sub { font-size: 18px; }
+  .cartao .progresso { gap: 5px; }
+  .cartao .subiu { flex-direction: row; gap: 10px; }
+  #jogo .cartao .premio canvas { width: 34px; height: 34px; }
+  #jogo .cartao .mini canvas { width: 24px; height: 24px; }
+  .cartao .bt { min-height: 44px; }
+  .cartao .botoes { flex-direction: row; align-items: center; }
+  .cartao .botoes .principal { flex: 2; }
+}
 .cartao .botoes, .menuPausa .botoes { display: flex; flex-direction: column; gap: 10px; width: 100%; }
 .bt { font: 700 20px Fredoka, system-ui, sans-serif; min-height: 52px; border-radius: 16px; border: 3px solid var(--tinta); background: #fff; box-shadow: 0 4px 0 var(--tinta); cursor: pointer; pointer-events: auto; }
 .bt.principal { background: var(--laranja); color: #fff; -webkit-text-stroke: 3px var(--tinta); paint-order: stroke fill; font-size: 24px; }

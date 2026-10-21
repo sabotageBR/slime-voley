@@ -1,12 +1,14 @@
-// Quadra do Volei de Gosma (em u, pela camera): piso e linhas, placas, rede de protecao, poste da
+// Quadra do Volei de Gosma (em u, pela camera): piso e linhas, placas, parede de fundo, poste da
 // rede, sombras; por cima dos slimes: bola, rastro, mira em gotas, reticula, coroa de respingo,
-// anel do saque e a sombra-alvo. Tres direcoes visuais (checkpoint M1) pelo objeto ESTILOS:
+// anel de tempo e marcador do saque e a sombra-alvo. Tres direcoes visuais (checkpoint M1) pelo objeto ESTILOS:
 // A (Gel Premium), B (Brinquedo de Vinil), C (Transmissao Esportiva). Tudo nitido em codigo.
 
 import { aplicar, paraTela } from './camera.js';
 import { TINTA } from './fundo.js';
 import { LARG, REDE_H, REDE_R, PLACA_X, PLACA_H, FUNDO_X, RB } from '../fisica/volei.js';
 import { gotasDaMira, CORTADA } from '../jogo/cortada.js';
+import { desenharBolha, desenharGelo, desenharAviso } from './icones.js';
+import { desenharBalao } from './carinhas.js';
 
 /** Direcoes visuais. traco: contorno em px CSS. */
 export const ESTILOS = Object.freeze({
@@ -14,18 +16,25 @@ export const ESTILOS = Object.freeze({
     id: 'a', traco: 1.9, brilhoSlime: 1, contornoBola: 1, sombra: 'rgba(90, 55, 20, 0.26)',
     linha: '#ffffff', piso: ['#f6d58e', '#ecc174', '#e3b35f'], placa: ['#ff7a59', '#ffd23a'], rede: '#ffffff', poste: '#f4f4f4', faixa: '#ff5a5a',
     bola: { base: '#ffffff', gomos: ['#ffb02e', '#2fb7e8'], brilho: 0.95, sombraInterna: 0.18 }, fundoRede: 'rgba(255,255,255,0.55)',
+    parede: ['rgba(255,255,255,0.30)', 'rgba(255,255,255,0.45)', 'rgba(255,255,255,0.95)'],
   }),
   b: Object.freeze({
     id: 'b', traco: 2.3, brilhoSlime: 0.8, contornoBola: 1.2, sombra: 'rgba(60, 30, 10, 0.32)',
     linha: '#fffaf0', piso: ['#ffcf73', '#f2b34e', '#d9963a'], placa: ['#ff4f6b', '#36c3ff'], rede: '#fff6e0', poste: '#ff4f6b', faixa: '#ffffff',
     bola: { base: '#fff8ec', gomos: ['#ff4f6b', '#36c3ff'], brilho: 0.8, sombraInterna: 0.26 }, fundoRede: 'rgba(255,246,224,0.6)',
+    parede: ['rgba(255,79,107,0.28)', 'rgba(255,246,224,0.55)', '#fff6e0'],
   }),
   c: Object.freeze({
     id: 'c', traco: 1.5, brilhoSlime: 1, contornoBola: 0.9, sombra: 'rgba(10, 20, 50, 0.3)',
     linha: '#ffffff', piso: ['#ecc883', '#cf9f5a', '#8f6a35'], placa: ['#11214a', '#ffd23a'], rede: '#ffffff', poste: '#dfe6f5', faixa: '#ffd23a',
     bola: { base: '#ffffff', gomos: ['#ffd23a', '#1e66d0'], brilho: 0.9, sombraInterna: 0.14 }, fundoRede: 'rgba(255,255,255,0.4)',
+    parede: ['rgba(80,200,255,0.16)', 'rgba(140,230,255,0.35)', 'rgba(150,235,255,0.95)'],
   }),
 });
+
+/** Parede de fundo: espessura e altura desenhadas (u); a fisica nao tem teto. */
+const PAREDE_E = 0.55;
+const PAREDE_H = 60;
 
 /** Pseudo-aleatorio fixo por indice. */
 const h = (k) => { const s = Math.sin(k * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -90,22 +99,25 @@ export function desenharPiso(ctx, cam, dpr, W, H, t, est, vis) {
   const tr = Math.max(0.035, est.traco / cam.s);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  // rede de protecao no fundo (alta, translucida), atras das placas
+  // parede de fundo (a bola nunca sai): painel translucido do chao ao alto, com a face clara
+  // voltada para a quadra e as costuras do acolchoado; atras das placas
   for (const lado of [-1, 1]) {
     const x = lado * FUNDO_X;
-    ctx.strokeStyle = est.id === 'c' ? 'rgba(255,255,255,0.18)' : 'rgba(40, 40, 50, 0.22)';
-    ctx.lineWidth = tr * 0.6;
+    ctx.fillStyle = est.parede[0];
+    ctx.fillRect(lado < 0 ? x - PAREDE_E : x, 0, PAREDE_E, PAREDE_H);
+    ctx.strokeStyle = est.parede[1];
+    ctx.lineWidth = tr * 0.7;
     ctx.beginPath();
-    for (let y = 0.4; y < 9; y += 0.55) {
-      ctx.moveTo(x - 0.18, y);
-      ctx.lineTo(x + 0.18, y + 0.28);
+    for (let y = 1.6; y < PAREDE_H; y += 1.6) {
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + lado * PAREDE_E, y);
     }
     ctx.stroke();
-    ctx.strokeStyle = est.id === 'c' ? 'rgba(255,255,255,0.5)' : 'rgba(40, 40, 50, 0.55)';
-    ctx.lineWidth = tr * 1.4;
+    ctx.strokeStyle = est.parede[2];
+    ctx.lineWidth = tr * 1.8;
     ctx.beginPath();
     ctx.moveTo(x, 0);
-    ctx.lineTo(x, 9.2);
+    ctx.lineTo(x, PAREDE_H);
     ctx.stroke();
   }
   // linhas da quadra (fundo e centro), em perspectiva rasa: uma faixa no chao
@@ -314,22 +326,32 @@ export function desenharTopo(ctx, cam, dpr, t, est, vis) {
     }
   }
   ctx.globalAlpha = 1;
-  // saque: anel de carga e mini-arco
+  // saque: anel de tempo (fecha ate o instante ideal; dourado na janela do perfeito) e o
+  // marcador de onde a bola vai cair no piso do rival
   const sq = vis.saque;
-  if (sq && sq.k > 0) {
-    ctx.lineWidth = tr * 2.2;
-    ctx.strokeStyle = sq.tipo === 'vermelho' ? '#ff4d4d' : sq.tipo === 'viagem' ? '#ffd23a' : '#ffffff';
+  if (sq) {
+    const r0 = RB + 0.28;
+    const ouro = sq.q === 'perfeito';
+    ctx.lineWidth = tr * 1.2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
     ctx.beginPath();
-    ctx.arc(b.x, b.y, RB + 0.35, Math.PI / 2, Math.PI / 2 - Math.PI * 2 * sq.k, true);
+    ctx.arc(b.x, b.y, r0, 0, Math.PI * 2);
     ctx.stroke();
-  }
-  if (sq && sq.arco && sq.arco.length) {
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    for (let k = 0; k < sq.arco.length; k += 6) {
-      ctx.beginPath();
-      ctx.arc(sq.arco[k], sq.arco[k + 1], 0.07, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    ctx.lineWidth = tr * (ouro ? 3.2 : 2.2);
+    ctx.strokeStyle = ouro ? '#ffd23a' : '#ffffff';
+    ctx.globalAlpha = sq.depois ? 0.45 : 1;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, r0 + 1.8 * (1 - sq.k), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = tr * 1.3;
+    ctx.setLineDash([0.18, 0.14]);
+    ctx.beginPath();
+    ctx.ellipse(sq.alvo, 0.03, 0.8, 0.18, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    gota(ctx, sq.alvo, 0.75 + 0.08 * Math.sin(t * 7), 0.2, 0, -1, '#ffffff', tr * 0.9, 1.7);
   }
   if (vis.pulsoSaque > 0) {
     ctx.strokeStyle = '#ffffff';
@@ -374,8 +396,22 @@ export function desenharTopo(ctx, cam, dpr, t, est, vis) {
     ctx.stroke();
     ctx.restore();
   }
-  // bola
+  // power-ups: a bolha (atras da bola) e o gelo nos slimes
+  if (vis.bolha) desenharBolha(ctx, vis.bolha, t, tr, vis.vidaBolha);
+  for (const g of vis.gelos || []) desenharGelo(ctx, g, tr);
+  // bola (a Bola de Fogo ganha um halo)
+  if (b && vis.bolaAlfa > 0 && vis.bolaFogo) {
+    const hg = ctx.createRadialGradient(b.x, b.y, RB * 0.6, b.x, b.y, RB * 2.1);
+    hg.addColorStop(0, 'rgba(255,140,40,0.75)');
+    hg.addColorStop(1, 'rgba(255,90,20,0)');
+    ctx.fillStyle = hg;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, RB * 2.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
   if (b && vis.bolaAlfa > 0) desenharBola(ctx, b.x, b.y, RB, b.ang, tr * 1.15, est, vis.bolaAlfa);
+  for (const a of vis.avisos || []) desenharAviso(ctx, a, t);
+  for (const bl of vis.baloes || []) desenharBalao(ctx, bl, tr);
   // coroas de respingo (anel de gotas que abre) e anel fino de tinta
   for (const c of vis.coroas) {
     const k = c.idade / c.dur;

@@ -2,7 +2,8 @@
 // (192.168.x, 10.x e 172.16-31.x: o celular pela Wi-Fi). Na Poki nada disso existe.
 // Unico modulo que le a URL (vigiado por test/estilo.test.js).
 //   ?semente=123          semente fixa (prints e GIFs reprodutiveis)
-//   ?roteiro=cortada      cena pronta: cortada | ponto | ponto-curto | jornada | fogo | raio | rali8 | fora | onboarding
+//   ?roteiro=cortada      cena pronta: cortada | ponto | ponto-curto | reacao | saque | bolha | gelo | fogo | fim
+//                         (citados no desenho e ainda sem roteiro: jornada | raio | rali8 | onboarding)
 //   ?quadro=ms            congela o jogo-real nesse instante do roteiro (prints)
 //   ?filme=N&cada=K       grava N quadros (K passos entre eles) em <pre id="filme">
 //   ?ginasio=praia ?skin=listrado ?rival=geleia ?nivel=T2
@@ -10,7 +11,7 @@
 //   ?visual=a|b|c         direcao visual do checkpoint M1
 //   ?gatilho=novo|segura  gatilho da cortada lenta
 //   ?defensor=0.3         escala do defensor na camera lenta; ?lenta=0.06 escala do mundo
-//   ?fora=0               desliga a bola fora (a rede de fundo segura tudo)
+//   ?fora=1               liga a regra antiga do fora (por padrao a bola nunca sai: parede de fundo)
 //   ?assist=0             desliga as assistencias (ima e devolucao)
 //   ?qualidade=0..3 ?render=2d ?lang=pt ?semhud ?semanuncio ?debug ?auto ?primeira
 //   ?semblur              o blur nao pausa (o Chrome headless das ferramentas perde o foco sozinho)
@@ -22,7 +23,7 @@
 export function lerDepuracao() {
   const base = {
     local: false, ganchos: false, modelo: false, debug: false, semente: 0, roteiro: '', quadro: -1, filme: 0, cada: 4,
-    ginasio: '', skin: '', rival: '', nivel: '', controle: '', visual: '', gatilho: '', defensor: 0, lenta: 0, fora: true, assist: true,
+    ginasio: '', skin: '', rival: '', nivel: '', controle: '', visual: '', gatilho: '', defensor: 0, lenta: 0, fora: false, assist: true,
     qualidade: -1, render: '', lang: '', semHud: false, semAnuncio: false, semBlur: false, auto: false, primeira: null, lab: false,
   };
   let local = false;
@@ -60,7 +61,7 @@ export function lerDepuracao() {
     gatilho: q.get('gatilho') || '',
     defensor: Number(q.get('defensor')) || 0,
     lenta: Number(q.get('lenta')) || 0,
-    fora: q.get('fora') !== '0',
+    fora: q.get('fora') === '1',
     assist: q.get('assist') !== '0',
     qualidade: q.has('qualidade') ? Math.max(0, Math.min(3, Number(q.get('qualidade')) | 0)) : -1,
     render: q.get('render') || '',
