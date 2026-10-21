@@ -2,7 +2,8 @@
 // slime-merge): copia so o jogo para dist/, tira o que e da build de modelos (linhas
 // "// modelo" e o gancho __voleiModelo), confere e zipa em dist-poki/slime-voley-<versao>.zip
 // (index.html na raiz do zip). Recusa URL externa, console.log, .map, import quebrado e os
-// tetos do desenho (§4.9). A thumb ainda nao existe (M3b): sem --thumb, o zip e so um ensaio.
+// tetos do desenho (§4.9). Com --thumb, confere marketing/thumb/slime-voley-1256.png (tools/thumb.mjs
+// --final) e a copia ao lado do zip; sem ela, o zip e so um ensaio.
 // Uso: node tools/empacotar.mjs [--thumb]
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, extname, basename } from 'node:path';
@@ -125,4 +126,4 @@ process.stdout.write(`audio: ${usados.size} arquivos, ${(bAudio / KB).toFixed(1)
 process.stdout.write(`build ok: ${arquivos.length} arquivos, ${(bruto / KB).toFixed(0)} KB (${(gz / KB).toFixed(0)} KB gzip)\n`);
 process.stdout.write(`${relative(RAIZ, zip)}: ${(tam / KB).toFixed(0)} KB, sha256 ${sha}\n`);
 if (COM_THUMB) process.stdout.write(`${relative(RAIZ, thumbSaida)}: ${thumbLado}x${thumbLado}, ${(statSync(thumbSaida).size / KB).toFixed(0)} KB\n`);
-else process.stdout.write('sem thumb (ensaio): a Poki pede a thumb no envio; rode com --thumb quando ela existir\n');
+else process.stdout.write('sem thumb (ensaio): a Poki pede a thumb no envio; rode com --thumb\n');

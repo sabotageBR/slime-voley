@@ -16,7 +16,7 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
 - as referências medidas do Blumgi, em `docs/referencias/`;
 - o que cada marco entregou e o que ficou para depois, em `docs/marcos/`.
 
-**O desenho vai além do código.** Ele descreve o jogo inteiro, até o M5. Muitos módulos, testes e ferramentas citados nele ainda não existem (`poderes.js`, `torneio.js`, `layout.test`, `fluxo.test`, `calibrar`, `thumb`, `sdkcheck`, `npm run poki`...). Antes de supor que algo existe, confira em `docs/marcos/`. Os comentários dos arquivos portados de projetos irmãos também citam coisas que não estão aqui, como `tools/pigmentos.mjs` e `test/cor.test.js`.
+**O desenho vai além do código.** Ele descreve o jogo inteiro, até o M5. Muitos módulos, testes e ferramentas citados nele ainda não existem (`poderes.js`, `torneio.js`, `layout.test`, `fluxo.test`, `calibrar`, `sdkcheck`, `npm run poki`...). Antes de supor que algo existe, confira em `docs/marcos/`. Os comentários dos arquivos portados de projetos irmãos também citam coisas que não estão aqui, como `tools/pigmentos.mjs` e `test/cor.test.js`.
 
 ## Rodar e testar
 - `npm run servir` abre o jogo em http://127.0.0.1:5380/. Os módulos ES não carregam por `file://`.
@@ -88,7 +88,7 @@ Sem teste, por convenção: no jogo, o `preventDefault` fica no `controles.js` e
 - `commercialBreak` só no toque em Próxima/Revanche (a partir da 3ª partida) e ao despausar; nunca no rali.
 
 ## Ferramentas
-Portas: 5380 (servir), 4380–4385, CDP 9380–9382. É um Chrome por vez: o `shot` usa 4380/9380, e o `gif` e o `medir` usam 4385/9382. Evite as portas 9222, 9503 e 9666.
+Portas: 5380 (servir), 4380–4385, CDP 9380–9382. É um Chrome por vez: o `shot` usa 4380/9380, a `thumb` usa 4384/9381, e o `gif` e o `medir` usam 4385/9382. Evite as portas 9222, 9503 e 9666.
 
 | Comando | O que faz |
 |---|---|
@@ -96,7 +96,8 @@ Portas: 5380 (servir), 4380–4385, CDP 9380–9382. É um Chrome por vez: o `sh
 | `node tools/gif.mjs saida.gif 844x390 480 "<query>@ms" ...` | GIF da partida |
 | `node tools/medir.mjs 4` | custo por quadro com a CPU limitada (relativo: GPU por software) |
 | `node tools/midia-m1.mjs` | quadros e GIFs das 3 direções |
-| `npm run empacotar` | build da Poki: `dist/` e `dist-poki/slime-voley-<versão>.zip` + `.sha256` (`--thumb` quando a thumb existir) |
+| `npm run empacotar` | build da Poki: `dist/` e `dist-poki/slime-voley-<versão>.zip` + `.sha256` (`-- --thumb` confere a thumb e a copia ao lado do zip) |
+| `node tools/thumb.mjs [--final]` | thumb da Poki pelo motor (`tools/thumb.html`): as opções em `marketing/thumb/opcoes/` e `comparar*.png`; o `--final` mede a `ESCOLHIDA` e grava `slime-voley-{1256,628}.{png,jpg}` e o `conferir.png` |
 | `node tools/artifact.mjs` | monta o checkpoint em `.tmp/artifact` |
 | `node tools/grok.mjs gerar <id> 16:9 "<prompt>"` | arte do Grok (headless, só `image_gen`/`image_edit`, pasta própria) |
 | `python3 -I tools/recortar.py <id>` | trata a arte para `src/arte/ginasios/` |

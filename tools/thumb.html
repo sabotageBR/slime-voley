@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>thumb</title>
+<style>html,body{margin:0;overflow:hidden;background:#000}canvas{display:block}</style></head>
+<body><canvas id="c"></canvas><pre id="medidas"></pre>
+<script type="module">
+// Thumb da Poki feita com o proprio jogo (porte do slime-merge): a partida monta a cena pelo
+// roteiro da cortada (a Laranjinha no ar, a mira em gotas e a reticula no piso do rival) e a cena
+// do jogo desenha os quatro canvases (fundo da praia com a arte, plateia, piso, gosma em WebGL2,
+// rostos, bola, mira e respingos), com a camera presa num quadro fixo. Direcao A, skin padrao.
+// Regras (developers.poki.com/guide/game-thumbnail, as mesmas do slime-merge):
+//   - quadrado 1:1 de no minimo 628 px, sangrado: sem borda, margem nem tarja (a Poki
+//     arredonda os cantos);
+//   - sem texto;
+//   - um assunto principal, com pose dinamica, o personagem na skin padrao;
+//   - parecida com o jogo de verdade; contraste alto e nada perto do #83FFE7 do site;
+//   - legivel nos tiles pequenos (ver ?grade).
+// Desenho (§3.11): a Laranjinha no ar na pose da cortada; linha de gotas, reticula no piso e
+// respingos na cor do time (sem anel branco); plateia desfocada; sem texto. A Arena ainda nao
+// existe como ginasio: vai a Praia, a do jogo.
+//   ?opcao=quadra&s=1256  a thumb no tamanho s (o canvas #c; a janela pode ter qualquer tamanho)
+//   ?opcao=quadra&grade   folha de conferencia: tiles de 314 a 94 px sobre o #83FFE7
+//   ?opcao=quadra&medir   mede a thumb de 628 px e escreve o JSON em #medidas
+//   ?opcao=quadra&perto   a thumb de 628 px com os pixels perto do #83FFE7 em magenta
+import { criarPartida } from '../src/jogo/partida.js';
+import { assentar } from '../src/jogo/pele.js';
+import { resolver } from '../src/jogo/cortada.js';
+import { skin } from '../src/jogo/skins.js';
+import { rival } from '../src/jogo/rivais.js';
+import { hexDaMistura } from '../src/cor/km.js';
+import { criarVista } from '../src/render/vista.js';
+import { criarCena, QUALIDADES } from '../src/render/cena.js';
+import { tonalidade } from '../src/render/celebracao.js';
+import { paraTela } from '../src/render/camera.js';
+import { REDE_H } from '../src/fisica/volei.js';
+
+const q = new URLSearchParams(location.search);
+const S = Math.max(64, parseInt(q.get('s') || '1256', 10));
+const OPCAO = q.get('opcao') || 'quadra';
+const POKI = '#83FFE7';
+const TILES = [314, 204, 140, 94];
+
+/**
+ * Cada opcao: o quadro (centro e lado em u, quadrado), onde ficam a Laranjinha (x e a altura da
+ * base no ar), o rival e a reticula, e as caras. A bola fica no ponto de batida da cortada.
+ */
+const OPCOES = {
+  // plano aberto (pedido do usuario: o jogo num plano maior): as duas metades, a rede, a
+  // Laranjinha no alto do pulo, a mira descendo para a reticula aos pes do rival assustado
+  quadra: { centro: [0.9, 5.1], lado: 14.5, x: -3.4, y: 3.4, rivalX: 5.6, alvoX: 4.0, caras: ['feliz', 'susto'] },
+  // plano medio: a Laranjinha maior, a rede e o rival cortado pela beirada
+  meia: { centro: [0.2, 4.7], lado: 12, x: -3.0, y: 3.2, rivalX: 5.2, alvoX: 3.6, caras: ['feliz', 'susto'] },
+};
+const O = { ...(OPCOES[OPCAO] || OPCOES.quadra) };
+// ?caras=feliz,susto troca as expressoes (para comparar)
+if (q.has('caras')) O.caras = q.get('caras').split(',');
+
+// a cena mede a janela: o lado da thumb vale para ela, qualquer que seja a janela de verdade
+let lado = S;
+Object.defineProperty(window, 'innerWidth', { configurable: true, get: () => lado });
+Object.defineProperty(window, 'innerHeight', { configurable: true, get: () => lado });
+Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: () => 1 });
+
+// ------------------------------------------------------------ cena (a partida de verdade)
+const sk = skin('laranjinha');
+const rv = rival('gota');
+const cores = [sk.hex, hexDaMistura(rv.pig)];
+const P = criarPartida({ semente: 5, modo: 'cpu', rival: rv.id, partidaN: 2, powerups: [] });
+const vista = criarVista(P);
+vista.vestir(0, sk.pig, cores[0]);
+vista.vestir(1, rv.pig, cores[1]);
+P.roteiro('cortada');
+P.slimes[1].x = O.rivalX;
+assentar(P.peles[1], P.slimes[1]);
+
+const cv0 = () => document.createElement('canvas');
+const el = { fundo: cv0(), slime: cv0(), topo: cv0(), tela: cv0() };
+const cena = criarCena(el, { visual: 'a' });
+// a celula do campo mais fina que a da qualidade alta: o contorno nao ondula no quadro grande
+QUALIDADES[0].celula = 0.05;
+cena.definirQualidade(0);
+cena.definirToque(false, 'a');
+const arte = new Image();
+arte.src = '../src/arte/ginasios/praia-a1.webp';
+await arte.decode();
+cena.definirArte(arte);
+
+// a mira segurada ate a camera lenta assentar (a entrada dura 60 ms)
+const it = { eixo: 0, botao: true, borda: false };
+for (let k = 0; k < 16; k++) {
+  P.intencao(0, it);
+  P.passo();
+  for (const e of P.eventos) if (e.tipo === 'cortada-entra') cena.corCortada = cores[e.i];
+  P.eventos.length = 0;
+}
+const C = P.cortada;
+if (!C || C.fase !== 'mirando') throw new Error('a cortada nao chegou na mira');
+// a Laranjinha vai para o alto do pulo (a pele, a bola e o ponto de batida andam juntos)
+const s0 = P.slimes[0];
+const dx = O.x - s0.x;
+const dy = O.y - s0.y;
+s0.x += dx;
+s0.y += dy;
+const p0 = P.peles[0];
+for (let k = 0; k < p0.n; k++) { p0.x[k] += dx; p0.y[k] += dy; }
+C.bx += dx;
+C.by += dy;
+P.bola.x = C.bx;
+P.bola.y = C.by;
+C.alvoX = O.alvoX;
+resolver(C, s0.lado);
+// o quadro anterior igual ao atual: a vista nao interpola nada
+const A = P.anterior;
+for (const i of [0, 1]) {
+  Object.assign(A.slimes[i], { x: P.slimes[i].x, y: P.slimes[i].y, sig: P.slimes[i].sig });
+  A.peles[i].x.set(P.peles[i].x);
+  A.peles[i].y.set(P.peles[i].y);
+}
+Object.assign(A.bola, { x: P.bola.x, y: P.bola.y, ang: P.bola.ang });
+P.jogadores[0].expr = O.caras[0];
+P.jogadores[1].expr = O.caras[1];
+
+const o2 = { cores, festa: null, inicio: null, saque: null, pulsoSaque: 0, alvoSaque: null };
+// respingos na cor do time no piso, onde a Laranjinha pulou (a coroa de chao no comeco: as
+// gotas abrindo, antes do anel fino aparecer; nada de anel branco nem circulo-fantasma). Em volta
+// da bola as gotas pareciam enfeite na cabeca dela.
+cena.coroa(O.x, 0.15, cores[0], { chao: true, miolo: tonalidade(cores[0], 0.6), r0: 1.1, r1: 2.3, n: 11, esc: 1.05, dur: 2 });
+
+/** Camera presa no quadro da opcao (o diretor sem tempo nao mexe no estado). */
+function prender(n) {
+  cena.medir();
+  const L = cena.layout;
+  const st = cena.diretor.estado;
+  const [x0, y0, x1, y1] = L.janela;
+  Object.assign(st, { zoom: n / O.lado / L.s, trauma: 0, recuo: 0, fx: (x0 + x1) / 2, fy: (y0 + y1) / 2, segueX: O.centro[0] - (x0 + x1) / 2, segueY: O.centro[1] - (y0 + y1) / 2 });
+}
+
+/** Desenha a cena em n x n e compoe as camadas em cv. */
+function thumb(cv, n) {
+  lado = n;
+  // os efeitos andam um pouco (a coroa abre, as gotas voam) e o quadro final sai sem tempo
+  prender(n);
+  for (let k = 0; k < 4; k++) cena.desenhar(P, vista, 1, 0.05, o2);
+  prender(n);
+  cena.desenhar(P, vista, 1, 0, o2);
+  cv.width = n;
+  cv.height = n;
+  const g = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d'));
+  g.drawImage(el.fundo, 0, 0);
+  // plateia e arte desfocadas acima do piso; a rede e a bandeirinha voltam nitidas por cima
+  const cam = cena.camera;
+  const yChao = paraTela(cam, 0, 0)[1] - cam.s * 0.1;
+  g.save();
+  g.beginPath();
+  g.rect(0, 0, n, yChao);
+  g.clip();
+  g.filter = `blur(${(n * 0.006).toFixed(1)}px)`;
+  g.drawImage(el.fundo, 0, 0);
+  g.restore();
+  g.save();
+  g.beginPath();
+  for (const [x0, y0, x1, y1] of [[-0.36, 0, 0.36, REDE_H + 0.6], [-0.36, REDE_H + 0.5, 0.95, REDE_H + 1.45]]) {
+    const [a, b] = paraTela(cam, x0, y1);
+    const [c, d] = paraTela(cam, x1, y0);
+    g.rect(a, b, c - a, Math.min(d, yChao) - b);
+  }
+  g.clip();
+  g.drawImage(el.fundo, 0, 0);
+  g.restore();
+  afastarDaPoki(g, n);
+  vinheta(g, n);
+  g.drawImage(el.slime, 0, 0, n, n);
+  g.drawImage(el.topo, 0, 0);
+}
+
+/**
+ * Ultimo passo de cor: o mar verde-agua da arte fica perto do #83FFE7 do site. Em vez de
+ * escurecer (o slime-merge), aqui ele puxa para um turquesa mais azul (b* desce), que ainda le
+ * como mar; abaixo de 25 (a regua) puxa tudo, de 25 a 33 volta aos poucos (sem degrau).
+ */
+function afastarDaPoki(ctx, s) {
+  const img = ctx.getImageData(0, 0, s, s);
+  const d = img.data;
+  const n = parseInt(POKI.slice(1), 16);
+  const Pk = lab((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  for (let i = 0; i < d.length; i += 4) {
+    const L = lab(d[i], d[i + 1], d[i + 2]);
+    const e = Math.hypot(L[0] - Pk[0], L[1] - Pk[1], L[2] - Pk[2]);
+    if (e >= 33) continue;
+    const w = e < 25 ? 1 : (33 - e) / 8;
+    const [r, g, b] = rgbDeLab(L[0] - 6 * w, L[1] + 8 * w, L[2] - 22 * w);
+    d[i] = r;
+    d[i + 1] = g;
+    d[i + 2] = b;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+/**
+ * Vinheta quente nos cantos: o assunto salta, a Laranjinha ganha contraste e o tile se separa
+ * do site (sem virar borda: o escuro cresce aos poucos ate o canto).
+ */
+function vinheta(g, n) {
+  const [fx, fy] = paraTela(cena.camera, O.centro[0] - 0.6, 3.2);
+  const v = g.createRadialGradient(fx, fy, n * 0.32, fx, fy, n * 0.9);
+  v.addColorStop(0, 'rgba(70, 30, 60, 0)');
+  v.addColorStop(1, 'rgba(70, 30, 60, 0.5)');
+  g.fillStyle = v;
+  g.fillRect(0, 0, n, n);
+}
+
+// ------------------------------------------------------------ medidas (mesma regua do slime-merge)
+function lab(r, g, b) {
+  const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const R = lin(r), G = lin(g), B = lin(b);
+  const f = (t) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
+  const x = f((R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047);
+  const y = f(R * 0.2126 + G * 0.7152 + B * 0.0722);
+  const z = f((R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+function rgbDeLab(L, A, B) {
+  const fy = (L + 16) / 116;
+  const inv = (t) => (t ** 3 > 216 / 24389 ? t ** 3 : (116 * t - 16) / (24389 / 27));
+  const X = inv(fy + A / 500) * 0.95047;
+  const Y = inv(fy);
+  const Z = inv(fy - B / 200) * 1.08883;
+  const enc = (v) => Math.round(255 * Math.max(0, Math.min(1, v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055)));
+  return [enc(3.2406 * X - 1.5372 * Y - 0.4986 * Z), enc(-0.9689 * X + 1.8758 * Y + 0.0415 * Z), enc(0.0557 * X - 0.204 * Y + 1.057 * Z)];
+}
+function lum(r, g, b) {
+  const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+/** Contraste WCAG entre a cor da Laranjinha e a media do fundo nos cantos. */
+function contrasteHeroi(d, s) {
+  const amostra = (x0, y0) => { let r = 0, g = 0, b = 0, n = 0; for (let y = y0; y < y0 + 20; y++) for (let x = x0; x < x0 + 20; x++) { const i = (y * s + x) * 4; r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } return [r / n, g / n, b / n]; };
+  const cantos = [amostra(10, 10), amostra(s - 30, 10), amostra(10, s - 30), amostra(s - 30, s - 30)];
+  const fundo = cantos.reduce((a, c) => a + lum(...c), 0) / 4;
+  const n = parseInt(cores[0].slice(1), 16);
+  const h = lum((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  return +((Math.max(fundo, h) + 0.05) / (Math.min(fundo, h) + 0.05)).toFixed(2);
+}
+function medir(cv) {
+  const s = cv.width;
+  const d = cv.getContext('2d').getImageData(0, 0, s, s).data;
+  const n = parseInt(POKI.slice(1), 16);
+  const Pk = lab((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  const dist = (L, M) => Math.hypot(L[0] - M[0], L[1] - M[1], L[2] - M[2]);
+  const cor = (x, y) => { const i = (y * s + x) * 4; return lab(d[i], d[i + 1], d[i + 2]); };
+  let perto = 0, opaca = true, somaB = 0, nB = 0;
+  const anel = Math.round(s * 0.02);
+  for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+    if (d[(y * s + x) * 4 + 3] < 255) opaca = false;
+    const e = dist(cor(x, y), Pk);
+    if (e < 25) perto++;
+    if (x < anel || y < anel || x >= s - anel || y >= s - anel) { somaB += e; nB++; }
+  }
+  const f = Math.round(s * 0.04);
+  const faixa = (x0, y0, w, h) => {
+    const labs = [];
+    for (let y = y0; y < y0 + h; y += 2) for (let x = x0; x < x0 + w; x += 2) labs.push(cor(x, y));
+    const m = [0, 1, 2].map((c) => labs.reduce((a, L) => a + L[c], 0) / labs.length);
+    return { m, lisa: labs.filter((L) => dist(L, m) < 3).length / labs.length };
+  };
+  const lados = { topo: [[0, 0, s, f], [0, f, s, f]], base: [[0, s - f, s, f], [0, s - 2 * f, s, f]], esq: [[0, 0, f, s], [f, 0, f, s]], dir: [[s - f, 0, f, s], [s - 2 * f, 0, f, s]] };
+  const tarja = [];
+  for (const [ld, [b, i]] of Object.entries(lados)) { const B = faixa(...b), I = faixa(...i); if (B.lisa > 0.9 && dist(B.m, I.m) > 8) tarja.push(ld); }
+  return { lado: s, pertoPoki: +(perto / (s * s)).toFixed(4), bordaPoki: +(somaB / nB).toFixed(1), tarja, contraste: { heroi: contrasteHeroi(d, s) }, opaca };
+}
+
+const cv = /** @type {HTMLCanvasElement} */ (document.getElementById('c'));
+if (q.has('grade')) {
+  const big = document.createElement('canvas');
+  thumb(big, 1256);
+  const m = 28;
+  cv.width = TILES.reduce((a, t) => a + t + m, m);
+  cv.height = TILES[0] + 2 * m;
+  const g = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d'));
+  g.fillStyle = POKI;
+  g.fillRect(0, 0, cv.width, cv.height);
+  g.imageSmoothingQuality = 'high';
+  let x = m;
+  for (const t of TILES) {
+    const y = m + TILES[0] - t;
+    g.save(); g.beginPath(); g.roundRect(x, y, t, t, Math.max(8, t * 0.08)); g.clip();
+    g.drawImage(big, x, y, t, t); g.restore();
+    x += t + m;
+  }
+} else if (q.has('perto')) {
+  thumb(cv, 628);
+  const g = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d'));
+  const img = g.getImageData(0, 0, 628, 628);
+  const d = img.data;
+  const n = parseInt(POKI.slice(1), 16);
+  const Pk = lab((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  for (let i = 0; i < d.length; i += 4) {
+    const L = lab(d[i], d[i + 1], d[i + 2]);
+    if (Math.hypot(L[0] - Pk[0], L[1] - Pk[1], L[2] - Pk[2]) < 25) { d[i] = 255; d[i + 1] = 0; d[i + 2] = 255; }
+  }
+  g.putImageData(img, 0, 0);
+} else if (q.has('medir')) {
+  thumb(cv, 628);
+  document.getElementById('medidas').textContent = JSON.stringify(medir(cv));
+} else {
+  thumb(cv, S);
+}
+document.title = 'PRONTO';
+</script></body></html>
