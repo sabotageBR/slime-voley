@@ -16,7 +16,7 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
 - as referências medidas do Blumgi, em `docs/referencias/`;
 - o que cada marco entregou e o que ficou para depois, em `docs/marcos/`.
 
-**O desenho vai além do código.** Ele descreve o jogo inteiro, até o M5. Muitos módulos, testes e ferramentas citados nele ainda não existem (`poderes.js`, `torneio.js`, `layout.test`, `fluxo.test`, o humano simulado, `sdkcheck`, `npm run poki`...). Antes de supor que algo existe, confira em `docs/marcos/`. Os comentários dos arquivos portados de projetos irmãos também citam coisas que não estão aqui, como `tools/pigmentos.mjs` e `test/cor.test.js`.
+**O desenho vai além do código.** Ele descreve o jogo inteiro, até o M5. Muitos módulos, testes e ferramentas citados nele ainda não existem (`poderes.js`, `layout.test`, `fluxo.test`, o humano simulado, `sdkcheck`, `npm run poki`...). Antes de supor que algo existe, confira em `docs/marcos/`. Os comentários dos arquivos portados de projetos irmãos também citam coisas que não estão aqui, como `tools/pigmentos.mjs` e `test/cor.test.js`.
 
 ## Rodar e testar
 - `npm run servir` abre o jogo em http://127.0.0.1:5380/. Os módulos ES não carregam por `file://`.
@@ -50,10 +50,11 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
   - `reacoes.js`: os emoji (a qualquer hora, com recarga) e a escolha da CPU;
   - `juiz.js`: o juiz da rede (olhar, apontar e a bolada sorteada; nunca muda a bola);
   - `falas.js`: as falas em balão (catálogo fixo por gatilho, recarga e rng próprio);
-  - `torneio.js` (a Copa Gosma: chave de 8 e de 16 derivada do save) e `paises.js` (os 195 códigos);
+  - `torneio.js` (a Copa Gosma: chave de 32 em todas as Copas, derivada do save) e `paises.js` (os 195 códigos);
   - `perfil.js`: XP, nível, trilha, Gotas e o save normalizado;
   - `visual.js`: o visual do vestiário (paleta de pigmentos, padrões, acessórios, arquétipos, compra e o save);
-  - `humor.js` (porte sem uso), `medidor.js`, `rivais.js` e `skins.js`.
+  - `rivais.js`: os níveis T, os 31 rivais (20 nos caminhos das Copas e 11 figurantes só da chave), as cores da paleta com a reserva (`corDoRival`) e as Copas;
+  - `humor.js` (porte sem uso), `medidor.js` e `skins.js`.
 - `src/core/`: laço, `rng.js`, save, áudio, vibração, o SDK (`poki.js`) e `depuracao.js`.
 - `src/cor/km.js`: a mistura de pigmentos Kubelka-Munk, que roda igual no shader da `composicao.js`. O `pigmentos.js` é gerado e não se edita à mão.
 - `src/render/`:
@@ -62,7 +63,7 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
   - `campo.js` e `composicao.js`: a gosma do slime-merge, com um campo móvel por slime;
   - `diretor.js` (câmera), `layout.js` (retrato, paisagem e desktop), `quadra.js`, `celebracao.js` e `plateia.js`;
   - `icones.js` (power-ups, bolha, gelo e prêmios), `carinhas.js` (as carinhas, o balão das reações e o das falas) e `juiz.js` (a cadeirinha e o juiz), em código;
-  - `bandeiras.js` (as 195 bandeiras numa mini-linguagem de primitivas) e `chave.js` (a chave da Copa e a taça);
+  - `bandeiras.js` (as 195 bandeiras numa mini-linguagem de primitivas) e `chave.js` (a chave da Copa, a faixa "seu caminho" do cartão e a taça);
   - `acessorios.js` (os 40 acessórios, no espaço do rosto), `estampas.js` (a estampa RGBA 128×64 do corpo: bandeira, pintura, arquétipos) e `vitrine.js` (a miniatura 2D dos cartões);
   - `ginasios/praia.js`.
 - `src/ui/`: `controles.js` (Metades e Botões, teclado e mouse), `hud.js` (placar, chips, barra e botão de reações e o cartão com a chave e a progressão), `menu.js` (o menu principal e a tela da chave), `vestiario.js` (a vitrine, as abas e o pincel) e `lab.js` (o laboratório da cortada).
@@ -93,6 +94,7 @@ Sem teste, por convenção: no jogo, o `preventDefault` fica no `controles.js` e
 - Não existe saque automático.
 - Portão de 30 s sem interação: até o saque da CPU espera um toque.
 - `commercialBreak` só no toque em Próxima/Revanche (a partir da 3ª partida) e ao despausar; nunca no rali.
+- O cartão de fim avança sozinho em 8 s sem toque (`?avanco=N`, 0 desliga), **sem anúncio**; a partida nova espera o toque para sacar.
 
 ## Ferramentas
 Portas: 5380 (servir), 4380–4385, CDP 9380–9382. É um Chrome por vez: o `shot` usa 4380/9380, a `thumb` usa 4384/9381, e o `gif` e o `medir` usam 4385/9382. Evite as portas 9222, 9503 e 9666.
@@ -112,7 +114,8 @@ Portas: 5380 (servir), 4380–4385, CDP 9380–9382. É um Chrome por vez: o `sh
 **Parâmetros de teste:**
 - Só valem em loopback e na LAN, ou pelo `window.__voleiModelo` da build de modelos.
 - O `core/depuracao.js` é o único módulo que lê a URL, e o cabeçalho dele tem a lista completa.
-- Os mais usados: `?semente ?roteiro=cortada|ponto|ponto-curto|reacao|saque|bolha|gelo|fogo|gosmao|juiz|juiz-<reação>|fim ?visual=a|b|c ?controle=a|b ?gatilho=novo|segura ?lab ?auto ?primeira ?menu ?chave ?vestiario=aba ?look=id ?bandeira=XX ?copa=N&fase=F ?semblur ?semanuncio ?debug`.
+- Os mais usados: `?semente ?roteiro=cortada|ponto|ponto-curto|reacao|saque|bolha|gelo|fogo|gosmao|juiz|juiz-<reação>|fim ?visual=a|b|c ?controle=a|b ?gatilho=novo|segura ?lab ?auto ?primeira ?menu ?chave ?vestiario=aba ?look=id ?bandeira=XX ?copa=N&fase=F ?avanco=N ?semblur ?semanuncio ?debug`.
+- Prints do cartão de fim pedem `?avanco=0`; o `?roteiro=fim` se repete a cada partida nova (a final da Copa é `?copa=N&fase=4&roteiro=fim`).
 - Para um print parado num instante, use `?filme=1&cada=N`: N passos e um desenho, sem rAF.
 - `?fora=1` liga a regra antiga do fora; por padrão, a bola nunca sai.
 - Os roteiros `jornada`, `raio`, `rali8` e `onboarding`, citados no desenho, ainda não existem.

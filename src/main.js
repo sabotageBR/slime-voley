@@ -16,14 +16,14 @@ import { criarHaptico } from './core/haptico.js';
 import { criarArmazem } from './core/armazenamento.js';
 import { criarLaco, PASSO } from './core/laco.js';
 import { lerDepuracao } from './core/depuracao.js';
-import { hexDaMistura, linearDeHex } from './cor/km.js';
+import { linearDeHex } from './cor/km.js';
 import { criarPartida } from './jogo/partida.js';
-import { rival as acharRival } from './jogo/rivais.js';
+import { rival as acharRival, corDoRival } from './jogo/rivais.js';
 import { skin as acharSkin } from './jogo/skins.js';
 import { CUSTO } from './jogo/medidor.js';
 import { REACOES } from './jogo/reacoes.js';
 import { vozDaFala, FALA } from './jogo/falas.js';
-import { chaveDaCopa, registrarVitoria, proximaCopa, trocarPais, normalizarCopa, GOTAS_TITULO, NUM_COPAS } from './jogo/torneio.js';
+import { chaveDaCopa, registrarVitoria, proximaCopa, trocarPais, normalizarCopa, GOTAS_TITULO, NUM_COPAS, TAM_COPA } from './jogo/torneio.js';
 import { paisDoIdioma } from './jogo/paises.js';
 import { visualDaSkin, visualDoArquetipo, comprar as comprarItem, normalizarVisual } from './jogo/visual.js';
 import { normalizarPerfil, rendimento, aplicarGanho, proximosMarcos } from './jogo/perfil.js';
@@ -48,7 +48,7 @@ const save = criarArmazem();
 const perfil = normalizarPerfil(save.ler('perfil', {}));
 if (D.bandeira) perfil.pais = D.bandeira.toUpperCase();
 // ?copa=N&fase=F (testes): a Copa na fase pedida
-if (D.copa) perfil.copa = normalizarCopa({ n: D.copa, semente: D.semente || 1, fase: D.fase, pais: perfil.pais });
+if (D.copa) perfil.copa = normalizarCopa({ n: D.copa, tam: TAM_COPA, semente: D.semente || 1, fase: D.fase, pais: perfil.pais });
 // a selecao do jogador: a regiao do idioma do navegador, ate ele escolher no vestiario
 if (!perfil.pais) {
   perfil.pais = paisDoIdioma([...(navigator.languages || []), navigator.language]);
@@ -99,6 +99,7 @@ const hud = criarHud(raiz, T, {
   aoContinuar: () => continuar(),
   aoProxima: () => proximaPartida(false),
   aoRevanche: () => proximaPartida(true),
+  aoAutoAvanco: (revanche) => proximaPartida(revanche, true),
   aoOpcao: (id) => { trocarOpcao(id); hud.menu(true, { controle: controles.esquema, som: perfil.som }); },
   som: (id) => mesa.tocar(id),
   icone: desenharIconeTela,
@@ -254,7 +255,7 @@ function nomePais(cod) {
 /** A chave pronta para desenhar (nomes, bandeiras e cores de cada vaga). */
 function dadosChave(ch = chaveDaCopa(perfil.copa)) {
   const corJogador = visualAtual().hex;
-  const vagas = ch.vagas.map((v) => (v.jogador ? { nome: T('ui.voce'), pais: v.pais, cor: corJogador } : { nome: T('rival.' + v.id), pais: v.pais, cor: hexDaMistura(acharRival(v.id).pig) }));
+  const vagas = ch.vagas.map((v) => (v.jogador ? { nome: T('ui.voce'), pais: v.pais, cor: corJogador } : { nome: T('rival.' + v.id), pais: v.pais, cor: corDoRival(acharRival(v.id), corJogador).hex }));
   return { chave: ch, vagas, corJogador };
 }
 
@@ -312,6 +313,12 @@ function avancarCopaSeCampeao() {
 let P = null;
 let vista = null;
 let cores = ['#ff8a2a', '#3fd6c8'];
+/** o rival da partida (src/jogo/rivais.js), vestido por vestirRival */
+let rivalAtual = null;
+/** a partida e a final da Copa (vencer = campeao: o letreiro, o foco e a taca) */
+let finalDaCopa = false;
+/** o cartao de fim esperando a festa do titulo (um toque abre na hora) */
+let cartaoPendente = null;
 /** nivel do tom do balbucio de cada slime (src/som/falas.js tomDoNivel) */
 let tons = [3, 4];
 let nomes = ['', ''];
@@ -367,6 +374,15 @@ function aplicarVisual(v = visualAtual()) {
   vista.m.slimes[0].dados.acessorios = { cabeca: v.cabeca, rosto: v.rosto, boca: v.boca };
   cena.definirEstampa(0, temEstampa && g ? g.getImageData(0, 0, EST_W, EST_H) : null);
   cena.definirAparencias(temAp ? [null, { ap: 1, chave: `${v.padrao}|${v.cor2}|${temEstampa}`, proc: v.padrao, escala: 1, modo: 0, corLin: linearDeHex(v.cor2), estampa: temEstampa ? 0 : -1 }] : []);
+  vestirRival();
+}
+
+/** O rival na cor dele, ou na reserva se o jogador estiver de cor parecida (src/jogo/rivais.js). */
+function vestirRival() {
+  if (!vista || !rivalAtual) return;
+  const c = corDoRival(rivalAtual, cores[0]);
+  cores[1] = c.hex;
+  vista.vestir(1, c.pig, c.hex);
 }
 
 function novaPartida(revanche = false) {
@@ -390,9 +406,11 @@ function novaPartida(revanche = false) {
     qualidadeMinima: cena.nivelQualidade >= 3,
   });
   vista = criarVista(P);
-  cores = [visualAtual().hex, hexDaMistura(riv.pig)];
+  const ch = chaveDaCopa(perfil.copa);
+  finalDaCopa = !D.rival && !D.auto && !ch.campeao && ch.fase === ch.fases.length - 1;
+  rivalAtual = riv;
+  cores = [visualAtual().hex, riv.hex];
   aplicarVisual();
-  vista.vestir(1, riv.pig, cores[1]);
   vista.m.slimes[1].dados.acessorios = acessoriosDoRival(riv.acessorio);
   nomes = [T('ui.voce'), T('rival.' + riv.id)];
   // tom do balbucio: o jogador agudo; o rival pelo nivel (os chefes falam grosso)
@@ -416,6 +434,7 @@ let primeiraInteracao = false;
 function interagir(e) {
   tUltimaInteracao = performance.now();
   audio.iniciar();
+  if (cartaoPendente) { cartaoPendente(); return; }
   if (!P || menu.aberto || vestiario.aberto) return;
   P.interacao();
   if (!primeiraInteracao) {
@@ -497,10 +516,11 @@ async function premiado() {
   hud.cartaoPremiado(p);
 }
 
-async function proximaPartida(revanche) {
+/** auto: o cartao avancou sozinho (sem toque), entao nao ha intervalo com anuncio. */
+async function proximaPartida(revanche, auto = false) {
   hud.cartao(null);
   partidaN++;
-  await intervalo();
+  if (!auto) await intervalo();
   avancarCopaSeCampeao();
   novaPartida(revanche);
 }
@@ -548,8 +568,8 @@ const TRATADORES = {
   'saque-pega': () => mesa.tocar('toque', { forca: 0.3 }, { max: 1 }),
   'saque-valendo': () => { tMao = 0; },
   'saque-liberado': () => {},
-  // rali longo: a plateia anima e o locutor conta as travessias pares (4, 6, 8, 10)
-  'cruzou': (e) => { if (e.n >= 4 && e.n % 2 === 0) { cena.plateia.animar(0.15); if (e.n <= 10) mesa.falar('vozCombo' + e.n + 'Slime'); } },
+  // rali longo: a plateia anima nas travessias pares (o locutor contando saiu a pedido, 2026-10-22)
+  'cruzou': (e) => { if (e.n >= 4 && e.n % 2 === 0) cena.plateia.animar(0.15); },
   'perfeita': (e) => { mesa.tocar('perfeita'); cena.coroa(e.x, e.y, '#ffffff', { r1: 1.6, n: 10, esc: 0.7 }); cena.vfx.texto(e.x, e.y + 1.6, T('grito.manchete'), '#ffffff', 1); },
   'cortada-entra': (e) => {
     mesa.tocar('lentaEntra', {}, { max: 1 });
@@ -623,13 +643,19 @@ const TRATADORES = {
     const ch = daCopa ? chaveDaCopa(perfil.copa) : null;
     let proxCopa = '';
     if (ch) proxCopa = titulo ? (ch.n < NUM_COPAS ? T('copa.liberada').replace('{n}', String(ch.n + 1)) : T('copa.campeao')) + ` · ${T('copa.titulo').replace('{g}', String(bonus))}` : textoProxima(ch);
-    setTimeout(() => {
+    // o titulo deixa a festa do campeao correr (um toque abre o cartao na hora)
+    if (titulo) cena.plateia.festa(-1, 1.5);
+    const abrir = () => {
+      if (cartaoPendente !== abrir) return;
+      cartaoPendente = null;
       hud.cartao({
         titulo: titulo ? T('copa.campeao') : venceu ? T('ui.venceu') : T('ui.perdeu'), sub: `${e.placar[0]} · ${e.placar[1]}`, proxima: venceu, revanche: !venceu,
-        progresso, premiado: !!progresso && poki.temAnuncios && !D.semAnuncio,
+        progresso, premiado: !!progresso && poki.temAnuncios && !D.semAnuncio, campeao: titulo, auto: D.avanco,
         chave: ch ? { ...dadosChave(ch), animar: venceu } : null, proxCopa,
       });
-    }, 400);
+    };
+    cartaoPendente = abrir;
+    setTimeout(abrir, titulo ? 2600 : 400);
   },
   // power-ups (bolhas)
   'bolha-aviso': () => mesa.tocar('bolhaSobe', {}, { max: 1 }),
@@ -739,14 +765,15 @@ function desenhar(dtReal, alfa) {
   const dt = pausado || emAnuncio ? 0 : dtReal;
   // comemoracao
   let festa = null;
-  if (P.estado === 'ponto' || (P.estado === 'fim' && P.festa.t < 3)) {
+  const campeao = finalDaCopa && P.festa.fim && P.resultado === -1;
+  if (P.estado === 'ponto' || (P.estado === 'fim' && P.festa.t < (campeao ? 9 : 3))) {
     const f = P.festa;
     const iv = f.lado < 0 ? 0 : 1;
     const venceu = P.resultado === -1;
     festa = {
       t: f.t, tipo: f.tipo, lado: f.lado, x: f.x, cor: cores[iv], placar: P.placar, semente: (P.placar[0] * 31 + P.placar[1] * 7 + 3) >>> 0,
       texto: f.palavra ? T('grito.' + f.palavra) : '', cpu: !P.humano[iv], fim: f.fim,
-      textoFim: f.fim ? T(venceu ? 'grito.vitoria' : 'grito.derrota') : '', derrota: f.fim && !venceu,
+      textoFim: f.fim ? T(campeao ? 'copa.campeao' : venceu ? 'grito.vitoria' : 'grito.derrota') : '', derrota: f.fim && !venceu, campeao,
     };
     if (f.fim) festa.cor = venceu ? cores[0] : '#7a7f95';
   }
@@ -765,7 +792,8 @@ function desenhar(dtReal, alfa) {
     const f = P.jogadores[i].fala;
     if (f && !D.semHud) falas.push({ i, texto: T('fala.' + f.id), t: f.t, dur: FALA.dur });
   }
-  cena.desenhar(P, vista, alfa, dt, { cores, festa, inicio, saque: sq, pulsoSaque: pulso, alvoSaque, falas, vitrine: vestiario.aberto ? vestiario.vitrine() : null });
+  const nomeBolha = P.bolha && !D.semHud ? T('pwn.' + P.bolha.id) : '';
+  cena.desenhar(P, vista, alfa, dt, { cores, festa, inicio, saque: sq, pulsoSaque: pulso, alvoSaque, falas, nomeBolha, vitrine: vestiario.aberto ? vestiario.vitrine() : null });
   // HUD
   const L = cena.layout;
   if (L) hud.posicionar(L);

@@ -5,6 +5,7 @@
 
 import { TINTA } from './fundo.js';
 import { desenharCarinhaTela } from './carinhas.js';
+import { paraTela } from './camera.js';
 
 /** Cor principal de cada power-up (chips do HUD e brilho da bolha). */
 export const COR_PODER = Object.freeze({
@@ -257,6 +258,52 @@ export function desenharPremioTela(ctx, pr, lado, cor) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
+const RAIO_BOLHA = 0.9;
+/** Altura da bolha agora (ela balanca). */
+const yBolha = (b, t) => b.y + Math.sin(t * 2.2) * 0.15;
+/** Alfa da bolha: fantasma piscando no aviso; viva, pisca nos ultimos 2 s. */
+function alfaBolha(b, t, vida) {
+  if (b.fase === 'aviso') return 0.35 + 0.25 * Math.sin(t * 16);
+  return vida - b.t < 2 && Math.sin(t * 18) < -0.2 ? 0.45 : 1;
+}
+
+/**
+ * Nome do power-up numa etiqueta logo abaixo da bolha (pedido de 2026-10-22), em px da tela,
+ * acompanhando o balanco e o pisca dela; presa dentro da tela.
+ * @param {CanvasRenderingContext2D} ctx o topo
+ * @param {{ id: string, x: number, y: number, fase: string, t: number }} b
+ * @param {number} t @param {number} vida @param {string} texto ja traduzido
+ * @param {import('./camera.js').Camera} cam @param {number} dpr @param {number} W largura (px CSS)
+ */
+export function desenharNomeBolha(ctx, b, t, vida, texto, cam, dpr, W) {
+  if (!texto) return;
+  const px = Math.round(Math.max(13, Math.min(20, cam.s * 0.5)));
+  const [x, y] = paraTela(cam, b.x, yBolha(b, t) - RAIO_BOLHA);
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.globalAlpha = b.fase === 'aviso' ? Math.min(1, alfaBolha(b, t, vida) * 1.6) : alfaBolha(b, t, vida);
+  ctx.font = `700 ${px}px Fredoka, system-ui, sans-serif`;
+  const w = ctx.measureText(texto).width + px * 0.9;
+  const h = px * 1.35;
+  const cx = Math.max(w / 2 + 6, Math.min(W - w / 2 - 6, x));
+  const y0 = y + px * 0.3;
+  ctx.beginPath();
+  ctx.roundRect(cx - w / 2, y0, w, h, h / 2);
+  ctx.fillStyle = COR_PODER[b.id] || '#ffffff';
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = TINTA;
+  ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = px * 0.24;
+  ctx.strokeText(texto, cx, y0 + h / 2 + 1);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(texto, cx, y0 + h / 2 + 1);
+  ctx.restore();
+}
+
 /**
  * Bolha de power-up: fantasma piscando no aviso; viva, balanca e pisca nos ultimos 2 s.
  * @param {CanvasRenderingContext2D} ctx
@@ -264,12 +311,12 @@ export function desenharPremioTela(ctx, pr, lado, cor) {
  * @param {number} t s (jogo) @param {number} tr traco em u @param {number} vida s de vida da bolha
  */
 export function desenharBolha(ctx, b, t, tr, vida) {
-  const R = 0.9;
-  const y = b.y + Math.sin(t * 2.2) * 0.15;
+  const R = RAIO_BOLHA;
+  const y = yBolha(b, t);
   const cor = COR_PODER[b.id] || '#ffffff';
   ctx.save();
+  ctx.globalAlpha = alfaBolha(b, t, vida);
   if (b.fase === 'aviso') {
-    ctx.globalAlpha = 0.35 + 0.25 * Math.sin(t * 16);
     ctx.setLineDash([0.22, 0.16]);
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = tr * 1.6;
@@ -281,7 +328,6 @@ export function desenharBolha(ctx, b, t, tr, vida) {
     ctx.restore();
     return;
   }
-  if (vida - b.t < 2 && Math.sin(t * 18) < -0.2) ctx.globalAlpha = 0.45;
   const g = ctx.createRadialGradient(b.x - R * 0.3, y + R * 0.35, R * 0.1, b.x, y, R);
   g.addColorStop(0, 'rgba(255,255,255,0.55)');
   g.addColorStop(0.7, 'rgba(255,255,255,0.18)');

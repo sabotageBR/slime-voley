@@ -10,6 +10,7 @@
 
 import { aplicar, paraTela } from './camera.js';
 import { TINTA } from './fundo.js';
+import { desenharTaca } from './chave.js';
 
 const TAU = Math.PI * 2;
 const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
@@ -50,6 +51,7 @@ export function tonalidade(hex, f) {
  * @property {string} [textoFim] VITORIA!/DERROTA
  * @property {boolean} [derrota]
  * @property {number} [trauma]   0,35 | 0,55 (ace/bomba) | 0,7 (super)
+ * @property {boolean} [campeao] a final da Copa vencida pelo jogador: o letreiro, o foco e a taca
  */
 
 /**
@@ -198,6 +200,7 @@ export function desenharFesta(ctx, cam, dpr, W, H, f, o) {
   const completa = f.tipo === 'completa';
   const tons = [f.cor, tonalidade(f.cor, 0.35), tonalidade(f.cor, 0.65), tonalidade(f.cor, -0.25), '#ffffff'];
   const q = CONFETE[o.qualidade] || CONFETE.media;
+  if (f.campeao) { desenharCampeao(ctx, cam, dpr, W, H, f, o, q[0], tons); return; }
   if (!f.cpu && !f.derrota) confete(ctx, cam, dpr, f, completa ? q[0] : Math.round(q[0] * 0.4), tons);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const Q = o.quadra;
@@ -244,6 +247,88 @@ export function desenharFesta(ctx, cam, dpr, W, H, f, o) {
     ctx.translate(Q.x + Q.w / 2, Q.y + Q.h * 0.4);
     ctx.scale(0.8 + 0.2 * a, 0.8 + 0.2 * a);
     palavraGosma(ctx, txtP, 0, 0, tam, f.cor, a, 0);
+    ctx.restore();
+  }
+}
+
+const OURO = '#ffc83a';
+
+/** Enquadramento do campeao: o slime do jogador grande, embaixo, com espaco para o letreiro e a taca. */
+export const QUADRO_CAMPEAO = Object.freeze({ esq: 3.6, dir: 3.6, baixo: -0.4, cima: 6.2, entra: 0.25, dur: 0.9 });
+
+/** Quanto a camera ja fechou no campeao (0..1) no instante t da festa. @param {number} t */
+export const focoCampeao = (t) => { const u = clamp((t - QUADRO_CAMPEAO.entra) / QUADRO_CAMPEAO.dur); return u * u * (3 - 2 * u); };
+
+/**
+ * Titulo da Copa (pedido de 2026-10-22: "um letreiro bem grande escrito campeao e ele em foco"):
+ * holofote no slime do jogador (a camera ja fechou nele, cena.js), confete em cone e chuva de
+ * confete dourado pela tela, a taca descendo sobre a cabeca dele e o letreiro gigante, que fica.
+ * @param {{ foco?: number[], cabeca?: number[] }} o foco e cabeca: px CSS do slime do jogador
+ */
+function desenharCampeao(ctx, cam, dpr, W, H, f, o, n, tons) {
+  const t = f.t;
+  confete(ctx, cam, dpr, f, n, tons);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const k = focoCampeao(t);
+  // holofote: escurece tudo fora do slime
+  if (o.foco && k > 0) {
+    const [fx, fy] = o.foco;
+    const r1 = Math.max(70, cam.s * 2.1);
+    const g = ctx.createRadialGradient(fx, fy, r1 * 0.6, fx, fy, r1 + Math.max(W, H) * 0.6);
+    g.addColorStop(0, 'rgba(14,10,30,0)');
+    g.addColorStop(0.3, `rgba(14,10,30,${0.45 * k})`);
+    g.addColorStop(1, `rgba(14,10,30,${0.72 * k})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+  // chuva de confete (px da tela): dourado, a cor do jogador e branco
+  if (t > 0.3) {
+    const r = rng(f.semente ^ 0x9e3779b9);
+    const cores = [OURO, OURO, f.cor, tonalidade(f.cor, 0.45), '#ffffff'];
+    const tt = t - 0.3;
+    for (let i = 0; i < n; i++) {
+      const x0 = r() * W;
+      const vel = 70 + r() * 110;
+      const atraso = r() * 1.2;
+      const tam = 5 + r() * 6;
+      const cor = cores[Math.floor(r() * cores.length)];
+      const giro = 3 + r() * 6;
+      const u = tt - atraso;
+      if (u < 0) continue;
+      const y = -20 + ((u * vel) % (H + 40));
+      const x = x0 + Math.sin(u * 2 + i) * 14;
+      ctx.save();
+      ctx.globalAlpha = clamp(u * 3);
+      ctx.translate(x, y);
+      ctx.rotate(u * giro + i);
+      ctx.scale(1, Math.cos(u * giro * 1.3 + i));
+      ctx.fillStyle = cor;
+      ctx.fillRect(-tam / 2, -tam * 0.35, tam, tam * 0.7);
+      ctx.restore();
+    }
+  }
+  // o letreiro gigante (no terco de cima): entra com mola e fica, balancando de leve
+  const txt = f.textoFim || '';
+  const tam = txt ? cabe(ctx, txt, Math.min(H * 0.24, 220), W * 0.9) : 0;
+  const yTxt = Math.max(H * 0.25, tam * 0.62 + 46);
+  // a taca desce e quica sobre a cabeca do campeao (nunca atras do letreiro, nem quando ele pula)
+  if (o.cabeca && t > 0.9) {
+    const s = Math.max(48, Math.min(140, cam.s * 1.25));
+    const u = (t - 0.9) / 0.55;
+    const [cx, cy] = o.cabeca;
+    const alvo = Math.max(cy - s * 1.02, yTxt + tam * 0.5 + 8) + Math.sin(t * 3) * s * 0.03;
+    const y = u < 1 ? -s + (alvo + s) * backOut(u) : alvo;
+    desenharTaca(ctx, cx, y, s, 0.6 + 0.4 * Math.sin(t * 4));
+  }
+  if (txt && t >= 0.15) {
+    const u = (t - 0.15) / 0.35;
+    const esc = (u < 1 ? backOut(u) : 1) * (1 + 0.03 * Math.sin(t * 4));
+    const y = yTxt;
+    ctx.save();
+    ctx.translate(W / 2, y);
+    ctx.rotate(Math.sin(t * 2.4) * 2.2 * (Math.PI / 180));
+    ctx.scale(esc, esc);
+    palavraGosma(ctx, txt, 0, 0, tam, OURO, clamp(u * 3), clamp((t - 0.4) / 0.6));
     ctx.restore();
   }
 }

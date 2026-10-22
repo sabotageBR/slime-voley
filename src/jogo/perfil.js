@@ -5,7 +5,7 @@
 
 import { INICIAIS as POWERUPS_INICIAIS } from './powerups.js';
 import { REACOES_INICIAIS } from './reacoes.js';
-import { normalizarCopa } from './torneio.js';
+import { normalizarCopa, TAM_COPA } from './torneio.js';
 import { ehPais } from './paises.js';
 import { normalizarVisual, visualDaSkin } from './visual.js';
 
@@ -62,8 +62,9 @@ export function normalizarPerfil(salvo) {
     skin: typeof s.skin === 'string' && s.skin ? s.skin : 'laranjinha',
     /** a selecao do jogador (codigo do pais; '' = ainda nao escolheu) */
     pais: ehPais(s.pais) ? String(s.pais).toUpperCase() : '',
-    /** a Copa em andamento (src/jogo/torneio.js); o save antigo vira a fase da Copa 1 */
-    copa: normalizarCopa(s.copa || { n: 1, semente: 1, fase: Math.min(2, num(s.fase)) }),
+    /** a Copa em andamento (src/jogo/torneio.js); o save antigo (Gota, Geleia, Rei) vira a fase
+     * do mesmo rival na Copa 1 */
+    copa: normalizarCopa(s.copa || { n: 1, tam: TAM_COPA, semente: 1, fase: [0, 2, 4][Math.min(2, num(s.fase))] }),
     /** quantas vezes ganhou cada Copa (indice n - 1) */
     titulos: [0, 1, 2, 3].map((k) => num(Array.isArray(s.titulos) ? s.titulos[k] : 0)),
     liberados: {

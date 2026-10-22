@@ -7,7 +7,7 @@ Dez pedidos do usuário, mais as bandeiras, aprovados no plano. As respostas do 
 - **Personagens:** arquétipos e personagens reais.
 - **Bandeiras:** as de todos os países.
 
-O trabalho foi dividido em 5 etapas, cada uma com o seu commit.
+O trabalho foi dividido em 5 etapas, cada uma com o seu commit. A 6ª veio do teste da build no mesmo dia.
 
 ## Etapa 1: sensação
 
@@ -128,9 +128,53 @@ O trabalho foi dividido em 5 etapas, cada uma com o seu commit.
 - **Thumb:** a oficial não mudou. Regenerada agora, sairia com os slimes mais cheios, a retícula nova e sem a bandeirinha. A `tools/thumb.html` passou a criar a partida sem o juiz; regenerar é decisão do usuário.
 - **Testes:** `test/vestiario.test.js` (save do visual, compra, desenhos e textos de todo item, a trilha mantendo os acessórios e o pacote local) e a regra nova do `estilo.test`. São 84 testes.
 
+## Etapa 6: ajustes do teste de 22/10
+
+Seis pedidos depois de jogar a build local. Respostas do AskUserQuestion:
+- **Copa:** 32 em todas (16-avos e depois oitavas).
+- **Rivais:** cor própria bem distinta (sem bandeira no corpo).
+- **Anúncio:** o avanço automático não passa anúncio.
+
+O que mudou:
+- **Copa de 32** (`torneio.js`, `rivais.js`):
+  - todas as Copas vão dos 16-avos à final, em 5 partidas;
+  - entraram 5 rivais nos caminhos (Pingo e Mingau na Copa 1, Quiabo, Onda e Vulcão abrindo as Copas 2 a 4) e 11 figurantes que só completam a chave;
+  - o save guarda `tam: 32`: a Copa salva da chave antiga recomeça na 1ª rodada, e o `perfil.fase` antigo cai no mesmo rival;
+  - a proteção da Geleia vale até a 3ª partida.
+- **Cores dos rivais:** a causa eram os dados, não o render. Cada rival tinha um pigmento fixo do M0, e os três da Copa 1 eram azuis.
+  - Agora cada um veste uma cor da paleta calibrada (`CORES_BASE`), distinta no caminho (ΔE OKLab×100 ≥ 15) e longe da laranjinha.
+  - Quando o jogador está de cor parecida (abaixo de 12), o rival veste a reserva (`corDoRival`). A quadra e a chave usam a mesma cor.
+- **Campeão** (`celebracao.js`, `cena.js`):
+  - a final vencida vira o letreiro "CAMPEÃO!" gigante e dourado, que fica;
+  - a câmera fecha no slime do jogador, com holofote, chuva de confete e a taça descendo e pairando sobre a cabeça dele;
+  - o cartão dourado abre 2,6 s depois do fim, ou na hora com um toque.
+- **Nome nas bolhas:** uma etiqueta na cor do power-up, logo abaixo da bolha (`desenharNomeBolha`). Acompanha o balanço e o pisca dela e fica presa dentro da tela.
+- **Voz:** saiu o locutor que contava as travessias (`vozCombo*`, 8 mp3). As outras vozes ficam. O áudio da build foi de 12 para 8 arquivos (51,8 → 37,7 KB).
+- **Cartão de fim:**
+  - **Faixa "seu caminho"** (`desenharCaminho`): o slime do jogador, as 5 rodadas e a taça.
+  - **Chave de 32:** caixas que crescem por rodada; o jogador fica na caixa cheia na cor dele, brilhando, com o caminho grosso por cima; o adversário da vez pulsa em vermelho com o selo VS.
+  - **Avanço automático em 8 s,** sem anúncio. A barra enche no botão principal, um toque recomeça a conta e o Prêmio ×2 cancela. O `?avanco=N` regula (0 desliga).
+  - **Telas baixas:** no celular deitado só a faixa aparece. Até 780 px de altura o cartão fica mais compacto.
+  - **Botões:** a regra que deveria pôr os botões em linha no celular deitado estava sendo desfeita por outra mais abaixo no CSS; foi corrigida.
+- **Conferido** em prints de 390×844, 844×390 e 1280×720/800:
+  - cartão, campeão em 1, 2,5, 4,5 e 8 s;
+  - menu com a chave;
+  - bolha com nome em pt e en;
+  - avanço com `?avanco=2` (a barra enche e a partida seguinte, contra a Geleia, entra).
+- **Testes:**
+  - `test/rivais.test.js` novo (31 rivais com nome nas 3 línguas, caminhos de 5 com o chefe na final, distância das cores e a reserva);
+  - `torneio.test.js` atualizado para 32 e para o save sem `tam`;
+  - são 87 testes.
+- **Calibragem:** mediana do rali de 5,8 s (p90 de 15,6 s), 33% na rede e saque perfeito do T2 em 70%. Igual a antes.
+- **Build:** `npm run empacotar` ok, com 855 KB (353 KB gzip).
+
 ## Fica para depois
 - Os ginásios Escola, Rua e Arena; as Copas 2 a 4 jogam na Praia.
 - As evoluções de skin (Pro, Craque, Lenda), a loja de bolas e as comemorações.
 - O código de compartilhar o visual (`GS1-`), que o desenho §3.6 prevê.
 - O pincel e a estampa no `?render=2d` (a reserva sem WebGL2 mostra só a cor e os acessórios).
 - A medida no Android real (`npm run lan`) do controle novo, do saque com movimento e do custo do campo maior.
+- **O arco de 7 minutos (§3.9):** refazer com a Copa 1 de 5 partidas, junto com o humano simulado.
+- **O pulo do campeão:** quando ele pula, passa por trás da taça (ela fica na altura da cabeça dele em pé).
+- **A thumb** (`tools/thumb.html`) usa a Gota, que agora é azul da paleta (antes, um azul-piscina). A oficial não mudou; regenerar é decisão do usuário.
+- **O avanço automático** não tem teste de fluxo (o `fluxo.test` do desenho ainda não existe). Foi conferido em print.

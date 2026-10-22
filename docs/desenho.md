@@ -81,7 +81,7 @@ Este plano junta as 3 propostas (jogabilidade, arquitetura, conteúdo/Poki), os 
 | Moeda | **"Gotas"**, moeda única | Coerente com o tema |
 | Níveis das habilidades | 5 níveis de +3% cada (no máximo +12%), custos 150/300/600/1000 | Sem pay-to-win |
 | Ginásios na v1 | 4 (Praia, Escola, Rua, Arena); Chuva e Neve no M8 | Escopo |
-| Partidas por Copa | Copa 1 = 3 partidas (Gota, Geleia, chefe Rei Gosma); Copas 2–4 = 4. Desde 2026-10-22 é a Copa Gosma em mata-mata de 8 e de 16 (§2.13) | Arco de 7 min |
+| Partidas por Copa | Copa 1 = 3 partidas (Gota, Geleia, chefe Rei Gosma); Copas 2–4 = 4. **Desde 2026-10-22 (revisto no mesmo dia): mata-mata de 32 em todas as Copas, 5 partidas cada** (§2.13) | Arco de 7 min (a rever: a Copa 1 ganhou Pingo e Mingau) |
 | Supers dentro dos 7 min | **Prova grátis**: Jornada na partida 2 e Raio na partida 3. O Fogo o jogador vê com o chefe e libera ao vencê-lo | O usuário pediu os três de forma explícita |
 | Áudio de voz | **19 falas *Slime**: sem as militares, sem `Tempo`, `Depressa`, `Fim` e **sem `Fogo` ("Fire in the hole!")**. Total de 87 KB | Público infantil |
 | Replay | Só no ponto final da partida, **re-simulado** a partir de um snapshot. Pode ser pulado | A pele e os rostos aparecem corretos |
@@ -553,10 +553,14 @@ Catálogo aprovado pelo usuário em 2026-10-21. O código está em `src/jogo/pow
 
 | Copa | Rivais | Chefe |
 |---|---|---|
-| 1 Praia | Gota (T0→T1, distraída; partida 1 imperdível), Geleia (**T1+ fixo** na 1ª vez, erro ×1,4, no máximo 1 cortada lenta telegrafada depois do 4º ponto e nunca no match point) | **Rei Gosma (T2**, mira, **1 Fogo roteirizado**, anunciado e defensável, sem cortada lenta no 1º encontro) |
-| 2 Escola | Bolinha (T2, lob), Muralha (T2, rede), Professora Pudim (T3) | Faísca (T3, Raio) |
-| 3 Rua | Dona Calma (T3), Chiclete (T3, Fogo), Bolota (T3, caça-powerup) | Vovó Nuvem (T4, Jornada) |
-| 4 Arena | Trovão (T4, Raio), Cometa (T4), Geleião (T4) | Pimenta (T5, Fogo + Meteoro) |
+| 1 Praia | Gota (T0→T1, distraída; partida 1 imperdível), **Pingo** (T1, lob), Geleia (**T1+ fixo** na 1ª vez, erro ×1,4, no máximo 1 cortada lenta telegrafada depois do 4º ponto e nunca no match point), **Mingau** (T2, rede) | **Rei Gosma (T2**, mira, **1 Fogo roteirizado**, anunciado e defensável, sem cortada lenta no 1º encontro) |
+| 2 Escola | **Quiabo** (T2), Bolinha (T2, lob), Muralha (T2, rede), Professora Pudim (T3) | Faísca (T3, Raio) |
+| 3 Rua | **Onda** (T3, lob), Dona Calma (T3), Chiclete (T3, Fogo), Bolota (T3, caça-powerup) | Vovó Nuvem (T4, Jornada) |
+| 4 Arena | **Vulcão** (T4, Fogo), Trovão (T4, Raio), Cometa (T4), Geleião (T4) | Pimenta (T5, Fogo + Meteoro) |
+
+Os rivais em negrito entraram com a chave de 32 (2026-10-22). Mais 11 **figurantes** (`copa: 0`) só completam a chave e nunca cruzam com o jogador: Xarope, Mel, Lama, Musgo, Piche, Amora, Kiwi, Tapioca, Grude, Brejo e Melado.
+
+**Cores (2026-10-22, "os rivais vêm sempre da mesma cor"):** cada rival veste uma cor da paleta calibrada do vestiário (`CORES_BASE`), distinta dentro do caminho da Copa (ΔE OKLab×100 ≥ 15) e longe da laranjinha; antes, os três da Copa 1 eram azuis. Quando o jogador veste uma cor a menos de 12 da do rival, o rival troca para a cor reserva (`alt`, `corDoRival`); a chave usa a mesma cor da quadra. O `test/rivais.test.js` vigia.
 
 **Elástico** (só contra a CPU): é uma função contínua do placar, limitada, e **nunca troca de nível no meio da partida**.
 - CPU 3 ou mais pontos à frente: erro ×1,3, reação +0,06 s, corta ×0,5.
@@ -695,18 +699,22 @@ Catálogo aprovado pelo usuário em 2026-10-21. O código está em `src/jogo/pow
 - **Catálogo fixo, sem texto livre.** Gatilhos e chances: ACE 85%, BOMBA 80%, bloqueio 80%, virada 90%, ponto comum 30% (o chefe ganhando provoca), erro do rival na rede 50% ("Valeu, rede!"), ponto perdido 30%, match point 70% (o outro responde "Ainda não!"), 8ª travessia 60%, saque perfeito 45%, manchete perfeita 75%, cortada solta 50%, power-up pego 60%, congelado 80%, Bola de Fogo recebida 75%, bolada no juiz 85% ("Foi mal, juiz!") e a abertura da partida pela CPU (o Rei se gaba, a Gota nem viu que começou).
 - **Ritmo:** uma fala por vez, 3,5 s de recarga por slime e 1 s entre duas falas quaisquer; nunca com o balão de reação (a reação apaga a fala). Medido no bot: cerca de 12 falas por partida.
 - **Balão:** acima do slime, foge da bola e fica dentro da tela; estufa ao entrar, sobe um pouco e some nos últimos 0,25 s (1,5 s ao todo).
-- **Gravações:** a vaga de voz é a mesma (uma por vez; a gravação recente tem prioridade). Agora tocam `vozCombo4/6/8/10` (travessias pares), `vozCuidado` (efeito do rival vindo contra o jogador) e `vozNivel` (subida de nível); `vozParabens` fica para o título da Copa. Saíram do catálogo as que nunca tocavam (`vozCombo3/5/7/9`, `vozMissao`, `vozObjetivo`, `vozRecorde`, `fichas`, `clique`): o empacotar tira os arquivos da build.
+- **Gravações:** a vaga de voz é a mesma (uma por vez; a gravação recente tem prioridade). Agora tocam `vozCuidado` (efeito do rival vindo contra o jogador) e `vozNivel` (subida de nível); `vozParabens` fica para o título da Copa. O locutor contando as travessias (`vozCombo4/6/8/10`) saiu a pedido do usuário em 2026-10-22 ("tire a voz contando os números"): nas travessias pares só a plateia anima. Saíram do catálogo as que nunca tocavam (`vozCombo3/5/7/9`, `vozMissao`, `vozObjetivo`, `vozRecorde`, `fichas`, `clique`): o empacotar tira os arquivos da build.
 
 ### 2.13 Copa Gosma e menu (pedido de 2026-10-22)
 
 - **Nome:** Copa Gosma (EN Goo Cup, ES Copa Slime). Nunca o nome do torneio de seleções de futebol (marca de terceiros; o `estilo.test` barra até em comentário). As bandeiras são de países reais (`src/jogo/paises.js`, 195 = ONU + Vaticano e Palestina; desenhadas em código em `src/render/bandeiras.js`), sem número nem escudo de seleção; a taça é desenho nosso (de gosma).
-- **Formato (decisão do usuário):** mata-mata de 8 na Copa 1 (quartas, semi e final) e de 16 nas Copas 2 a 4 (oitavas até a final). O caminho do jogador é fixo pela ordem dos rivais da Copa (`COPAS` em `rivais.js`; o chefe na final), como no arco do §3.9; os rivais do caminho vencem os seus jogos simulados e os outros jogos saem por sorteio pelo nível T. **Perder não elimina:** é revanche da mesma fase.
-- **Estado:** `src/jogo/torneio.js` é puro; o save guarda só `{ n, semente, fase, placares, pais }` e a chave inteira sai de `chaveDaCopa()`. Cada vitória revela a rodada inteira (placares plausíveis, vai-a-2). O save antigo (`perfil.fase`) vira a fase da Copa 1.
+- **Formato (decisão do usuário, revista no mesmo dia):** mata-mata de **32 em todas as Copas**, dos 16-avos à final (5 partidas). Antes era de 8 na Copa 1 e de 16 nas Copas 2 a 4. A chave usa os 20 rivais das Copas e 11 figurantes. O caminho do jogador é fixo pela ordem dos rivais da Copa (`COPAS` em `rivais.js`; o chefe na final), como no arco do §3.9; os rivais do caminho vencem os seus jogos simulados e os outros jogos saem por sorteio pelo nível T. **Perder não elimina:** é revanche da mesma fase.
+- **Estado:** `src/jogo/torneio.js` é puro; o save guarda só `{ n, tam, semente, fase, placares, pais }` e a chave inteira sai de `chaveDaCopa()`. Cada vitória revela a rodada inteira (placares plausíveis, vai-a-2). O save antigo (`perfil.fase`) vira a fase do mesmo rival na Copa 1 (Gota, Geleia ou Rei); a Copa salva sem `tam: 32` (da chave de 8 ou 16) recomeça na primeira rodada, mantendo a Copa, a seleção e os títulos.
 - **Título:** +50 Gotas no 1º título de cada Copa (+20 nos seguintes), `vozParabens`, "Copa Gosma N+1 liberada!"; a Copa 4 se repete com outra chave. Todas na Praia até existirem os outros ginásios.
 - **Seleção do jogador:** a região do idioma do navegador (`pt-BR` → Brasil) até ele escolher no vestiário; os rivais nunca repetem a bandeira dele.
 - **Cartão de fim:** a chave em canvas (`src/render/chave.js`, espelhada na horizontal ou na vertical no retrato), com a rodada nova animando em 1,2 s (um toque pula), e "Próxima: Semifinal contra Geleia (Kuwait)". Botões Próxima/Revanche, Menu e o premiado.
+  - **Seu caminho (2026-10-22):** acima da chave, uma faixa com o slime do jogador, as 5 rodadas (bandeira do adversário, visto e placar nas jogadas; a atual pulsando com VS e o nome; as seguintes em aberto) e a taça (`desenharCaminho`). No celular deitado (altura até 460 px) só a faixa aparece; a chave inteira fica no menu.
+  - **Destaque do jogador na chave:** a caixa dele cheia na cor dele, brilhando e por cima das vizinhas; o caminho dele em linha grossa com contorno; o adversário da vez com borda vermelha pulsando e o selo VS. As caixas crescem a cada rodada (os 16-avos só com bandeira e placar).
+  - **Avanço automático:** sem toque, depois das animações, uma barra enche dentro do botão principal e em **8 s** a próxima partida (ou a revanche) vem sozinha, **sem anúncio** (o `commercialBreak` continua só no toque em Próxima/Revanche). Um toque no cartão recomeça a conta; o Prêmio ×2 cancela. A partida nova espera o toque para sacar, então o `gameplayStart` segue vindo de entrada real. `?avanco=N` (0 desliga).
+  - **Título:** a final vencida vira a festa do campeão (`celebracao.js`): o letreiro "CAMPEÃO!" gigante e dourado no terço de cima, a câmera fechando no slime do jogador com um holofote, chuva de confete e a taça descendo sobre a cabeça dele. O cartão (dourado) abre 2,6 s depois do fim (um toque abre na hora).
 - **Menu principal** (`src/ui/menu.js`): abre a partir da 2ª sessão (a 1ª vai direto para a partida), pelo cartão (a próxima partida fica pronta; o JOGAR paga o intervalo pendente) e pela pausa (o JOGAR continua). JOGAR (foco inicial, com a seleção e o próximo jogo), CHAVE (tela cheia) e as opções de controle e som. O teclado do `hud.js` navega pelas caixas do menu; Esc volta da chave.
-- **Parâmetros:** `?menu`, `?chave`, `?copa=N&fase=F`.
+- **Parâmetros:** `?menu`, `?chave`, `?copa=N&fase=F` (F de 0 a 5), `?avanco=N`.
 
 ---
 
@@ -935,6 +943,8 @@ O editor deste §3.6 continua no plano; o vestiário que existe hoje é este:
 
 ### 3.9 Onboarding (sem texto) e arco de 7 minutos
 
+> **2026-10-22:** com a chave de 32, a Copa 1 passou a ter 5 partidas (Gota, Pingo, Geleia, Mingau e Rei Gosma). A tabela abaixo é o arco original de 3 partidas e precisa ser refeita com o humano simulado.
+
 | Tempo | O que acontece |
 |---|---|
 | 0:00 | Praia, 6 slimes na plateia. A Gota segura a bola. Polegar fantasma (no desktop, teclas desenhadas) |
@@ -1148,7 +1158,7 @@ Começa em "baixa" se `hardwareConcurrency<=4 && deviceMemory<=2`. Desce de degr
 | Saque Raio | crepitar + trovão |
 | Saque Jornada | assobio + JOR-NA-DA + `vozCuidadoSlime` |
 | Medidor cheio, bolha | `vozPowerUpSlime` (no máximo 1 a cada 20 s) |
-| Combo de travessias | `vozCombo3…10Slime` |
+| Combo de travessias | só a plateia (o locutor saiu a pedido, 2026-10-22) |
 | Início | `vozProntoSlime` → `vozVaiSlime` (só com o áudio destravado) |
 | Vitória / derrota / título / recorde / nível / desafio / ginásio | `vozVenceu`, `vozPerdeu`, `vozParabens`, `vozRecorde`, `vozNivel`, `vozMissao`, `vozObjetivo` (*Slime) |
 | UI | `fichas.mp3`, `moedinha`, `clique.mp3`, `botaoPop` |

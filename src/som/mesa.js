@@ -1,5 +1,5 @@
 // Mesa de som do Volei de Gosma: cada evento do jogo vira uma receita sintetizada (receitas do
-// slime-merge e as do volei aqui) ou uma fala gravada (19 falas *Slime da Kenney, CC0). Sem
+// slime-merge e as do volei aqui) ou uma fala gravada (as falas *Slime da Kenney, CC0, do catalogo arquivos.js). Sem
 // musica (escolha do usuario no slime-merge: "nenhuma"). Os arquivos carregam depois do
 // primeiro gesto (audio.pronto()); enquanto nao chegam, a fala fica quieta.
 //

@@ -19,16 +19,20 @@
 //   ?menu ?chave          abre o menu principal (e a tela da chave) no comeco; ?vestiario=cores abre o vestiario na aba
 //   ?copa=2&fase=3        poe a Copa Gosma N na fase F (0 = primeira rodada; grava no save do navegador)
 //   ?look=pirata          veste o jogador com um arquetipo (src/jogo/visual.js); ?bandeira=BR a estampa da bandeira
+//   ?avanco=8             segundos ate o cartao de fim avancar sozinho (0 desliga; padrao 8, tambem fora do loopback)
 //
 // Fora disso, a build de modelos (tools/artifact.mjs) liga window.__voleiModelo = { visual,
 // controle, gatilho, ... } antes do main.js: vale fora do loopback e o empacotar apaga o gancho.
+
+/** O cartao de fim avanca sozinho depois disto, em s (pedido de 2026-10-22; sem anuncio). */
+const AVANCO = 8;
 
 export function lerDepuracao() {
   const base = {
     local: false, ganchos: false, modelo: false, debug: false, semente: 0, roteiro: '', quadro: -1, filme: 0, cada: 4,
     ginasio: '', skin: '', rival: '', nivel: '', controle: '', visual: '', gatilho: '', defensor: 0, lenta: 0, fora: false, assist: true,
     qualidade: -1, render: '', lang: '', semHud: false, semAnuncio: false, semBlur: false, auto: false, primeira: null, lab: false,
-    menu: false, chave: false, vestiario: '', copa: 0, fase: 0, look: '', bandeira: '',
+    menu: false, chave: false, vestiario: '', copa: 0, fase: 0, look: '', bandeira: '', avanco: AVANCO,
   };
   let local = false;
   try {
@@ -83,5 +87,6 @@ export function lerDepuracao() {
     fase: Math.max(0, num('fase') | 0),
     look: q.get('look') || '',
     bandeira: /^[a-z]{2}$/i.test(q.get('bandeira') || '') ? String(q.get('bandeira')) : '',
+    avanco: q.has('avanco') ? Math.max(0, num('avanco')) : AVANCO,
   });
 }

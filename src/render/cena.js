@@ -15,7 +15,7 @@ import { criarPlateia } from './plateia.js';
 import { calcularLayout } from './layout.js';
 import { ESTILOS, desenharPiso, desenharTopo } from './quadra.js';
 import { desenharFundo, desenharArquibancada, desenharBiruta } from './ginasios/praia.js';
-import { cameraFesta, desenharFesta, desenharInicio } from './celebracao.js';
+import { cameraFesta, desenharFesta, desenharInicio, focoCampeao, QUADRO_CAMPEAO } from './celebracao.js';
 import { paraMundo, paraTela, aplicar, enquadrar } from './camera.js';
 import { CORTADA } from '../jogo/cortada.js';
 import { alfaCanal } from '../jogo/tempo.js';
@@ -24,6 +24,7 @@ import { BOLHA } from '../jogo/powerups.js';
 import { REACAO } from '../jogo/reacoes.js';
 import { desenharFala } from './carinhas.js';
 import { desenharAcessorios } from './acessorios.js';
+import { desenharNomeBolha } from './icones.js';
 
 /**
  * Raio do nucleo do campo (no passo normal da pele e raio 2; cada slime escala pelo escNucleo) e
@@ -139,6 +140,7 @@ export function criarCena(el, o = {}) {
    *   feixe: false esconde o feixe da mira (a thumb desenha as setas dela; a reticula fica)
    *   falas: [{ i, texto, t, dur }] baloes de fala ja traduzidos
    *   vitrine: { x, y, w, h } (px CSS): o vestiario enquadra so o slime do jogador nesse retangulo
+   *   nomeBolha: o nome traduzido do power-up da bolha em quadra ('' esconde)
    */
   function desenhar(P, vista, alfa, dtR, o2) {
     medir();
@@ -162,6 +164,14 @@ export function criarCena(el, o = {}) {
       foco = foco || [C.bx, C.by];
     }
     let { base, cam } = diretor.quadro(L, b, dtR, { zoom, foco, reduzir: o.reduzir });
+    // campeao da Copa: a camera fecha no slime do jogador (o letreiro e a taca na celebracao.js)
+    const kc = F && F.campeao ? focoCampeao(F.t) : 0;
+    if (kc > 0) {
+      const sx = vista.slimes[0].x;
+      const Q = QUADRO_CAMPEAO;
+      const alvo = enquadrar([sx - Q.esq, Q.baixo, sx + Q.dir, Q.cima], { x: 0, y: 0, w: W, h: H });
+      cam = { s: cam.s + (alvo.s - cam.s) * kc, cx: cam.cx + (alvo.cx - cam.cx) * kc, cy: cam.cy + (alvo.cy - cam.cy) * kc, sx: cam.sx + (alvo.sx - cam.sx) * kc, sy: cam.sy + (alvo.sy - cam.sy) * kc };
+    }
     // vitrine do vestiario: o slime do jogador grande no retangulo dela (o rival, a bola e as
     // festas saem); o pincel converte o ponteiro por esta camera (paraMundo)
     const vit = o2.vitrine || null;
@@ -250,6 +260,8 @@ export function criarCena(el, o = {}) {
         desenharFala(ctxTopo, { texto: f.texto, t: f.t, dur: f.dur, ax, ay, bx, by, px, W });
       }
     }
+    // o nome do power-up embaixo da bolha
+    if (o2.nomeBolha && P.bolha) desenharNomeBolha(ctxTopo, P.bolha, t, BOLHA.vida, o2.nomeBolha, cam, dpr, W);
     // ---------------- tela (por cima do HUD)
     const dT = Math.min(1.5, dpr);
     const ativo = !!F || !!(o2.inicio && o2.inicio.t < 1.4);
@@ -258,7 +270,12 @@ export function criarCena(el, o = {}) {
       ctxTela.clearRect(0, 0, el.tela.width, el.tela.height);
       telaSuja = ativo;
     }
-    if (F) desenharFesta(ctxTela, cam, dT, W, H, F, { quadra: L.quadra, qualidade: q.nome, retrato: L.orient === 'retrato' });
+    if (F) {
+      const s0 = vista.slimes[0];
+      // a taca paira na altura da cabeca dele em pe (ele pula embaixo dela)
+      const campeao = F.campeao ? { foco: paraTela(cam, s0.x, s0.y + s0.b * 0.5), cabeca: paraTela(cam, s0.x, s0.b + 0.1) } : {};
+      desenharFesta(ctxTela, cam, dT, W, H, F, { quadra: L.quadra, qualidade: q.nome, retrato: L.orient === 'retrato', ...campeao });
+    }
     if (o2.inicio && o2.inicio.t < 1.4) desenharInicio(ctxTela, dT, o2.inicio.t, { quadra: L.quadra }, o2.inicio.txt, P.placar, o2.cores[0]);
   }
 

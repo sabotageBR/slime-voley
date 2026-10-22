@@ -6,15 +6,16 @@
 // desktop (fora dos menus). Teclado nos menus: setas e
 // WASD movem o foco, Enter/Espaco acionam, Esc volta; o foco inicial e sempre o botao normal.
 
-import { desenharChave } from '../render/chave.js';
+import { desenharChave, desenharCaminho } from '../render/chave.js';
 
 /**
  * @param {HTMLElement} raiz
  * @param {(k: string) => string} T
  * @param {{ aoPausar: () => void, aoContinuar: () => void, aoProxima: () => void, aoRevanche: () => void, aoOpcao: (id: string, v?: any) => void, som: (id: string) => void, icone: (ctx: CanvasRenderingContext2D, id: string, lado: number) => void, carinha: (ctx: CanvasRenderingContext2D, id: string, lado: number) => void, aoReagir: (id: string) => void, aoReagirTecla: (k: number) => void, aoBotaoReacao: () => void,
- *   premio: (ctx: CanvasRenderingContext2D, pr: any, lado: number) => void, aoPremiado: () => void, aoMenu: () => void,
+ *   premio: (ctx: CanvasRenderingContext2D, pr: any, lado: number) => void, aoPremiado: () => void, aoMenu: () => void, aoAutoAvanco: (revanche: boolean) => void,
  *   caixaExtra?: () => HTMLElement|null, aoEscExtra?: () => void }} cb
  *   caixaExtra: o menu principal ou a chave abertos (src/ui/menu.js): o teclado navega por eles
+ *   aoAutoAvanco: o cartao de fim avancou sozinho (ninguem tocou): a proxima partida sem anuncio
  */
 export function criarHud(raiz, T, cb) {
   raiz.insertAdjacentHTML('beforeend', `
@@ -34,6 +35,7 @@ export function criarHud(raiz, T, cb) {
       <div class="caixa">
         <div class="titulo"></div>
         <div class="sub"></div>
+        <canvas class="cvCaminho" hidden></canvas>
         <canvas class="cvChave" hidden></canvas>
         <div class="proxCopa" hidden></div>
         <div class="progresso" hidden>
@@ -63,7 +65,7 @@ export function criarHud(raiz, T, cb) {
     med0: $('.l0 .medidor'), med1: $('.l1 .medidor'), chips0: $('.l0 .chips'), chips1: $('.l1 .chips'), pausa: $('.pausa'), reagir: $('.reagir'), faixa: $('.faixa'),
     reacoes: $('.reacoes'), mao: $('.mao'), maoTexto: $('.mao .texto'), cartao: $('#cartao'), cTitulo: $('#cartao .titulo'), cSub: $('#cartao .sub'),
     proxima: $('#cartao .proxima'), revanche: $('#cartao .revanche'), premiado: $('#cartao .premiado'), menuBt: $('#cartao .menuBt'),
-    cvChave: /** @type {HTMLCanvasElement} */ ($('#cartao .cvChave')), proxCopa: $('#cartao .proxCopa'), opMenu: $('[data-op="menu"]'),
+    cvChave: /** @type {HTMLCanvasElement} */ ($('#cartao .cvChave')), cvCaminho: /** @type {HTMLCanvasElement} */ ($('#cartao .cvCaminho')), cCaixa: $('#cartao .caixa'), proxCopa: $('#cartao .proxCopa'), opMenu: $('[data-op="menu"]'),
     prog: $('#cartao .progresso'), gTotal: $('#cartao .gTotal'), gMais: $('#cartao .gMais'), xpMais: $('#cartao .xpMais'),
     nNum: $('#cartao .nNum'), barraXp: $('#cartao .barraXp i'), nXp: $('#cartao .nXp'), subiu: $('#cartao .subiu'),
     subiuTit: $('#cartao .subiuTit'), subiuPremios: $('#cartao .subiuPremios'), trilha: $('#cartao .trilha'), menu: $('#menuPausa'), mTitulo: $('#menuPausa .titulo'),
@@ -84,6 +86,8 @@ export function criarHud(raiz, T, cb) {
   let barra = null;
   let chaveBarra = '';
   let cartaoAberto = false;
+  /** s do avanco automatico do cartao aberto (0 = desligado) */
+  let autoSeg = 0;
 
   el.pausa.addEventListener('click', () => { cb.som('botao'); cb.aoPausar(); });
   el.reagir.addEventListener('click', () => { cb.som('botao'); cb.aoBotaoReacao(); });
@@ -98,9 +102,10 @@ export function criarHud(raiz, T, cb) {
   el.revanche.addEventListener('click', () => { cb.som('botao'); cb.aoRevanche(); });
   el.menuBt.addEventListener('click', () => { cb.som('botao'); cb.aoMenu(); });
   el.opMenu.addEventListener('click', () => { cb.som('botao'); cb.aoMenu(); });
-  el.premiado.addEventListener('click', () => { cb.som('botao'); el.premiado.disabled = true; cb.aoPremiado(); });
-  // um toque no cartao pula a contagem (Gotas, barra de XP e a chave)
-  el.cartao.addEventListener('pointerdown', () => { anim.fim = 0; animChave.fim = 0; });
+  el.premiado.addEventListener('click', () => { cb.som('botao'); el.premiado.disabled = true; pararAuto(); cb.aoPremiado(); });
+  // um toque no cartao pula a contagem (Gotas, barra de XP e a chave) e recomeca o avanco automatico
+  el.cartao.addEventListener('pointerdown', () => { anim.fim = 0; animChave.fim = 0; reiniciarAuto(); });
+  el.cartao.addEventListener('keydown', () => reiniciarAuto());
   el.opControle.addEventListener('click', () => { cb.som('botao'); cb.aoOpcao('controle'); });
   el.opSom.addEventListener('click', () => { cb.som('botao'); cb.aoOpcao('som'); });
   // build de modelos (Artifact): volta para o hub (o empacotar corta as linhas "// modelo")
@@ -161,23 +166,71 @@ export function criarHud(raiz, T, cb) {
 
   /** Chave no cartao: a rodada que acabou de ser revelada anima em ~1,2 s (um toque pula). */
   const animChave = { ini: 0, fim: 0, dados: /** @type {any} */ (null) };
+  /** Pinta um canvas do cartao no tamanho dele (DPR ate 2); o escondido (display none) fica. */
+  function pintar(cv, desenho) {
+    const r = cv.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.round(r.width);
+    const h = Math.round(r.height);
+    if (cv.width !== Math.round(w * dpr)) cv.width = Math.round(w * dpr);
+    if (cv.height !== Math.round(h * dpr)) cv.height = Math.round(h * dpr);
+    const g = cv.getContext('2d');
+    if (!g) return;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    desenho(g, w, h);
+  }
   function animarChave() {
     if (!cartaoAberto || !animChave.dados) return;
     const agora = performance.now();
     const k = animChave.fim <= animChave.ini ? 1 : Math.min(1, (agora - animChave.ini) / (animChave.fim - animChave.ini));
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const r = el.cvChave.getBoundingClientRect();
-    const w = Math.max(1, Math.round(r.width));
-    const h = Math.max(1, Math.round(r.height));
-    if (el.cvChave.width !== Math.round(w * dpr)) el.cvChave.width = Math.round(w * dpr);
-    if (el.cvChave.height !== Math.round(h * dpr)) el.cvChave.height = Math.round(h * dpr);
-    const g = el.cvChave.getContext('2d');
-    if (g) {
-      g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      g.clearRect(0, 0, w, h);
-      desenharChave(g, w, h, { ...animChave.dados, k: 1 - Math.pow(1 - k, 2), t: (agora - animChave.ini) / 1000 });
-    }
+    const d = { ...animChave.dados, k: 1 - Math.pow(1 - k, 2), t: (agora - animChave.ini) / 1000 };
+    pintar(el.cvCaminho, (g, w, h) => desenharCaminho(g, w, h, d));
+    pintar(el.cvChave, (g, w, h) => desenharChave(g, w, h, d));
     requestAnimationFrame(animarChave);
+  }
+
+  /**
+   * Avanco automatico do cartao de fim (pedido de 2026-10-22): sem toque, depois das animacoes, a
+   * barra enche no botao principal e a partida seguinte vem sozinha (sem anuncio: main.js). Um toque
+   * no cartao recomeca a conta; a aba oculta para (o rAF nao roda); o Premio x2 cancela.
+   */
+  const auto = { dur: 0, resta: 0, desde: 0, ultimo: 0, ativo: false, bt: /** @type {HTMLElement|null} */ (null) };
+  function iniciarAuto(seg) {
+    pararAuto();
+    if (!(seg > 0) || !cartaoAberto) return;
+    auto.bt = el.proxima.hidden ? el.revanche : el.proxima;
+    auto.dur = seg;
+    auto.ativo = true;
+    reiniciarAuto();
+    auto.bt.classList.add('auto');
+    requestAnimationFrame(passoAuto);
+  }
+  function reiniciarAuto() {
+    if (!auto.ativo) return;
+    auto.resta = auto.dur;
+    auto.desde = performance.now() + 1500;
+    auto.ultimo = performance.now();
+  }
+  function pararAuto() {
+    auto.ativo = false;
+    if (auto.bt) { auto.bt.classList.remove('auto'); auto.bt.style.removeProperty('--auto'); }
+  }
+  function passoAuto() {
+    if (!auto.ativo || !cartaoAberto || !auto.bt) return;
+    const agora = performance.now();
+    const dt = Math.min(0.1, (agora - auto.ultimo) / 1000);
+    auto.ultimo = agora;
+    if (agora >= auto.desde) auto.resta -= dt;
+    auto.bt.style.setProperty('--auto', (1 - Math.max(0, auto.resta) / auto.dur).toFixed(3));
+    if (auto.resta <= 0) {
+      const revanche = auto.bt === el.revanche;
+      pararAuto();
+      cb.aoAutoAvanco(revanche);
+      return;
+    }
+    requestAnimationFrame(passoAuto);
   }
 
   /** Nome curto de um premio da trilha. */
@@ -331,7 +384,8 @@ export function criarHud(raiz, T, cb) {
     cartao(c) {
       cartaoAberto = !!c;
       el.cartao.hidden = !c;
-      if (!c) return;
+      if (!c) { pararAuto(); return; }
+      el.cCaixa.classList.toggle('campeao', !!c.campeao);
       el.cTitulo.textContent = c.titulo;
       el.cSub.textContent = c.sub || '';
       el.proxima.hidden = !c.proxima;
@@ -341,9 +395,10 @@ export function criarHud(raiz, T, cb) {
       el.menuBt.hidden = !!c.semMenu;
       // a chave da Copa (com a rodada nova animando) e o proximo jogo
       el.cvChave.hidden = !c.chave;
+      el.cvCaminho.hidden = !c.chave;
       el.proxCopa.hidden = !c.proxCopa;
       el.proxCopa.textContent = c.proxCopa || '';
-      animChave.dados = c.chave || null;
+      animChave.dados = c.chave ? { ...c.chave, nomesFases: c.chave.chave.fases.map((f) => T('copa.' + f)) } : null;
       if (c.chave) {
         // a vitoria revela a rodada nova animando; na derrota a chave so aparece
         animChave.ini = performance.now() + (c.chave.animar === false ? 0 : 250);
@@ -352,11 +407,14 @@ export function criarHud(raiz, T, cb) {
       }
       progresso(c.progresso || null);
       requestAnimationFrame(() => (c.proxima ? el.proxima : el.revanche).focus());
+      autoSeg = c.auto || 0;
+      iniciarAuto(autoSeg);
     },
     /** depois do premiado: o progresso dobrado (ou null: o video nao rendeu) */
     cartaoPremiado(p) {
       el.premiado.hidden = true;
       if (p) progresso(p);
+      iniciarAuto(autoSeg);
       requestAnimationFrame(() => (el.proxima.hidden ? el.revanche : el.proxima).focus());
     },
     menu(aberto, ops = {}) {

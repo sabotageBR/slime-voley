@@ -1,9 +1,9 @@
-// Copa Gosma (pedido de 2026-10-22; decisao do usuario: mata-mata de 8 na Copa 1 e de 16 nas
-// Copas 2 a 4): a chave com os rivais do Circuito, cada um com a bandeira de um pais, e o jogador
-// com a dele. O nome e nosso: nunca o do torneio de selecoes de futebol (marca de terceiros; a
+// Copa Gosma (pedido de 2026-10-22; decisao do usuario, revista no mesmo dia: mata-mata de 32 em
+// todas as Copas, dos 16-avos a final, 5 partidas): a chave com os rivais do Circuito e os
+// figurantes, cada um com a bandeira de um pais, e o jogador com a dele. O nome e nosso: nunca o do torneio de selecoes de futebol (marca de terceiros; a
 // lista do estilo.test barra o nome ate em comentario).
 //
-// Puro e deterministico: o save guarda so { n, semente, fase, placares, pais } e a chave inteira
+// Puro e deterministico: o save guarda so { n, tam, semente, fase, placares, pais } e a chave inteira
 // sai daqui (vagas, jogos simulados, campeao). O caminho do jogador e fixo pela ordem dos rivais
 // da Copa (src/jogo/rivais.js COPAS: o ultimo e o chefe, na final), como no arco do desenho §3.9;
 // os rivais do caminho sempre vencem os seus jogos simulados (sao os mais fortes da chave). Os
@@ -15,18 +15,17 @@ import { RIVAIS, COPAS, rival as acharRival } from './rivais.js';
 import { PAISES, embaralharPaises, ehPais } from './paises.js';
 
 /** Nomes das fases (chaves de texto copa.<fase>), da primeira rodada a final. */
-export const FASES = Object.freeze({ 8: Object.freeze(['quartas', 'semi', 'final']), 16: Object.freeze(['oitavas', 'quartas', 'semi', 'final']) });
+export const FASES = Object.freeze({ 32: Object.freeze(['dezesseisavos', 'oitavas', 'quartas', 'semi', 'final']) });
+/** Tamanho da chave (o save de antes da chave de 32 recomeca a Copa dele: normalizarCopa). */
+export const TAM_COPA = 32;
 export const NUM_COPAS = COPAS.length;
 /** Gotas pelo titulo de cada Copa (desenho §3.7: 1o titulo de cada Copa). */
 export const GOTAS_TITULO = 50;
 
-/** @param {number} n */
-export const tamanhoDaCopa = (n) => (n <= 1 ? 8 : 16);
-
 const ORDEM_NIVEL = ['T0', 'T1', 'T1+', 'T2', 'T3', 'T4', 'T5'];
 
 /**
- * @typedef {{ n: number, semente: number, fase: number, placares: number[][], pais: string }} EstadoCopa
+ * @typedef {{ n: number, tam: number, semente: number, fase: number, placares: number[][], pais: string }} EstadoCopa
  * @typedef {{ id: string, pais: string, jogador: boolean }} Vaga
  * @typedef {{ a: number, b: number, venc: number, placar: number[]|null, doJogador: boolean }} Jogo
  *   a, b: indices das vagas; venc: o indice de quem venceu (-1 = ainda nao jogado)
@@ -34,14 +33,19 @@ const ORDEM_NIVEL = ['T0', 'T1', 'T1+', 'T2', 'T3', 'T4', 'T5'];
 
 /** Uma copa nova. @param {number} n @param {number} semente @param {string} [pais] @returns {EstadoCopa} */
 export function novaCopa(n, semente, pais = '') {
-  return { n: Math.max(1, Math.min(NUM_COPAS, n | 0 || 1)), semente: semente >>> 0, fase: 0, placares: [], pais: ehPais(pais) ? pais.toUpperCase() : '' };
+  return { n: Math.max(1, Math.min(NUM_COPAS, n | 0 || 1)), tam: TAM_COPA, semente: semente >>> 0, fase: 0, placares: [], pais: ehPais(pais) ? pais.toUpperCase() : '' };
 }
 
-/** O save, validado (sem copa: a Copa 1). @param {any} s @param {number} [semente] @returns {EstadoCopa} */
+/**
+ * O save, validado (sem copa: a Copa 1). O de outra chave (sem tam, de quando a Copa 1 era de 8 e
+ * as outras de 16) recomeca a mesma Copa na primeira rodada.
+ * @param {any} s @param {number} [semente] @returns {EstadoCopa}
+ */
 export function normalizarCopa(s, semente = 1) {
   if (!s || typeof s !== 'object') return novaCopa(1, semente);
   const c = novaCopa(Number(s.n) || 1, Number(s.semente) >>> 0 || semente, typeof s.pais === 'string' ? s.pais : '');
-  const rodadas = FASES[tamanhoDaCopa(c.n)].length;
+  if (Number(s.tam) !== TAM_COPA) return c;
+  const rodadas = FASES[TAM_COPA].length;
   c.fase = Math.max(0, Math.min(rodadas, Number(s.fase) | 0));
   const pl = Array.isArray(s.placares) ? s.placares : [];
   c.placares = pl.slice(0, c.fase).map((p) => (Array.isArray(p) && p.length === 2 ? [Math.max(0, p[0] | 0), Math.max(0, p[1] | 0)] : [7, 0]));
@@ -67,7 +71,7 @@ function placarSimulado(r, final, n) {
  * @returns {{ n: number, tam: number, fases: readonly string[], vagas: Vaga[], rodadas: Jogo[][], fase: number, campeao: boolean, adversario: string, nomeFase: string }}
  */
 export function chaveDaCopa(c) {
-  const tam = tamanhoDaCopa(c.n);
+  const tam = TAM_COPA;
   const fases = FASES[tam];
   const caminho = caminhoDaCopa(c.n);
   const rng = criarRng(((c.semente >>> 0) ^ hashTexto('copa' + c.n)) >>> 0);
@@ -140,7 +144,7 @@ export function chaveDaCopa(c) {
  * @returns {EstadoCopa}
  */
 export function registrarVitoria(c, placar) {
-  const rodadas = FASES[tamanhoDaCopa(c.n)].length;
+  const rodadas = FASES[TAM_COPA].length;
   if (c.fase >= rodadas) return c;
   return { ...c, fase: c.fase + 1, placares: [...c.placares, [placar[0] | 0, placar[1] | 0]] };
 }
