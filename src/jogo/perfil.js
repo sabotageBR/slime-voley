@@ -5,6 +5,8 @@
 
 import { INICIAIS as POWERUPS_INICIAIS } from './powerups.js';
 import { REACOES_INICIAIS } from './reacoes.js';
+import { normalizarCopa } from './torneio.js';
+import { ehPais } from './paises.js';
 
 /** XP por partida. */
 export const XP = Object.freeze({ vitoria: 30, derrota: 12, ponto: 2, ace: 3, bomba: 3, rali10: 5 });
@@ -57,12 +59,19 @@ export function normalizarPerfil(salvo) {
     nivel: Math.max(1, num(s.nivel) || 1),
     xp: num(s.xp),
     skin: typeof s.skin === 'string' && s.skin ? s.skin : 'laranjinha',
+    /** a selecao do jogador (codigo do pais; '' = ainda nao escolheu) */
+    pais: ehPais(s.pais) ? String(s.pais).toUpperCase() : '',
+    /** a Copa em andamento (src/jogo/torneio.js); o save antigo vira a fase da Copa 1 */
+    copa: normalizarCopa(s.copa || { n: 1, semente: 1, fase: Math.min(2, num(s.fase)) }),
+    /** quantas vezes ganhou cada Copa (indice n - 1) */
+    titulos: [0, 1, 2, 3].map((k) => num(Array.isArray(s.titulos) ? s.titulos[k] : 0)),
     liberados: {
       reacoes: lista(lib.reacoes, REACOES_INICIAIS),
       powerups: lista(lib.powerups, POWERUPS_INICIAIS),
       skins: lista(lib.skins, ['laranjinha']),
     },
   };
+  if (!p.copa.pais && p.pais) p.copa.pais = p.pais;
   // o que a trilha ja deu ate o nivel atual fica liberado (save mexido ou trilha nova), sem trocar a skin
   for (let n = 2; n <= p.nivel; n++) {
     for (const pr of premiosDoNivel(n)) {

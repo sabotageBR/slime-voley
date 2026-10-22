@@ -134,6 +134,36 @@ body { font-family: Fredoka, system-ui, sans-serif; color: var(--tinta); }
 .bt:focus-visible { outline: 3px dashed var(--azul); outline-offset: 3px; }
 .bt:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--tinta); }
 
+/* menu principal e tela da chave (src/ui/menu.js) */
+.menuInicial, .telaChave { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: rgba(23,22,28,.4); pointer-events: auto; }
+.menuInicial[hidden], .telaChave[hidden] { display: none; }
+.telaChave { z-index: 9; }
+.menuInicial .caixa, .telaChave .caixa { background: #fff; border: 4px solid var(--tinta); border-radius: 22px; box-shadow: 0 6px 0 var(--tinta); padding: 18px 22px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: calc(100vw - 24px); max-height: calc(100vh - 16px); overflow-y: auto; }
+.menuInicial .caixa { width: min(360px, calc(100vw - 32px)); }
+.menuInicial .logo { font-size: 38px; color: var(--laranja); -webkit-text-stroke: 4px var(--tinta); paint-order: stroke fill; transform: rotate(-3deg); }
+.menuInicial .copaInfo { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.menuInicial .copaInfo b { display: block; font-size: 18px; }
+#jogo .menuInicial .icPais { position: static; width: 54px; height: 36px; }
+.menuInicial .botoes, .telaChave .botoes { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.menuInicial .linha { display: flex; gap: 8px; }
+.menuInicial .linha .bt { flex: 1; font-size: 15px; min-height: 44px; }
+.menuInicial .jogar { min-height: 64px; font-size: 30px; }
+.telaChave .caixa { width: min(980px, calc(100vw - 24px)); }
+.telaChave .titulo { font-size: 26px; }
+.telaChave .sub { font-size: 16px; }
+#jogo .telaChave .cvChave, #jogo .cartao .cvChave { position: static; display: block; width: 100%; background: #f6efe2; border-radius: 14px; }
+#jogo .telaChave .cvChave { height: min(62vh, 560px); }
+#jogo .cartao .cvChave { height: clamp(130px, 30vh, 240px); }
+.cartao .cvChave[hidden], .cartao .proxCopa[hidden] { display: none; }
+.cartao .caixa:has(.cvChave:not([hidden])) { width: min(720px, calc(100vw - 24px)); }
+.cartao .proxCopa { font-size: 16px; text-align: center; }
+.bt.secundario { font-size: 16px; min-height: 42px; }
+@media (orientation: portrait) {
+  #jogo .telaChave .cvChave { height: min(70vh, 640px); }
+  #jogo .cartao .cvChave { height: clamp(170px, 34vh, 300px); }
+}
+
 /* laboratorio da cortada (so na build de modelos) */
 .lab { position: absolute; left: 8px; top: 64px; z-index: 9; width: min(300px, calc(100vw - 16px)); max-height: calc(100vh - 80px); overflow: auto; background: rgba(255,255,255,.94);
   border: 3px solid var(--tinta); border-radius: 14px; box-shadow: 0 4px 0 var(--tinta); font-size: 13px; pointer-events: auto; touch-action: pan-y; }

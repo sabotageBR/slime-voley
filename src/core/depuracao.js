@@ -16,6 +16,8 @@
 //   ?qualidade=0..3 ?render=2d ?lang=pt ?semhud ?semanuncio ?debug ?auto ?primeira
 //   ?semblur              o blur nao pausa (o Chrome headless das ferramentas perde o foco sozinho)
 //   ?lab                  laboratorio da cortada lenta (sliders ao vivo)
+//   ?menu ?chave          abre o menu principal (e a tela da chave) no comeco
+//   ?copa=2&fase=3        poe a Copa Gosma N na fase F (0 = primeira rodada; grava no save do navegador)
 //
 // Fora disso, a build de modelos (tools/artifact.mjs) liga window.__voleiModelo = { visual,
 // controle, gatilho, ... } antes do main.js: vale fora do loopback e o empacotar apaga o gancho.
@@ -25,6 +27,7 @@ export function lerDepuracao() {
     local: false, ganchos: false, modelo: false, debug: false, semente: 0, roteiro: '', quadro: -1, filme: 0, cada: 4,
     ginasio: '', skin: '', rival: '', nivel: '', controle: '', visual: '', gatilho: '', defensor: 0, lenta: 0, fora: false, assist: true,
     qualidade: -1, render: '', lang: '', semHud: false, semAnuncio: false, semBlur: false, auto: false, primeira: null, lab: false,
+    menu: false, chave: false, copa: 0, fase: 0,
   };
   let local = false;
   try {
@@ -72,5 +75,9 @@ export function lerDepuracao() {
     auto: q.has('auto'),
     primeira: q.has('primeira') ? q.get('primeira') !== '0' : null,
     lab: q.has('lab'),
+    menu: q.has('menu'),
+    chave: q.has('chave'),
+    copa: Math.max(0, Math.min(4, num('copa') | 0)),
+    fase: Math.max(0, num('fase') | 0),
   });
 }

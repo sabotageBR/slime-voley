@@ -50,6 +50,7 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
   - `reacoes.js`: os emoji (a qualquer hora, com recarga) e a escolha da CPU;
   - `juiz.js`: o juiz da rede (olhar, apontar e a bolada sorteada; nunca muda a bola);
   - `falas.js`: as falas em balão (catálogo fixo por gatilho, recarga e rng próprio);
+  - `torneio.js` (a Copa Gosma: chave de 8 e de 16 derivada do save) e `paises.js` (os 195 códigos);
   - `perfil.js`: XP, nível, trilha, Gotas e o save normalizado;
   - `humor.js` (porte sem uso), `medidor.js`, `rivais.js` e `skins.js`.
 - `src/core/`: laço, `rng.js`, save, áudio, vibração, o SDK (`poki.js`) e `depuracao.js`.
@@ -59,9 +60,10 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
   - `vista.js`: o proxy que o campo e os rostos leem;
   - `campo.js` e `composicao.js`: a gosma do slime-merge, com um campo móvel por slime;
   - `diretor.js` (câmera), `layout.js` (retrato, paisagem e desktop), `quadra.js`, `celebracao.js` e `plateia.js`;
-  - `icones.js` (power-ups, bolha, gelo e prêmios), `carinhas.js` (as carinhas e o balão das reações) e `juiz.js` (a cadeirinha e o juiz), em código;
+  - `icones.js` (power-ups, bolha, gelo e prêmios), `carinhas.js` (as carinhas, o balão das reações e o das falas) e `juiz.js` (a cadeirinha e o juiz), em código;
+  - `bandeiras.js` (as 195 bandeiras numa mini-linguagem de primitivas) e `chave.js` (a chave da Copa e a taça);
   - `ginasios/praia.js`.
-- `src/ui/`: `controles.js` (Metades e Botões, teclado e mouse), `hud.js` (placar, chips, barra de reações e o cartão com a progressão) e `lab.js` (o laboratório da cortada).
+- `src/ui/`: `controles.js` (Metades e Botões, teclado e mouse), `hud.js` (placar, chips, barra e botão de reações e o cartão com a chave e a progressão), `menu.js` (o menu principal e a tela da chave) e `lab.js` (o laboratório da cortada).
 - `src/som/mesa.js`: os eventos tocam receitas, as gravações `*Slime` do catálogo `arquivos.js` e o balbucio sintetizado das falas (`som/falas.js`). Não há música.
 - `src/i18n/textos.js`: todo texto visível.
 - `src/main.js` liga tudo e é o **único** dono do SDK (`core/poki.js`), do áudio, do save e do DOM.
@@ -107,7 +109,7 @@ Portas: 5380 (servir), 4380–4385, CDP 9380–9382. É um Chrome por vez: o `sh
 **Parâmetros de teste:**
 - Só valem em loopback e na LAN, ou pelo `window.__voleiModelo` da build de modelos.
 - O `core/depuracao.js` é o único módulo que lê a URL, e o cabeçalho dele tem a lista completa.
-- Os mais usados: `?semente ?roteiro=cortada|ponto|ponto-curto|reacao|saque|bolha|gelo|fogo|gosmao|juiz|juiz-<reação>|fim ?visual=a|b|c ?controle=a|b ?gatilho=novo|segura ?lab ?auto ?primeira ?semblur ?semanuncio ?debug`.
+- Os mais usados: `?semente ?roteiro=cortada|ponto|ponto-curto|reacao|saque|bolha|gelo|fogo|gosmao|juiz|juiz-<reação>|fim ?visual=a|b|c ?controle=a|b ?gatilho=novo|segura ?lab ?auto ?primeira ?menu ?chave ?copa=N&fase=F ?semblur ?semanuncio ?debug`.
 - Para um print parado num instante, use `?filme=1&cada=N`: N passos e um desenho, sem rAF.
 - `?fora=1` liga a regra antiga do fora; por padrão, a bola nunca sai.
 - Os roteiros `jornada`, `raio`, `rali8` e `onboarding`, citados no desenho, ainda não existem.

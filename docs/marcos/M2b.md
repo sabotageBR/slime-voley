@@ -83,3 +83,25 @@ O trabalho foi dividido em 5 etapas, cada uma com o seu commit.
   - agora tocam `vozCombo4`, `vozCuidado` (efeito do rival vindo contra o jogador) e `vozNivel` (subida de nível);
   - saíram 9 arquivos que nunca tocavam (cerca de 37 KB a menos na build).
 - **Testes:** `test/falas.test.js` (textos nas 3 línguas, balbucio, recarga, intervalo, frequência e determinismo). São 70 testes.
+
+## Etapa 4: Copa Gosma e menu
+
+- **Copa Gosma** (`src/jogo/torneio.js`, puro): mata-mata de 8 na Copa 1 e de 16 nas Copas 2 a 4.
+  - O caminho é fixo pelos rivais da Copa, com o chefe na final.
+  - Os outros jogos são simulados pelo nível, e cada vitória revela a rodada inteira.
+  - Perder é revanche da mesma fase.
+  - O save guarda só `{ n, semente, fase, placares, pais }`, e o save antigo (`perfil.fase`) vira a fase da Copa 1.
+  - O título dá +50 Gotas (+20 nos seguintes) e `vozParabens`, e libera a Copa seguinte.
+- **Bandeiras:**
+  - `src/jogo/paises.js` tem os 195 códigos (ONU + Vaticano e Palestina);
+  - `src/render/bandeiras.js` desenha as 195 numa mini-linguagem de primitivas, com brasões simplificados; foram conferidas numa folha inteira e de perto nas mais vistas;
+  - os nomes vêm do `Intl.DisplayNames`, com 3 corrigidos no i18n;
+  - a seleção do jogador vem do idioma do navegador.
+- **Chave** (`src/render/chave.js`): espelhada na horizontal ou na vertical no retrato, com taça de gosma, bandeiras, nomes, placares, vencedor em ouro, o jogador na cor dele e a rodada nova animando. Aparece no cartão de fim, com o "Próxima: Semifinal contra Geleia (Kuwait)", e na tela da chave.
+- **Menu principal** (`src/ui/menu.js`):
+  - opções: Jogar (com a seleção e o próximo jogo), Chave, Controle e Som;
+  - abre a partir da 2ª sessão, pelo cartão (Menu) e pela pausa (Menu);
+  - teclado e Esc.
+  - O fluxo pausa → Menu → Chave → Esc → Jogar foi conferido com cliques reais pelo CDP.
+- **Parâmetros:** `?menu`, `?chave` e `?copa=N&fase=F`.
+- **Testes:** `test/torneio.test.js` (tamanhos, caminho, revelação, placares, revanche, título, Copa seguinte e save) e `test/bandeiras.test.js` (195 sem repetir, todas desenhadas, nomes nas 3 línguas e o país pelo idioma). São 78 testes.

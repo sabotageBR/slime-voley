@@ -81,7 +81,7 @@ Este plano junta as 3 propostas (jogabilidade, arquitetura, conteúdo/Poki), os 
 | Moeda | **"Gotas"**, moeda única | Coerente com o tema |
 | Níveis das habilidades | 5 níveis de +3% cada (no máximo +12%), custos 150/300/600/1000 | Sem pay-to-win |
 | Ginásios na v1 | 4 (Praia, Escola, Rua, Arena); Chuva e Neve no M8 | Escopo |
-| Partidas por Copa | Copa 1 = 3 partidas (Gota, Geleia, chefe Rei Gosma); Copas 2–4 = 4 | Arco de 7 min |
+| Partidas por Copa | Copa 1 = 3 partidas (Gota, Geleia, chefe Rei Gosma); Copas 2–4 = 4. Desde 2026-10-22 é a Copa Gosma em mata-mata de 8 e de 16 (§2.13) | Arco de 7 min |
 | Supers dentro dos 7 min | **Prova grátis**: Jornada na partida 2 e Raio na partida 3. O Fogo o jogador vê com o chefe e libera ao vencê-lo | O usuário pediu os três de forma explícita |
 | Áudio de voz | **19 falas *Slime**: sem as militares, sem `Tempo`, `Depressa`, `Fim` e **sem `Fogo` ("Fire in the hole!")**. Total de 87 KB | Público infantil |
 | Replay | Só no ponto final da partida, **re-simulado** a partir de um snapshot. Pode ser pulado | A pele e os rostos aparecem corretos |
@@ -696,6 +696,17 @@ Catálogo aprovado pelo usuário em 2026-10-21. O código está em `src/jogo/pow
 - **Ritmo:** uma fala por vez, 3,5 s de recarga por slime e 1 s entre duas falas quaisquer; nunca com o balão de reação (a reação apaga a fala). Medido no bot: cerca de 12 falas por partida.
 - **Balão:** acima do slime, foge da bola e fica dentro da tela; estufa ao entrar, sobe um pouco e some nos últimos 0,25 s (1,5 s ao todo).
 - **Gravações:** a vaga de voz é a mesma (uma por vez; a gravação recente tem prioridade). Agora tocam `vozCombo4/6/8/10` (travessias pares), `vozCuidado` (efeito do rival vindo contra o jogador) e `vozNivel` (subida de nível); `vozParabens` fica para o título da Copa. Saíram do catálogo as que nunca tocavam (`vozCombo3/5/7/9`, `vozMissao`, `vozObjetivo`, `vozRecorde`, `fichas`, `clique`): o empacotar tira os arquivos da build.
+
+### 2.13 Copa Gosma e menu (pedido de 2026-10-22)
+
+- **Nome:** Copa Gosma (EN Goo Cup, ES Copa Slime). Nunca o nome do torneio de seleções de futebol (marca de terceiros; o `estilo.test` barra até em comentário). As bandeiras são de países reais (`src/jogo/paises.js`, 195 = ONU + Vaticano e Palestina; desenhadas em código em `src/render/bandeiras.js`), sem número nem escudo de seleção; a taça é desenho nosso (de gosma).
+- **Formato (decisão do usuário):** mata-mata de 8 na Copa 1 (quartas, semi e final) e de 16 nas Copas 2 a 4 (oitavas até a final). O caminho do jogador é fixo pela ordem dos rivais da Copa (`COPAS` em `rivais.js`; o chefe na final), como no arco do §3.9; os rivais do caminho vencem os seus jogos simulados e os outros jogos saem por sorteio pelo nível T. **Perder não elimina:** é revanche da mesma fase.
+- **Estado:** `src/jogo/torneio.js` é puro; o save guarda só `{ n, semente, fase, placares, pais }` e a chave inteira sai de `chaveDaCopa()`. Cada vitória revela a rodada inteira (placares plausíveis, vai-a-2). O save antigo (`perfil.fase`) vira a fase da Copa 1.
+- **Título:** +50 Gotas no 1º título de cada Copa (+20 nos seguintes), `vozParabens`, "Copa Gosma N+1 liberada!"; a Copa 4 se repete com outra chave. Todas na Praia até existirem os outros ginásios.
+- **Seleção do jogador:** a região do idioma do navegador (`pt-BR` → Brasil) até ele escolher no vestiário; os rivais nunca repetem a bandeira dele.
+- **Cartão de fim:** a chave em canvas (`src/render/chave.js`, espelhada na horizontal ou na vertical no retrato), com a rodada nova animando em 1,2 s (um toque pula), e "Próxima: Semifinal contra Geleia (Kuwait)". Botões Próxima/Revanche, Menu e o premiado.
+- **Menu principal** (`src/ui/menu.js`): abre a partir da 2ª sessão (a 1ª vai direto para a partida), pelo cartão (a próxima partida fica pronta; o JOGAR paga o intervalo pendente) e pela pausa (o JOGAR continua). JOGAR (foco inicial, com a seleção e o próximo jogo), CHAVE (tela cheia) e as opções de controle e som. O teclado do `hud.js` navega pelas caixas do menu; Esc volta da chave.
+- **Parâmetros:** `?menu`, `?chave`, `?copa=N&fase=F`.
 
 ---
 
