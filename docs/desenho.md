@@ -674,6 +674,21 @@ Catálogo aprovado pelo usuário em 2026-10-21. O código está em `src/jogo/pow
   - quando ganha o ponto, fica convencida ou ri; quando perde, fica brava ou chora; e responde coração com coração.
 - **Telemetria:** `reacao/<id>/humano`.
 
+### 2.11 Juiz da rede (pedido de 2026-10-22)
+
+- **Onde está:** a lógica em `src/jogo/juiz.js` (pura, rng próprio `hashTexto('juiz')`, no relógio do mundo: entra na câmera lenta e no hitstop) e o desenho em `src/render/juiz.js`.
+- **Posto:** uma cadeirinha atrás do poste da rede (plataforma em y = 2,62, logo acima do topo do poste), no lugar da bandeirinha. O juiz é um humano pequeno (cerca de 1,45 u), de boné e bigode, com cores apagadas e traço fino: na hierarquia fica abaixo da rede.
+- **Olhar:** a cabeça e os olhos acompanham a bola; ele pisca de vez em quando.
+- **No ponto:** olha para o lado de quem ganhou e aponta o braço para ele (o apito já toca no `ponto`); depois volta a olhar a bola.
+- **A bolada:**
+  - ele fica atrás da rede, em profundidade, e a bola passa à frente dele;
+  - quando a bola entra no círculo do corpo (0,6 u + RB), um sorteio decide se pegou "no plano dele": 4%, ou 9% em bola rápida (≥ 20 u/s), cortada ou de poder; se não pegou, ele só pisca;
+  - **a bola não desvia** (decisão do usuário: "quase não desvia"): a física, a IA e o `hash()` da partida não mudam (`test/juiz.test.js` compara com `{ juiz: false }`);
+  - medido no `calibrar`: cerca de 1 bolada por partida.
+- **Reações** (sorteadas; as fortes derrubam): tombo (cai da cadeira, fica deitado, levanta e sobe pela escadinha), pendurado (fica pendurado na plataforma balançando e se puxa), pião (gira e fica tonto), galo, apito (voa e ele pega no ar), boné (voa e cai de volta na cabeça), bigode (entorta e ele arruma) e cartão amarelo para a bola. Todas voltam ao posto em até 2,5 s.
+- **Som e telemetria:** evento `juiz-bolada` com o som `bonk`; `measure('juiz', <reação>, 'bolada')`.
+- **Roteiro:** `?roteiro=juiz` ou `?roteiro=juiz-<reação>`.
+
 ---
 
 ## 3. Conteúdo

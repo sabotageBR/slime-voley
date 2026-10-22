@@ -18,6 +18,8 @@ import { desenharFundo, desenharArquibancada, desenharBiruta } from './ginasios/
 import { cameraFesta, desenharFesta, desenharInicio } from './celebracao.js';
 import { paraMundo, paraTela, aplicar } from './camera.js';
 import { CORTADA } from '../jogo/cortada.js';
+import { alfaCanal } from '../jogo/tempo.js';
+import { desenharCadeira, desenharJuiz } from './juiz.js';
 import { BOLHA } from '../jogo/powerups.js';
 import { REACAO } from '../jogo/reacoes.js';
 
@@ -170,10 +172,13 @@ export function criarCena(el, o = {}) {
       sombras: vista.slimes.map((s) => ({ x: s.x, y: s.y, a: s.a })),
       bola: P.estado !== 'ponto' || (F && F.t < 0.6) ? b : null,
       alvoSaque: o2.alvoSaque,
+      atrasDaRede: P.juiz ? desenharCadeira : undefined,
     });
     if (L.plateia) plateia.desenharFaixa(ctxFundo, dpr, L.plateia, est, 0.8);
     aplicar(ctxFundo, cam, dpr);
     desenharBiruta(ctxFundo, -11.6, 3.2, 0, t, Math.max(0.03, est.traco / cam.s));
+    // o juiz em cima da cadeirinha (atras dos slimes e da bola: em profundidade)
+    if (P.juiz) desenharJuiz(ctxFundo, P.juiz, alfaCanal(P.tempo, 'mundo', alfa), t, Math.max(0.03, est.traco / cam.s));
     // ---------------- slimes
     const q = QUALIDADES[qual];
     if (comp && !comp.perdeu()) {

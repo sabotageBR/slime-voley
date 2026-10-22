@@ -21,6 +21,7 @@ import { BOT, paramsIA, rival as acharRival } from './rivais.js';
 import * as Cort from './cortada.js';
 import { criarBolhas, powerUp, EFEITO } from './powerups.js';
 import { reacao as acharReacao, escolherReacaoCpu, chanceReacaoCpu, REACAO } from './reacoes.js';
+import { criarJuiz, passoJuiz, forcarBolada } from './juiz.js';
 import { criarRng, hashTexto } from '../core/rng.js';
 
 /** Velocidade de saida que conta como BOMBA (com a bola descendo). */
@@ -61,6 +62,7 @@ const intencaoVazia = () => ({ eixo: 0, botao: false, borda: false, superBorda: 
  * @property {{ ima?: boolean, devolucao?: boolean }} [assist]
  * @property {number} [nivelCortada]
  * @property {number[]} [pig]                 pigmentos [jogador, rival]
+ * @property {boolean} [juiz]                 false: sem o juiz da rede (ele nunca muda a bola; o hash e o mesmo)
  * @property {number} [alvo]
  * @property {boolean} [qualidadeMinima]      pele com menos particulas
  * @property {0|1} [sacaPrimeiro]
@@ -83,6 +85,8 @@ export function criarPartida(o = {}) {
   const assist = { ima: true, devolucao: true, ...(o.assist || {}) };
   const comFora = !!o.fora;
   const bolhas = criarBolhas({ semente: o.semente, liberados: o.primeira ? [] : o.powerups || [] });
+  // o juiz da rede: rng proprio, nunca mexe na bola (so sofre a bolada)
+  const juiz = o.juiz === false ? null : criarJuiz(o.semente || 1);
   /** reacoes da CPU: rng proprio (nao mexe no das IAs) */
   const rngR = criarRng(((o.semente || 7) ^ hashTexto('reacoes')) >>> 0);
   /** reacao planejada da CPU: { t (s que faltam), id } */
@@ -1033,6 +1037,17 @@ export function criarPartida(o = {}) {
     anterior.peles[i].y.set(peles[i].y);
   }
 
+  /** O que o juiz ve: a bola, se ela esta em jogo (fora da mira) e, no ponto, quem ganhou. */
+  function contextoJuiz() {
+    const mirando = !!cortada && cortada.fase !== 'soltando';
+    return {
+      bola,
+      ativa: estado === 'jogo' && bola.solta && !mirando,
+      forte: bola.estado !== 'normal' || rali.ultimaCortada,
+      ponto: estado === 'ponto' || estado === 'fim' ? { lado: festa.lado } : null,
+    };
+  }
+
   /**
    * Um passo real (1/120 s de jogo-real).
    */
@@ -1058,6 +1073,8 @@ export function criarPartida(o = {}) {
         anterior.bola.x = bola.x; anterior.bola.y = bola.y; anterior.bola.ang = bola.ang;
         passoDaBola(PASSO, andaram);
       }
+      // o juiz anda no relogio do mundo (camera lenta e hitstop valem para ele)
+      if (juiz && k < n.mundo) for (const e of passoJuiz(juiz, PASSO, contextoJuiz())) ev(e);
       // CPU tenta a cortada no ar (na janela)
       for (const i of [0, 1]) {
         if (!ias[i] || cortada || estado !== 'jogo') continue;
@@ -1141,6 +1158,8 @@ export function criarPartida(o = {}) {
     get peles() { return peles; },
     get bola() { return bola; },
     get jogadores() { return J; },
+    /** o juiz da rede (null com { juiz: false }) */
+    get juiz() { return juiz; },
     get humano() { return humano; },
     get rali() { return rali; },
     get rival() { return riv; },
@@ -1199,6 +1218,7 @@ export function criarPartida(o = {}) {
      * ponto | ponto-curto: o ponto acabou de sair (festa completa ou curta); reacao: o curto com o
      * balao da CPU. bolha | gelo | fogo: power-ups no rali. gosmao: o Gosmao inchando (e o rival
      * encolhido). saque: a bola no ar, logo antes do ideal, com o sacador recuado (saque fundo).
+     * juiz | juiz-<reacao>: a bola acabou de pegar no juiz.
      * @param {string} nome
      */
     roteiro(nome) {
@@ -1264,6 +1284,20 @@ export function criarPartida(o = {}) {
         J[0].efeitos.gosmao = 2;
         J[1].efeitos.encolher = 2;
         ev({ tipo: 'powerup', i: 0, id: 'gosmao', alvo: 0, humano: humano[0] });
+        return true;
+      }
+      if (nome === 'juiz' || nome.startsWith('juiz-')) {
+        // a bola acaba de passar pelo juiz: bolada garantida (juiz-<reacao> escolhe a reacao)
+        estado = 'jogo';
+        rali.lado = -1; rali.toques = 1; rali.ultimo = 0; rali.ultimoLado = -1; rali.recepcaoSaque = false;
+        slimes[0].x = -6; slimes[1].x = 6;
+        assentar(peles[0], slimes[0]);
+        assentar(peles[1], slimes[1]);
+        bola.solta = true; bola.x = 0.4; bola.y = 3.6; bola.vx = 9; bola.vy = 5;
+        if (juiz) {
+          const r = forcarBolada(juiz, nome.slice(5), { x: -0.5, y: 3.4, vx: 14, vy: -2 });
+          ev({ tipo: 'juiz-bolada', reacao: r, x: -0.5, y: 3.4, v: 14 });
+        }
         return true;
       }
       if (nome === 'saque') {

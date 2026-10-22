@@ -382,6 +382,12 @@ const TRATADORES = {
     mesa.tocar('botaoPop', {}, { max: 2 });
     if (e.i === 0) { vibrar(10); poki.measure('reacao', e.id, 'humano'); }
   },
+  // o juiz da rede levou a bolada (a bola nao desvia; so ele sofre)
+  'juiz-bolada': (e) => {
+    mesa.tocar('bonk', { forca: Math.min(1, e.v / 20) }, { max: 1 });
+    cena.vfx.respingo(e.x, e.y, '#ffffff', 6, 4);
+    poki.measure('juiz', e.reacao, 'bolada');
+  },
   'tutorial-cortada': () => { tMao = 0; },
   'texto': () => {},
   'lenta': () => {},

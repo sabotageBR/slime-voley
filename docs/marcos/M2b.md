@@ -54,3 +54,16 @@ O trabalho foi dividido em 5 etapas, cada uma com o seu commit.
 - **Balão:** de 64 a 136 px de diâmetro (antes, 32 a 95 px), e a 75% no rali.
 
 **Testes:** 62, com os novos `pele`, os de controle no `fisica`, o da retícula no `cortada`, os do saque andando no `regras` e os de reação no rali.
+
+## Etapa 2: juiz
+
+- **Juiz da rede:** um humano pequeno, de boné e bigode, numa cadeirinha atrás do poste, no lugar da bandeirinha.
+  - O módulo `src/jogo/juiz.js` é puro, com rng próprio, e anda no relógio do mundo.
+  - O desenho fica em `src/render/juiz.js`, com cores apagadas e traço fino.
+- **Olhar e ponto:** a cabeça e os olhos seguem a bola; no ponto, ele olha e aponta para quem ganhou.
+- **Bolada:**
+  - quando a bola passa pelo corpo dele, um sorteio decide se pegou "no plano dele" (4%, ou 9% em bola forte); se não pegou, ele pisca;
+  - a bola não desvia, e o `hash()` da partida é igual com e sem o juiz;
+  - deu 1,0 a 1,1 bolada por partida no `calibrar`.
+- **8 reações:** tombo, pendurado, pião, galo, apito, boné, bigode e cartão amarelo, todas de volta ao posto em até 2,5 s. Os prints foram conferidos quadro a quadro, com `?roteiro=juiz-<reação>&filme=1&cada=N`.
+- **Testes:** `test/juiz.test.js` (determinismo, hash com e sem o juiz, volta ao posto, apontar, olhar e taxa de boladas). São 67 testes.

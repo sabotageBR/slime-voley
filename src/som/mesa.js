@@ -110,6 +110,14 @@ export const RECEITAS_VOLEI = Object.freeze({
     tom(v, t + 0.3, { f: 520, f2: 380, glide: 0.08, vol: 0.06, ataque: 0.004, queda: 0.1 });
     return 0.45;
   },
+  /** bolada no juiz: "bonk" de desenho animado (oco, que cai) com um boing curto */
+  bonk(v, t, p = {}) {
+    const k = Math.max(0.5, Math.min(1, p.forca || 0.7));
+    tom(v, t, { f: 620, f2: 210, glide: 0.09, vol: 0.2 * k, ataque: 0.002, queda: 0.14, tipo: 'triangle' });
+    sopro(v, t, { f: 1800, q: 1.2, vol: 0.08 * k, ataque: 0.001, queda: 0.04 });
+    tom(v, t + 0.06, { f: 300, f2: 520, glide: 0.18, vol: 0.06 * k, ataque: 0.01, queda: 0.22, vib: { f: 14, prof: 40 } });
+    return 0.35;
+  },
   /** botao da UI */
   botao(v, t) {
     tom(v, t, { f: 620, f2: 880, glide: 0.04, vol: 0.06, ataque: 0.002, queda: 0.06 });

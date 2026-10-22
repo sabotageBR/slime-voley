@@ -53,7 +53,7 @@ export function tom(hex, f) {
  * @param {import('./camera.js').Camera} cam
  * @param {number} dpr @param {number} W @param {number} H @param {number} t
  * @param {any} est ESTILOS[x]
- * @param {{ sombras: Array<{x:number, y:number, a:number}>, bola: {x:number,y:number}, alvoSaque?: number|null, ginasio?: any }} vis
+ * @param {{ sombras: Array<{x:number, y:number, a:number}>, bola: {x:number,y:number}, alvoSaque?: number|null, ginasio?: any, atrasDaRede?: (ctx: CanvasRenderingContext2D, tr: number) => void }} vis
  */
 export function desenharPiso(ctx, cam, dpr, W, H, t, est, vis) {
   const y0 = paraTela(cam, 0, 0)[1];
@@ -159,6 +159,8 @@ export function desenharPiso(ctx, cam, dpr, W, H, t, est, vis) {
     rr(ctx, x - w / 2, 0, w, PLACA_H, 0.12);
     ctx.stroke();
   }
+  // atras da rede (em profundidade): a cadeirinha do juiz
+  if (vis.atrasDaRede) vis.atrasDaRede(ctx, tr);
   // a rede (fundo de malha, visto quase de lado) e o poste
   ctx.fillStyle = est.fundoRede;
   ctx.fillRect(-0.32, 1.05, 0.64, REDE_H - 1.05);
@@ -186,23 +188,10 @@ export function desenharPiso(ctx, cam, dpr, W, H, t, est, vis) {
   ctx.beginPath();
   rr(ctx, -REDE_R, -0.25, 2 * REDE_R, REDE_H - REDE_R + 0.25, REDE_R);
   ctx.stroke();
-  // ponta com bandeirinha
+  // ponta do poste (a bandeirinha saiu: o juiz fica em cima, na cadeirinha atras do poste)
   ctx.fillStyle = est.placa[1];
   ctx.beginPath();
   ctx.arc(0, REDE_H - REDE_R, REDE_R * 1.3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  const bal = Math.sin(t * 3.2) * 0.1;
-  ctx.beginPath();
-  ctx.moveTo(0, REDE_H + REDE_R * 0.2);
-  ctx.lineTo(0, REDE_H + 1.0);
-  ctx.stroke();
-  ctx.fillStyle = est.placa[0];
-  ctx.beginPath();
-  ctx.moveTo(0, REDE_H + 1.0);
-  ctx.quadraticCurveTo(0.38, REDE_H + 0.88 + bal, 0.72, REDE_H + 0.78 + bal * 1.6);
-  ctx.quadraticCurveTo(0.36, REDE_H + 0.66 + bal, 0, REDE_H + 0.55);
-  ctx.closePath();
   ctx.fill();
   ctx.stroke();
   // marca do saque (onde a bola vai cair) para quem recebe
