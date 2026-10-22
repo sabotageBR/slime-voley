@@ -22,6 +22,7 @@ import * as Cort from './cortada.js';
 import { criarBolhas, powerUp, EFEITO } from './powerups.js';
 import { reacao as acharReacao, escolherReacaoCpu, chanceReacaoCpu, REACAO } from './reacoes.js';
 import { criarJuiz, passoJuiz, forcarBolada } from './juiz.js';
+import { criarFalas, passoFalas, disparar as dispararFala, FALA } from './falas.js';
 import { criarRng, hashTexto } from '../core/rng.js';
 
 /** Velocidade de saida que conta como BOMBA (com a bola descendo). */
@@ -87,6 +88,8 @@ export function criarPartida(o = {}) {
   const bolhas = criarBolhas({ semente: o.semente, liberados: o.primeira ? [] : o.powerups || [] });
   // o juiz da rede: rng proprio, nunca mexe na bola (so sofre a bolada)
   const juiz = o.juiz === false ? null : criarJuiz(o.semente || 1);
+  // falas dos slimes (catalogo fixo, rng proprio)
+  const falas = criarFalas(o.semente || 1);
   /** reacoes da CPU: rng proprio (nao mexe no das IAs) */
   const rngR = criarRng(((o.semente || 7) ^ hashTexto('reacoes')) >>> 0);
   /** reacao planejada da CPU: { t (s que faltam), id } */
@@ -142,6 +145,8 @@ export function criarPartida(o = {}) {
     reagiuEm: -1,
     /** s de jogo-real ate o humano poder reagir de novo (a qualquer hora, com recarga) */
     recargaReacao: 0,
+    /** fala no balao de texto: { id, t } (src/jogo/falas.js) */
+    fala: /** @type {{ id: string, t: number }|null} */ (null),
   }));
 
   /** @type {'saque'|'jogo'|'ponto'|'fim'} */
@@ -362,6 +367,7 @@ export function criarPartida(o = {}) {
     tSaqueSolto = T.tMundo;
     novaJogadaIAs();
     ev({ tipo: 'saque', i, tipoSaque: tipo, alvo, x: bola.x, y: bola.y, erro });
+    if (tipo === 'perfeito') falar(i, 'saque');
   }
 
   // ------------------------------------------------------------------ pontos
@@ -433,12 +439,36 @@ export function criarPartida(o = {}) {
     }
     ev({ tipo: 'ponto', lado: ladoV, i: iv, motivo, palavra: festa.palavra, festa: festa.tipo, x, placar: [...placar], humano: humano[iv], cpu: daCpu, matchPoint: vence === 0 ? mp : 0, fim: vence !== 0, travessias: rali.travessias });
     if (vence === 0 && mp !== 0 && pontoDaPartida(antes, regras) !== mp) ev({ tipo: 'match-point', lado: mp });
+    // falas: quem marcou comemora (o chefe provoca), senao quem perdeu reclama; no match point,
+    // quem lidera avisa e o outro responde
+    if (vence === 0) {
+      const g = virada ? 'virada' : ['ace', 'bomba', 'bloqueio'].includes(motivo) ? motivo : motivo === 'rede' ? 'presente' : 'ponto';
+      const provoca = g === 'ponto' && !humano[iv] && riv.chefe && humano[ip];
+      if (!falar(iv, provoca ? 'provoca' : g)) falar(ip, motivo === 'rede' ? 'erro' : 'perdeu');
+      if (mp !== 0 && pontoDaPartida(antes, regras) !== mp) {
+        const lider = iDoLado(mp);
+        if (!falar(lider, 'matchPoint')) falar(outroI(lider), 'aindaNao');
+      }
+    }
     // a CPU as vezes reage sozinha ao ponto (convencida quando ganha, brava ou chorando quando perde)
     reacaoCpu = null;
     if (modo === 'cpu' && vence === 0 && rngR() < chanceReacaoCpu(riv)) {
       const [a0, a1] = REACAO.atraso;
       reacaoCpu = { t: a0 + (a1 - a0) * rngR(), id: escolherReacaoCpu(rngR, { ganhou: iv === 1 }) };
     }
+  }
+
+  /**
+   * Fala de `i` pelo gatilho (src/jogo/falas.js): nunca com o balao de reacao nem outra fala no ar.
+   * @param {number} i @param {string} gatilho
+   */
+  function falar(i, gatilho) {
+    if (i < 0 || J[i].reacao || J[i].fala) return false;
+    const id = dispararFala(falas, gatilho, /** @type {0|1} */ (i));
+    if (!id) return false;
+    J[i].fala = { id, t: 0 };
+    ev({ tipo: 'fala', i, id, humano: humano[i] });
+    return true;
   }
 
   /**
@@ -456,6 +486,7 @@ export function criarPartida(o = {}) {
     Ji.reagiuEm = pontoN;
     Ji.recargaReacao = REACAO.recarga;
     Ji.reacao = { id, t: 0 };
+    Ji.fala = null;
     if (!(cortada && cortada.i === i)) caretar(i, r.expr, REACAO.dur);
     ev({ tipo: 'reacao', i, id, humano: humano[i] });
     const c = outroI(i);
@@ -467,8 +498,10 @@ export function criarPartida(o = {}) {
 
   /** Baloes e a reacao planejada da CPU (jogo-real). */
   function passoReacoes(dtR) {
+    passoFalas(falas, dtR);
     for (const Jx of J) {
       if (Jx.recargaReacao > 0) Jx.recargaReacao = Math.max(0, Jx.recargaReacao - dtR);
+      if (Jx.fala && (Jx.fala.t += dtR) >= FALA.dur) Jx.fala = null;
       if (!Jx.reacao) continue;
       Jx.reacao.t += dtR;
       if (Jx.reacao.t >= REACAO.dur) Jx.reacao = null;
@@ -573,6 +606,7 @@ export function criarPartida(o = {}) {
     caretar(i, 'feliz', 0.8);
     const quick = c.tTotal < Cort.CORTADA.devolucao + Cort.CORTADA.entrada && c.mexido < 1;
     ev({ tipo: 'cortada-solta', i, x: c.bx, y: c.by, vx: c.vx, vy: c.vy, alvoX: c.alvoX, auto: !c.mexeu, rapida: quick, tMira: c.tTotal });
+    falar(i, 'cortada');
     if (gatilho === 'segura' && quick && !c.gratis) J[i].med.v = Math.min(300, J[i].med.v + CUSTO.cortada);
     if (tutorialCortada === 'oferecida' && humano[i]) tutorialCortada = 'feito';
   }
@@ -652,6 +686,7 @@ export function criarPartida(o = {}) {
         bola.vx *= EFEITO.fogo.saida;
         bola.vy = Math.max(bola.vy * EFEITO.fogo.saida, 5);
         ev({ tipo: 'fogo-recepcao', i, x: e.x, y: e.y });
+        falar(i, 'fogo');
       }
       if (perfeita) {
         const [vx, vy] = arco(bola.x, bola.y, s.lado * 6, bola.y + 3.2);
@@ -660,6 +695,7 @@ export function criarPartida(o = {}) {
         bola.vy = Math.max(7, vy * Math.max(0.6, f));
         ganhar(Jm.med, 'perfeita');
         ev({ tipo: 'perfeita', i, x: bola.x, y: bola.y, contra: bola.estado });
+        falar(i, 'manchete');
       }
       bola.estado = 'normal';
       bola.semLimite = false;
@@ -722,6 +758,7 @@ export function criarPartida(o = {}) {
       if (id === 'pisoMola') Jm.pisoMola = 1;
     }
     ev({ tipo: 'powerup', i, id, alvo: c.tipo === 'rival' ? r : i, humano: humano[i] });
+    falar(i, 'poder');
   }
 
   /** Avisos e gelo de um slime (s de mundo). */
@@ -736,6 +773,7 @@ export function criarPartida(o = {}) {
         if (id === 'congelar') Jm.gelo = { fase: 'preso', t: 0 };
         else Jm.efeitos[id] = powerUp(id)?.pontos || 1;
         ev({ tipo: 'powerup-vale', i, id, x: s.x, y: s.y });
+        if (id === 'congelar') falar(i, 'gelo');
       }
     }
     if (Jm.gelo) {
@@ -964,6 +1002,7 @@ export function criarPartida(o = {}) {
           rali.toques = 0;
           rali.bateuRede = false;
           ev({ tipo: 'cruzou', lado: e.lado, n: rali.travessias });
+          if (rali.travessias === 8) falar(quemMandou, 'rali');
         }
       } else if (e.tipo === 'chao') {
         ev({ tipo: 'chao', x: e.x, v: e.v, estado });
@@ -1074,7 +1113,12 @@ export function criarPartida(o = {}) {
         passoDaBola(PASSO, andaram);
       }
       // o juiz anda no relogio do mundo (camera lenta e hitstop valem para ele)
-      if (juiz && k < n.mundo) for (const e of passoJuiz(juiz, PASSO, contextoJuiz())) ev(e);
+      if (juiz && k < n.mundo) {
+        for (const e of passoJuiz(juiz, PASSO, contextoJuiz())) {
+          ev(e);
+          falar(rali.ultimo, 'juiz');
+        }
+      }
       // CPU tenta a cortada no ar (na janela)
       for (const i of [0, 1]) {
         if (!ias[i] || cortada || estado !== 'jogo') continue;
@@ -1136,6 +1180,8 @@ export function criarPartida(o = {}) {
         esperaToque = false;
         primeiroToque = true;
         if (estado === 'saque') ev({ tipo: 'saque-liberado', i: sacador });
+        // a CPU abre a partida falando (o Rei se gaba, a distraida nem viu que comecou)
+        if (pontoN === 0 && modo === 'cpu' && ias[1]) falar(1, riv.id === 'rei' ? 'inicioRei' : (riv.perso || []).includes('distraida') ? 'inicioDistraida' : 'inicio');
       }
     },
     /** volta de pausa ou anuncio: o proximo saque espera um toque (a bola no ar volta para a mao) */
@@ -1298,6 +1344,9 @@ export function criarPartida(o = {}) {
           const r = forcarBolada(juiz, nome.slice(5), { x: -0.5, y: 3.4, vx: 14, vy: -2 });
           ev({ tipo: 'juiz-bolada', reacao: r, x: -0.5, y: 3.4, v: 14 });
         }
+        // e quem tocou pede desculpa (o balao de fala, garantido no roteiro)
+        J[0].fala = { id: 'foiMalJuiz', t: 0 };
+        ev({ tipo: 'fala', i: 0, id: 'foiMalJuiz', humano: humano[0] });
         return true;
       }
       if (nome === 'saque') {

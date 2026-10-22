@@ -689,6 +689,14 @@ Catálogo aprovado pelo usuário em 2026-10-21. O código está em `src/jogo/pow
 - **Som e telemetria:** evento `juiz-bolada` com o som `bonk`; `measure('juiz', <reação>, 'bolada')`.
 - **Roteiro:** `?roteiro=juiz` ou `?roteiro=juiz-<reação>`.
 
+### 2.12 Falas dos slimes (pedido de 2026-10-22)
+
+- **Onde estão:** o catálogo e as regras em `src/jogo/falas.js` (puro, rng próprio `hashTexto('falas')`); os textos em `fala.<id>` no `i18n/textos.js` (pt, en e es, até 14 caracteres); o balão em `render/carinhas.js` (`desenharFala`, em px da tela, Fredoka 700); a voz é o **balbucio sintetizado** de `som/falas.js` (0 KB), no tom de cada slime (o jogador agudo, o rival pelo nível, os chefes grossos).
+- **Catálogo fixo, sem texto livre.** Gatilhos e chances: ACE 85%, BOMBA 80%, bloqueio 80%, virada 90%, ponto comum 30% (o chefe ganhando provoca), erro do rival na rede 50% ("Valeu, rede!"), ponto perdido 30%, match point 70% (o outro responde "Ainda não!"), 8ª travessia 60%, saque perfeito 45%, manchete perfeita 75%, cortada solta 50%, power-up pego 60%, congelado 80%, Bola de Fogo recebida 75%, bolada no juiz 85% ("Foi mal, juiz!") e a abertura da partida pela CPU (o Rei se gaba, a Gota nem viu que começou).
+- **Ritmo:** uma fala por vez, 3,5 s de recarga por slime e 1 s entre duas falas quaisquer; nunca com o balão de reação (a reação apaga a fala). Medido no bot: cerca de 12 falas por partida.
+- **Balão:** acima do slime, foge da bola e fica dentro da tela; estufa ao entrar, sobe um pouco e some nos últimos 0,25 s (1,5 s ao todo).
+- **Gravações:** a vaga de voz é a mesma (uma por vez; a gravação recente tem prioridade). Agora tocam `vozCombo4/6/8/10` (travessias pares), `vozCuidado` (efeito do rival vindo contra o jogador) e `vozNivel` (subida de nível); `vozParabens` fica para o título da Copa. Saíram do catálogo as que nunca tocavam (`vozCombo3/5/7/9`, `vozMissao`, `vozObjetivo`, `vozRecorde`, `fichas`, `clique`): o empacotar tira os arquivos da build.
+
 ---
 
 ## 3. Conteúdo

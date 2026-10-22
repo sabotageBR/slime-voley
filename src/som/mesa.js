@@ -3,10 +3,12 @@
 // musica (escolha do usuario no slime-merge: "nenhuma"). Os arquivos carregam depois do
 // primeiro gesto (audio.pronto()); enquanto nao chegam, a fala fica quieta.
 //
-// Falas: no maximo uma a cada INTERVALO_FALA s (a de prioridade maior passa na frente).
+// Falas: no maximo uma a cada INTERVALO_FALA s (a de prioridade maior passa na frente). As falas
+// em balao (src/jogo/falas.js) usam o balbucio sintetizado de src/som/falas.js (balbuciar).
 
 import { ARQUIVOS } from './arquivos.js';
 import { tom, sopro } from './receitas.js';
+import { falar as balbucio } from './falas.js';
 
 export const INTERVALO_FALA = 1.2;
 const VOL_ARQUIVO = 0.5;
@@ -188,9 +190,23 @@ export function criarMesa(audio, o = {}) {
     return d;
   }
 
+  /**
+   * Balbucio sintetizado de slime (src/som/falas.js, 0 KB) para as falas em balao. Divide a vaga
+   * de voz com as gravacoes (chave 'fala', uma por vez); a gravacao recente tem prioridade.
+   * @param {string} frase chave de FRASES @param {{ nivel?: number, f0?: number, vol?: number }} [p]
+   */
+  function balbuciar(frase, p = {}) {
+    const agora = audio.agora();
+    if (agora - tFala < INTERVALO_FALA * 0.5) return 0;
+    const d = audio.tocarReceita((v, t, q) => balbucio(v, t, frase, q), { vol: 0.26, ...p }, { destino: 'voz', chave: 'fala', max: 1 });
+    if (d) tFala = agora;
+    return d;
+  }
+
   return {
     tocar,
     falar,
+    balbuciar,
     /** arquivos de UI (fichas, clique) */
     ui(id) {
       const buf = buffers.get(id);

@@ -22,6 +22,7 @@ import { alfaCanal } from '../jogo/tempo.js';
 import { desenharCadeira, desenharJuiz } from './juiz.js';
 import { BOLHA } from '../jogo/powerups.js';
 import { REACAO } from '../jogo/reacoes.js';
+import { desenharFala } from './carinhas.js';
 
 /**
  * Raio do nucleo do campo (no passo normal da pele e raio 2; cada slime escala pelo escNucleo) e
@@ -135,6 +136,7 @@ export function criarCena(el, o = {}) {
    * @param {number} dtR s de jogo-real desde o ultimo quadro
    * @param {{ textos: (k: string) => string, cores: string[], festa?: any, inicio?: { t: number, txt: string }|null, pulsoSaque?: number, saque?: { k: number, q: string, alvo: number, depois: boolean }|null, alvoSaque?: number|null, mao?: any, feixe?: boolean }} o2
    *   feixe: false esconde o feixe da mira (a thumb desenha as setas dela; a reticula fica)
+   *   falas: [{ i, texto, t, dur }] baloes de fala ja traduzidos
    */
   function desenhar(P, vista, alfa, dtR, o2) {
     medir();
@@ -220,6 +222,17 @@ export function criarCena(el, o = {}) {
       bolha: P.bolha, vidaBolha: BOLHA.vida, gelos, avisos, baloes, bolaFogo: P.bola.estado === 'fogo' && P.estado === 'jogo',
     });
     vfx.desenhar(ctxTopo, cam, dpr);
+    // falas dos slimes: balao de texto em px da tela, acima do slime, fugindo da bola
+    if (o2.falas && o2.falas.length) {
+      ctxTopo.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const [bx, by] = paraTela(cam, b.x, b.y);
+      const px = Math.round(Math.max(13, Math.min(22, cam.s * 0.5)));
+      for (const f of o2.falas) {
+        const s = vista.slimes[f.i];
+        const [ax, ay] = paraTela(cam, s.x, s.y + s.b + 0.25);
+        desenharFala(ctxTopo, { texto: f.texto, t: f.t, dur: f.dur, ax, ay, bx, by, px, W });
+      }
+    }
     // ---------------- tela (por cima do HUD)
     const dT = Math.min(1.5, dpr);
     const ativo = !!F || !!(o2.inicio && o2.inicio.t < 1.4);

@@ -49,6 +49,7 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
   - `powerups.js`: catálogo, sorteio e relógio das bolhas (rng próprio, separado do das IAs);
   - `reacoes.js`: os emoji (a qualquer hora, com recarga) e a escolha da CPU;
   - `juiz.js`: o juiz da rede (olhar, apontar e a bolada sorteada; nunca muda a bola);
+  - `falas.js`: as falas em balão (catálogo fixo por gatilho, recarga e rng próprio);
   - `perfil.js`: XP, nível, trilha, Gotas e o save normalizado;
   - `humor.js` (porte sem uso), `medidor.js`, `rivais.js` e `skins.js`.
 - `src/core/`: laço, `rng.js`, save, áudio, vibração, o SDK (`poki.js`) e `depuracao.js`.
@@ -61,7 +62,7 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
   - `icones.js` (power-ups, bolha, gelo e prêmios), `carinhas.js` (as carinhas e o balão das reações) e `juiz.js` (a cadeirinha e o juiz), em código;
   - `ginasios/praia.js`.
 - `src/ui/`: `controles.js` (Metades e Botões, teclado e mouse), `hud.js` (placar, chips, barra de reações e o cartão com a progressão) e `lab.js` (o laboratório da cortada).
-- `src/som/mesa.js`: os eventos tocam receitas e as 19 falas `*Slime`. Não há música.
+- `src/som/mesa.js`: os eventos tocam receitas, as gravações `*Slime` do catálogo `arquivos.js` e o balbucio sintetizado das falas (`som/falas.js`). Não há música.
 - `src/i18n/textos.js`: todo texto visível.
 - `src/main.js` liga tudo e é o **único** dono do SDK (`core/poki.js`), do áudio, do save e do DOM.
 

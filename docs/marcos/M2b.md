@@ -67,3 +67,19 @@ O trabalho foi dividido em 5 etapas, cada uma com o seu commit.
   - deu 1,0 a 1,1 bolada por partida no `calibrar`.
 - **8 reações:** tombo, pendurado, pião, galo, apito, boné, bigode e cartão amarelo, todas de volta ao posto em até 2,5 s. Os prints foram conferidos quadro a quadro, com `?roteiro=juiz-<reação>&filme=1&cada=N`.
 - **Testes:** `test/juiz.test.js` (determinismo, hash com e sem o juiz, volta ao posto, apontar, olhar e taxa de boladas). São 67 testes.
+
+## Etapa 3: falas
+
+- **Catálogo:** `src/jogo/falas.js`, puro e com rng próprio, tem 22 gatilhos com chance e 32 falas curtas (`fala.<id>` em pt, en e es, até 14 caracteres). Entre elas:
+  - ACE, BOMBA, bloqueio e virada;
+  - match point ("Falta uma!" / "Ainda não!") e rali longo;
+  - saque perfeito, manchete e cortada;
+  - power-up, gelo, Bola de Fogo e bolada no juiz ("Foi mal, juiz!");
+  - a abertura da CPU (o Rei se gaba, a Gota não viu que começou).
+- **Ritmo:** uma fala por vez, 3,5 s de recarga por slime e 1 s de intervalo geral, nunca junto da reação. Deu cerca de 12 falas por partida no bot.
+- **Balão de texto:** em px da tela, foge da bola e fica dentro da tela.
+- **Voz:** o balbucio sintetizado (`som/falas.js`, 0 KB), que antes não era usado, agora toca no tom de cada slime.
+- **Gravações:**
+  - agora tocam `vozCombo4`, `vozCuidado` (efeito do rival vindo contra o jogador) e `vozNivel` (subida de nível);
+  - saíram 9 arquivos que nunca tocavam (cerca de 37 KB a menos na build).
+- **Testes:** `test/falas.test.js` (textos nas 3 línguas, balbucio, recarga, intervalo, frequência e determinismo). São 70 testes.

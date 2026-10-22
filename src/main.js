@@ -22,6 +22,7 @@ import { rival as acharRival, COPAS } from './jogo/rivais.js';
 import { skin as acharSkin } from './jogo/skins.js';
 import { CUSTO } from './jogo/medidor.js';
 import { REACOES } from './jogo/reacoes.js';
+import { vozDaFala, FALA } from './jogo/falas.js';
 import { normalizarPerfil, rendimento, aplicarGanho, proximosMarcos } from './jogo/perfil.js';
 import { TEMPOS } from './jogo/regras.js';
 import { criarVista } from './render/vista.js';
@@ -115,6 +116,8 @@ function gravarPerfil() { save.gravar('perfil', perfil); }
 let P = null;
 let vista = null;
 let cores = ['#ff8a2a', '#3fd6c8'];
+/** nivel do tom do balbucio de cada slime (src/som/falas.js tomDoNivel) */
+let tons = [3, 4];
 let nomes = ['', ''];
 let inicio = null;
 let tMao = 0;
@@ -146,6 +149,8 @@ function novaPartida(revanche = false) {
   vista.vestir(0, sk.pig, cores[0]);
   vista.vestir(1, riv.pig, cores[1]);
   nomes = [T('ui.voce'), T('rival.' + riv.id)];
+  // tom do balbucio: o jogador agudo; o rival pelo nivel (os chefes falam grosso)
+  tons = [3, riv.chefe ? 11 : 2 + Math.max(0, ['T0', 'T1', 'T1+', 'T2', 'T3', 'T4', 'T5'].indexOf(riv.nivel))];
   inicio = null;
   tMao = 0;
   if (D.roteiro) {
@@ -225,6 +230,8 @@ function ganhar(g, dobrado) {
   const r = aplicarGanho(perfil, g);
   Object.assign(perfil, r.perfil);
   for (const s of r.subiu) poki.measure('nivel', 'n' + s.nivel, 'subiu');
+  // subiu de nivel: o locutor anuncia quando o cartao abre (depois do "venceu/perdeu")
+  if (r.subiu.length) mesa.falar('vozNivelSlime', { forcar: true, atraso: 1.6 });
   return { ...r, gotasAntes, gotasTotal: perfil.gotas, marcos: proximosMarcos(r.depois.nivel, 4), dobrado };
 }
 
@@ -294,7 +301,8 @@ const TRATADORES = {
   'saque-pega': () => mesa.tocar('toque', { forca: 0.3 }, { max: 1 }),
   'saque-valendo': () => { tMao = 0; },
   'saque-liberado': () => {},
-  'cruzou': (e) => { if (e.n >= 6 && e.n % 2 === 0) { cena.plateia.animar(0.15); if (e.n <= 10) mesa.falar('vozCombo' + Math.min(10, e.n) + 'Slime'); } },
+  // rali longo: a plateia anima e o locutor conta as travessias pares (4, 6, 8, 10)
+  'cruzou': (e) => { if (e.n >= 4 && e.n % 2 === 0) { cena.plateia.animar(0.15); if (e.n <= 10) mesa.falar('vozCombo' + e.n + 'Slime'); } },
   'perfeita': (e) => { mesa.tocar('perfeita'); cena.coroa(e.x, e.y, '#ffffff', { r1: 1.6, n: 10, esc: 0.7 }); cena.vfx.texto(e.x, e.y + 1.6, T('grito.manchete'), '#ffffff', 1); },
   'cortada-entra': (e) => {
     mesa.tocar('lentaEntra', {}, { max: 1 });
@@ -366,6 +374,8 @@ const TRATADORES = {
     cena.vfx.texto(s.x, s.y + 4.2, T('pw.' + e.id), cores[e.i], 1);
     if (e.id === 'gosmao') { mesa.tocar('inflar', {}, { max: 1 }); cena.vfx.respingo(s.x, s.y + 2.4, cores[e.alvo], 10, 6); }
     if (e.humano && tReal - tVozPw > 20) { tVozPw = tReal; mesa.falar('vozPowerUpSlime'); }
+    // efeito do rival vindo contra o jogador: "cuidado!"
+    else if (e.alvo === 0 && e.i !== 0) mesa.falar('vozCuidadoSlime');
     if (e.alvo === 0 || e.i === 0) vibrar(e.alvo === 0 && e.i !== 0 ? [20, 30, 20] : 25);
     poki.measure('powerup', e.id, e.humano ? 'humano' : 'cpu');
   },
@@ -388,6 +398,8 @@ const TRATADORES = {
     cena.vfx.respingo(e.x, e.y, '#ffffff', 6, 4);
     poki.measure('juiz', e.reacao, 'bolada');
   },
+  // falas em balao: o balbucio no tom de cada slime (o texto a cena desenha)
+  'fala': (e) => mesa.balbuciar(vozDaFala(e.id), { nivel: tons[e.i] }),
   'tutorial-cortada': () => { tMao = 0; },
   'texto': () => {},
   'lenta': () => {},
@@ -479,7 +491,12 @@ function desenhar(dtReal, alfa) {
     const pr = P.previsao();
     if (pr && pr.x < 0) alvoSaque = pr.x;
   }
-  cena.desenhar(P, vista, alfa, dt, { cores, festa, inicio, saque: sq, pulsoSaque: pulso, alvoSaque });
+  const falas = [];
+  for (const i of [0, 1]) {
+    const f = P.jogadores[i].fala;
+    if (f && !D.semHud) falas.push({ i, texto: T('fala.' + f.id), t: f.t, dur: FALA.dur });
+  }
+  cena.desenhar(P, vista, alfa, dt, { cores, festa, inicio, saque: sq, pulsoSaque: pulso, alvoSaque, falas });
   // HUD
   const L = cena.layout;
   if (L) hud.posicionar(L);

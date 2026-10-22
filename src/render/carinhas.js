@@ -305,3 +305,56 @@ export function desenharBalao(ctx, b, tr) {
   desenharCarinha(ctx, b.id, 0, 0.02, R * 0.78);
   ctx.restore();
 }
+
+/**
+ * Balao de fala (texto curto, src/jogo/falas.js) em px CSS da tela: estufa ao entrar, sobe um pouco
+ * e some nos ultimos 0,25 s. A ponta aponta para (ax, ay); o corpo foge da bola (bx, by) e fica
+ * dentro da tela.
+ * @param {CanvasRenderingContext2D} ctx (transform: px CSS, com o dpr)
+ * @param {{ texto: string, t: number, dur: number, ax: number, ay: number, bx: number, by: number, px: number, W: number }} f
+ *   px: tamanho da letra
+ */
+export function desenharFala(ctx, f) {
+  const k = f.t < 0.1 ? 0.6 + (f.t / 0.1) * 0.48 : f.t < 0.18 ? 1.08 - ((f.t - 0.1) / 0.08) * 0.08 : 1;
+  const a = Math.min(1, (f.dur - f.t) / 0.25);
+  if (a <= 0) return;
+  ctx.save();
+  ctx.font = `700 ${f.px}px Fredoka, system-ui, sans-serif`;
+  const w = ctx.measureText(f.texto).width + f.px * 1.1;
+  const h = f.px * 1.7;
+  const sobe = Math.min(1, f.t / f.dur) * 6;
+  let cx = f.ax;
+  const cy = f.ay - h * 0.5 - f.px * 0.7 - sobe;
+  // foge da bola: se ela estiver no retangulo do balao, desloca para o outro lado
+  const r = f.px * 1.6;
+  if (Math.abs(f.by - cy) < h * 0.5 + r && Math.abs(f.bx - cx) < w * 0.5 + r) cx = f.bx > cx ? f.bx - (w * 0.5 + r) : f.bx + (w * 0.5 + r);
+  cx = Math.max(w * 0.5 + 8, Math.min(f.W - w * 0.5 - 8, cx));
+  ctx.globalAlpha = a;
+  ctx.translate(cx, cy);
+  ctx.scale(k, k);
+  const raio = h * 0.45;
+  const corpo = (dy) => {
+    ctx.beginPath();
+    ctx.roundRect(-w / 2, -h / 2 + dy, w, h, raio);
+    // ponta para o slime (presa na base do balao)
+    const pxo = Math.max(-w / 2 + raio, Math.min(w / 2 - raio, (f.ax - cx) / k));
+    ctx.moveTo(pxo - f.px * 0.35, h / 2 - 1 + dy);
+    ctx.lineTo(pxo + (f.ax - cx) * 0.15, h / 2 + f.px * 0.6 + dy);
+    ctx.lineTo(pxo + f.px * 0.35, h / 2 - 1 + dy);
+  };
+  ctx.fillStyle = TINTA;
+  corpo(3);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  corpo(0);
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = TINTA;
+  ctx.stroke();
+  ctx.fillStyle = TINTA;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(f.texto, 0, f.px * 0.05);
+  ctx.restore();
+}
