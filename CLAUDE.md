@@ -2,7 +2,7 @@
 
 Guia do projeto para o Claude Code. Respostas e textos em português.
 
-# Vôlei de Gosma (Goo Spike!, nome provisório)
+# Slime Volley (em PT, Vôlei de Gosma)
 
 Vôlei 1x1 de slimes para a Poki, ficha #58 dos "Cinco jogos de gosma". É feito só com HTML + JavaScript:
 - ES modules nativos, Canvas 2D, WebGL2 (a gosma) e WebAudio;

@@ -4,7 +4,7 @@
 /** @type {Record<string, Record<string, string>>} */
 const T = {
   en: {
-    titulo: 'Goo Spike!',
+    titulo: 'Slime Volley',
     'grito.ponto': 'POINT!', 'grito.ace': 'ACE!', 'grito.bomba': 'SPIKE!', 'grito.bloqueio': 'BLOCK!', 'grito.fora': 'OUT!',
     'grito.rede': 'NET!', 'grito.toques4': '4 TOUCHES!', 'grito.virada': 'COMEBACK!', 'grito.rali': 'WHAT A RALLY!',
     'grito.fogo': 'FIRE!', 'grito.raio': 'BOLT!', 'grito.jornada': 'SKY SERVE!', 'grito.manchete': 'NICE DIG!', 'grito.saquePerfeito': 'PERFECT!',
@@ -82,7 +82,7 @@ const T = {
     'ginasio.praia': 'Praia do Saque', 'ginasio.escola': 'Quadra da Escola', 'ginasio.rua': 'Quadra da Rua', 'ginasio.arena': 'Arena Gelatão',
   },
   es: {
-    titulo: 'Goo Spike!',
+    titulo: 'Slime Volley',
     'grito.ponto': '¡PUNTO!', 'grito.ace': '¡ACE!', 'grito.bomba': '¡REMATE!', 'grito.bloqueio': '¡BLOQUEO!', 'grito.fora': '¡FUERA!',
     'grito.rede': '¡RED!', 'grito.toques4': '¡4 TOQUES!', 'grito.virada': '¡REMONTADA!', 'grito.rali': '¡QUÉ RALLY!',
     'grito.fogo': '¡FUEGO!', 'grito.raio': '¡RAYO!', 'grito.jornada': '¡AL CIELO!', 'grito.manchete': '¡QUÉ DEFENSA!', 'grito.saquePerfeito': '¡PERFECTO!',

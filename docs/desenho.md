@@ -1,4 +1,4 @@
-# Plano de implementação: Vôlei de Gosma (#58), "Goo Spike!" (VERSÃO FINAL, revisada)
+# Plano de implementação: Slime Volley (#58; em PT, Vôlei de Gosma) (VERSÃO FINAL, revisada)
 
 Este plano junta as 3 propostas (jogabilidade, arquitetura, conteúdo/Poki), os 5 relatórios de exploração e as correções dos 3 revisores adversariais. Foi feito só com leitura: nenhum arquivo foi criado. Quando as propostas ou os revisores divergiam, escolhi uma opção, marquei como **Decisão** e dei o motivo. O que foi aceito ou rejeitado está na seção "Decisões da revisão", no fim.
 
@@ -45,7 +45,7 @@ Este plano junta as 3 propostas (jogabilidade, arquitetura, conteúdo/Poki), os 
 
 ## 1. Visão, pilares e nome
 
-**Nome:** **"Goo Spike!"** é provisório (EN e ES); em PT, **"Vôlei de Gosma"**. Antes do M1 conferimos o catálogo da Poki por semelhança de estrutura, não só pelo nome exato. "Slime Dunk!" já existe e segue o padrão "slime/goo + verbo de esporte + !". No M1 o usuário escolhe entre 3 opções. O nome do zip e as chaves de i18n só ficam definitivos depois dessa escolha.
+**Nome (decisão do usuário, 2026-10-22):** **"Slime Volley"** (EN e ES); em PT, **"Vôlei de Gosma"**. O nome do zip (`slime-voley`) já combina com ele. Antes do envio, conferir o catálogo da Poki por semelhança de estrutura, não só pelo nome exato ("Slime Dunk!" já existe).
 
 **Visão:** um vôlei 1x1 de slimes, original, com cara de jogo comercial. Cada toque amassa a gosma e muda o ângulo da bola. Cada ponto vira uma festa curta, sem tela no meio. A jogada de assinatura é a **Cortada em Câmera Lenta**: o ritmo e a sensação da câmera lenta do Blumgi (medidos na captura do passo 0), com a forma e a cor da gosma.
 

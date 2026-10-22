@@ -2,7 +2,7 @@
   "name": "slime-voley",
   "version": "0.1.1",
   "private": true,
-  "description": "Volei de Gosma (Goo Spike!): volei 1x1 de slimes para a Poki (HTML + JavaScript puro).",
+  "description": "Slime Volley (em PT, Volei de Gosma): volei 1x1 de slimes para a Poki (HTML + JavaScript puro).",
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.js",
