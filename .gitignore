@@ -1,5 +1,6 @@
 dist/
 dist-poki/*.zip
+dist-poki/*-thumb.png
 .tmp/
 assets/brutos/
 node_modules/
