@@ -2,7 +2,8 @@
 // o save antigo continuando a valer.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { xpParaSubir, normalizarPerfil, aplicarGanho, rendimento, premiosDoNivel, proximosMarcos, TRILHA, GOTAS_POR_NIVEL } from '../src/jogo/perfil.js';
+import { xpParaSubir, normalizarPerfil, aplicarGanho, rendimento, premiosDoNivel, proximosMarcos, TRILHA, GOTAS_POR_NIVEL, PRESENTES, presenteDaVitoria, darPresente } from '../src/jogo/perfil.js';
+import { precoDe, temItem } from '../src/jogo/visual.js';
 import { INICIAIS } from '../src/jogo/powerups.js';
 import { REACOES_INICIAIS, reacao } from '../src/jogo/reacoes.js';
 import { powerUp } from '../src/jogo/powerups.js';
@@ -84,4 +85,30 @@ test('o resumo da partida bate com o placar', async () => {
   assert.equal(r.pontos, p.placar[0]);
   assert.equal(r.perdidos, p.placar[1]);
   assert.equal(r.venceu, p.placar[0] > p.placar[1]);
+});
+
+test('presentes das primeiras vitorias: itens do vestiario, vestidos no encaixe livre (ou de outro presente)', () => {
+  for (const chave of PRESENTES) assert.ok(precoDe(chave) > 0, `${chave} existe e nao e gratis`);
+  assert.equal(presenteDaVitoria(1), PRESENTES[0]);
+  assert.equal(presenteDaVitoria(PRESENTES.length + 1), '');
+  let p = normalizarPerfil({});
+  const r1 = darPresente(p, 1);
+  assert.equal(r1.chave, PRESENTES[0]);
+  assert.ok(temItem(r1.perfil, PRESENTES[0]));
+  const [, enc1, id1] = PRESENTES[0].split(':');
+  assert.equal(r1.perfil.visual[enc1], id1);
+  assert.equal(p.liberados.itens.length, 0, 'o perfil de entrada nao muda');
+  // ja tinha: nada de novo
+  assert.equal(darPresente(r1.perfil, 1).chave, '');
+  // o encaixe com um item escolhido pelo jogador fica como esta; o de outro presente troca
+  p = r1.perfil;
+  for (let n = 2; n <= PRESENTES.length; n++) {
+    const [, enc, id] = PRESENTES[n - 1].split(':');
+    const meu = { cabeca: 'bandana', rosto: 'tapaOlho', boca: 'presas' }[enc];
+    const escolhido = normalizarPerfil({ ...p, visual: { ...p.visual, [enc]: meu } });
+    assert.equal(darPresente(escolhido, n).perfil.visual[enc], meu);
+    p = darPresente(p, n).perfil;
+    assert.equal(p.visual[enc], id);
+  }
+  assert.equal(darPresente(p, PRESENTES.length + 1).chave, '');
 });

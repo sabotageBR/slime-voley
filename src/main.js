@@ -26,7 +26,7 @@ import { vozDaFala, FALA } from './jogo/falas.js';
 import { chaveDaCopa, registrarVitoria, proximaCopa, trocarPais, normalizarCopa, GOTAS_TITULO, NUM_COPAS, TAM_COPA } from './jogo/torneio.js';
 import { paisDoIdioma } from './jogo/paises.js';
 import { visualDaSkin, visualDoArquetipo, comprar as comprarItem, normalizarVisual } from './jogo/visual.js';
-import { normalizarPerfil, rendimento, aplicarGanho, proximosMarcos } from './jogo/perfil.js';
+import { normalizarPerfil, rendimento, aplicarGanho, proximosMarcos, darPresente, presenteDaVitoria } from './jogo/perfil.js';
 import { TEMPOS } from './jogo/regras.js';
 import { criarVista } from './render/vista.js';
 import { criarCena } from './render/cena.js';
@@ -34,6 +34,7 @@ import { tonalidade } from './render/celebracao.js';
 import { desenharIconeTela, desenharPremioTela } from './render/icones.js';
 import { desenharCarinhaTela } from './render/carinhas.js';
 import { desenharEstampa, EST_W, EST_H } from './render/estampas.js';
+import { desenharMiniSlime } from './render/vitrine.js';
 import { criarControles } from './ui/controles.js';
 import { criarHud } from './ui/hud.js';
 import { criarMenu } from './ui/menu.js';
@@ -107,9 +108,13 @@ const hud = criarHud(raiz, T, {
   aoReagir: (id) => reagirJogador(id),
   aoReagirTecla: (k) => { if (reacoesLiberadas[k]) reagirJogador(reacoesLiberadas[k]); },
   aoBotaoReacao: () => { barra = tReal < barra.ate && tReal >= barra.de ? { de: 0, ate: 0 } : { de: tReal, ate: tReal + 2.5 }; },
-  premio: (ctx, pr, lado) => desenharPremioTela(ctx, pr, lado, pr.tipo === 'skin' ? acharSkin(pr.id).hex : undefined),
+  // o presente (acessorio) aparece no slime do jogador, como na vitrine do vestiario
+  premio: (ctx, pr, lado) => (pr.tipo === 'acessorio'
+    ? desenharMiniSlime(ctx, lado, lado, { ...visualAtual(), [pr.encaixe]: pr.id }, { pais: perfil.pais, pintura: cvPintura })
+    : desenharPremioTela(ctx, pr, lado, pr.tipo === 'skin' ? acharSkin(pr.id).hex : undefined)),
   aoPremiado: () => premiado(),
   aoMenu: () => irParaMenu(),
+  aoPresente: () => abrirPresente(),
   caixaExtra: () => vestiario.caixa || menu.caixa,
   aoEscExtra: () => menu.voltar(),
 });
@@ -155,11 +160,12 @@ const pincel = { cor: '#17161c', tam: 6, borracha: false };
 const desfazer = [];
 let ultimoPonto = null;
 
-function abrirVestiario() {
+/** @param {string} [aba] @param {'menu'|'cartao'} [origem] */
+function abrirVestiario(aba, origem = 'menu') {
   menu.fechar();
   controles.soltarTudo();
-  vestiario.abrir();
-  poki.measure('vestiario', 'abrir', 'menu');
+  vestiario.abrir(aba);
+  poki.measure('vestiario', 'abrir', origem);
 }
 
 function fecharVestiario() {
@@ -280,19 +286,33 @@ function abrirMenu() {
   });
 }
 
-/** Menu pelo cartao de fim (a proxima partida fica pronta, esperando o JOGAR) ou pela pausa. */
+/** Fecha o cartao de fim e deixa a proxima partida pronta, esperando o JOGAR do menu. */
+function sairDoCartao() {
+  hud.cartao(null);
+  partidaN++;
+  intervaloPendente = true;
+  avancarCopaSeCampeao();
+  novaPartida();
+}
+
+/** Menu pelo cartao de fim ou pela pausa. */
 function irParaMenu() {
   if (hud.cartaoAberto) {
-    hud.cartao(null);
-    partidaN++;
-    intervaloPendente = true;
-    avancarCopaSeCampeao();
-    novaPartida();
+    poki.measure('cartao', 'menu', 'interact');
+    sairDoCartao();
   } else if (pausado) {
     hud.menu(false);
     menuDaPausa = true;
   }
   abrirMenu();
+}
+
+/** O presente novo do cartao: o vestiario abre nos acessorios (o Pronto volta ao menu, e o JOGAR segue). */
+function abrirPresente() {
+  if (!hud.cartaoAberto) return;
+  poki.measure('cartao', 'vestiario', 'interact');
+  sairDoCartao();
+  abrirVestiario('acessorios', 'cartao');
 }
 
 async function jogarDoMenu() {
@@ -326,6 +346,16 @@ let inicio = null;
 let tMao = 0;
 let partidaN = perfil.partidas;
 let premiadoNaPausa = false;
+/** a partida ja mandou o level/mN/start (no primeiro gameplayStart dela) */
+let inicioMedido = false;
+/** passos do tutorial da 1a partida (0 nao comecou, 1 comecou, 2 feito): receber, sacar, cortar */
+let tutorial = { receber: 0, saque: 0, cortada: 0 };
+/** um passo do tutorial (progress events da Poki: start e complete) */
+function passoTutorial(id, fase) {
+  if (D.auto || !P || !P.regras.imperdivel) return;
+  if (fase === 'start' && tutorial[id] === 0) { tutorial[id] = 1; poki.measure('tutorial', id, 'start'); }
+  else if (fase === 'complete' && tutorial[id] === 1) { tutorial[id] = 2; poki.measure('tutorial', id, 'complete'); }
+}
 
 // ------------------------------------------------------------------ visual (vestiario)
 /** o canvas da estampa do jogador (128 x 64) e o da pintura (o pincel; so no aparelho) */
@@ -386,9 +416,12 @@ function vestirRival() {
 }
 
 function novaPartida(revanche = false) {
-  // a 1a partida da vida e as quartas da Copa 1, contra a Gota (imperdivel)
-  const adversario = chaveDaCopa(perfil.copa).adversario || 'gota';
+  // a 1a partida da vida e os 16-avos da Copa 1, contra a Gota (imperdivel); as oitavas da Copa 1
+  // (a 2a partida da vida, contra o Pingo) vao a 5 sem vai-a-2
+  const ch0 = chaveDaCopa(perfil.copa);
+  const adversario = ch0.adversario || 'gota';
   const primeira = D.primeira ?? (perfil.partidas === 0 && adversario === 'gota');
+  const curta = !primeira && !D.rival && ch0.n === 1 && ch0.fase === 1;
   const idRival = D.rival || adversario;
   const riv = acharRival(idRival);
   reacoesLiberadas = REACOES.map((r) => r.id).filter((id) => perfil.liberados.reacoes.includes(id));
@@ -397,6 +430,7 @@ function novaPartida(revanche = false) {
     modo: D.auto ? 'demo' : 'cpu',
     rival: riv.id,
     primeira,
+    curta,
     partidaN: partidaN + 1,
     gatilho: /** @type {any} */ (D.gatilho || 'novo'),
     assist: { ima: D.assist, devolucao: D.assist },
@@ -417,6 +451,8 @@ function novaPartida(revanche = false) {
   tons = [3, riv.chefe ? 11 : 2 + Math.max(0, ['T0', 'T1', 'T1+', 'T2', 'T3', 'T4', 'T5'].indexOf(riv.nivel))];
   inicio = null;
   tMao = 0;
+  inicioMedido = false;
+  tutorial = { receber: 0, saque: 0, cortada: 0 };
   if (D.roteiro) {
     primeiraInteracao = true;
     jogando = true;
@@ -444,6 +480,11 @@ function interagir(e) {
   if (!jogando && !pausado && !emAnuncio && P.estado !== 'fim' && !hud.cartaoAberto) {
     jogando = true;
     poki.gameplayStart();
+    // o funil da Poki: a partida N comecou (com o complete/fail do fim, o painel mostra quem saiu nela)
+    if (!inicioMedido) {
+      inicioMedido = true;
+      if (!D.auto) poki.measure('level', 'm' + (perfil.partidas + 1), 'start');
+    }
     if (!inicio) inicio = { t: 0, txt: T('grito.vai') };
     audio.pronto().then((ok) => { if (ok) { mesa.falar('vozProntoSlime', { forcar: true }); mesa.falar('vozVaiSlime', { forcar: true, atraso: 0.55 }); } });
   }
@@ -503,12 +544,13 @@ function ganhar(g, dobrado) {
 /** Premio x2 (video recompensado, so por escolha): dobra o XP e as Gotas da partida. */
 async function premiado() {
   if (!ultimoGanho || emAnuncio) return;
+  // o SDK ja mede o video e o resultado; aqui so a oferta (visible no cartao, interact no toque)
+  poki.measure('rewarded', 'dobrar', 'interact');
   premiadoNaPausa = true;
   emAnuncio = true;
   controles.soltarTudo();
   const ok = await poki.rewardedBreak();
   emAnuncio = false;
-  poki.measure('rewarded', 'dobrar', ok ? 'premio' : 'sem-premio');
   if (!ok) { hud.cartaoPremiado(null); return; }
   const p = ganhar(ultimoGanho, true);
   ultimoGanho = null;
@@ -518,6 +560,8 @@ async function premiado() {
 
 /** auto: o cartao avancou sozinho (sem toque), entao nao ha intervalo com anuncio. */
 async function proximaPartida(revanche, auto = false) {
+  if (!hud.cartaoAberto) return;
+  poki.measure('cartao', revanche ? 'revanche' : 'proxima', auto ? 'auto' : 'interact');
   hud.cartao(null);
   partidaN++;
   if (!auto) await intervalo();
@@ -541,7 +585,7 @@ const TRATADORES = {
     const f = Math.min(1.5, e.imp / 16);
     mesa.tocar('toque', { forca: f }, { max: 4 });
     if (f > 0.8) cena.vfx.respingo(e.x, e.y, cores[e.i], 6, 4 + f * 3);
-    if (e.i === 0) vibrar(18);
+    if (e.i === 0) { vibrar(18); passoTutorial('receber', 'complete'); }
   },
   'contagem': (e) => { const s = P.slimes[e.i]; cena.contagem(s.x, s.y + 3.4, e.n); },
   'pulo': () => mesa.tocar('pulo', {}, { max: 2 }),
@@ -561,12 +605,14 @@ const TRATADORES = {
     }
     if (e.i === 0) {
       vibrar(e.tipoSaque === 'perfeito' ? [16, 30, 16] : 12);
-      poki.measure('saque', e.tipoSaque, 'humano');
-    }
+      // o saque de um toque (1a partida) sai sempre perfeito: conta a parte
+      poki.measure('saque', e.simples ? 'simples' : e.tipoSaque, 'humano');
+      passoTutorial('saque', 'complete');
+    } else passoTutorial('receber', 'start');
   },
   'saque-levanta': () => mesa.tocar('pulo', {}, { max: 1 }),
   'saque-pega': () => mesa.tocar('toque', { forca: 0.3 }, { max: 1 }),
-  'saque-valendo': () => { tMao = 0; },
+  'saque-valendo': (e) => { tMao = 0; if (e.i === 0) passoTutorial('saque', 'start'); },
   'saque-liberado': () => {},
   // rali longo: a plateia anima nas travessias pares (o locutor contando saiu a pedido, 2026-10-22)
   'cruzou': (e) => { if (e.n >= 4 && e.n % 2 === 0) cena.plateia.animar(0.15); },
@@ -575,7 +621,6 @@ const TRATADORES = {
     mesa.tocar('lentaEntra', {}, { max: 1 });
     cena.corCortada = cores[e.i];
     if (e.humano && P.jogadores[e.i].cortadas === 1) mesa.falar('vozPowerUpSlime');
-    poki.measure('powerup', 'cortada-lenta', 'interact');
   },
   'cortada-mira': () => {},
   'cortada-solta': (e) => {
@@ -583,8 +628,14 @@ const TRATADORES = {
     cena.coroa(e.x, e.y, cores[e.i], { miolo: tonalidade(cores[e.i], 0.6) });
     cena.diretor.tremer(0.45);
     if (e.i === 0) vibrar([30, 40, 60]);
-    if (e.rapida) poki.measure('cortada', 'lenta', 'sem-querer');
-    poki.measure('cortada', 'mira', e.auto ? 'auto' : 'manual');
+    // so o humano (antes de 2026-10-22 a CPU entrava na conta): o gesto (toque simples ou segurou)
+    // e a mira (a padrao ou mexida)
+    if (e.humano) {
+      poki.measure('cortada', 'gesto', e.toque ? 'toque' : 'segurou');
+      poki.measure('cortada', 'mira', e.auto ? 'auto' : 'manual');
+      if (e.rapida) poki.measure('cortada', 'lenta', 'sem-querer');
+      passoTutorial('cortada', 'complete');
+    }
   },
   'ponto': (e) => {
     const completa = e.festa === 'completa';
@@ -636,6 +687,17 @@ const TRATADORES = {
       ultimoGanho.gotas += bonus;
       progresso = ganhar(ultimoGanho, false);
     }
+    // presente das primeiras vitorias: ja vestido no slime (src/jogo/perfil.js PRESENTES)
+    let presente = '';
+    if (venceu && !D.auto) {
+      const r = darPresente(perfil, perfil.vitorias);
+      if (r.chave) {
+        Object.assign(perfil, r.perfil);
+        presente = r.chave;
+        aplicarVisual();
+        poki.measure('presente', r.chave.split(':')[2], 'ganhou');
+      }
+    }
     gravarPerfil();
     mesa.falar(titulo ? 'vozParabensSlime' : venceu ? 'vozVenceuSlime' : 'vozPerdeuSlime', { forcar: true });
     poki.measure('level', 'm' + perfil.partidas, venceu ? 'complete' : 'fail');
@@ -645,14 +707,29 @@ const TRATADORES = {
     if (ch) proxCopa = titulo ? (ch.n < NUM_COPAS ? T('copa.liberada').replace('{n}', String(ch.n + 1)) : T('copa.campeao')) + ` · ${T('copa.titulo').replace('{g}', String(bonus))}` : textoProxima(ch);
     // o titulo deixa a festa do campeao correr (um toque abre o cartao na hora)
     if (titulo) cena.plateia.festa(-1, 1.5);
+    // o presente que acabou de ganhar e o da proxima vitoria (com o rival da proxima partida)
+    const pres = (chave) => { const [, encaixe, id] = chave.split(':'); return { tipo: 'acessorio', encaixe, id }; };
+    let prox = ch && !ch.campeao && !D.auto ? presenteDaVitoria(perfil.vitorias + 1) : '';
+    if (perfil.liberados.itens.includes(prox)) prox = '';
+    const presenteCartao = presente || prox
+      ? { novo: presente ? { pr: pres(presente) } : null, proximo: prox && ch ? { pr: pres(prox), rival: T('rival.' + ch.adversario) } : null }
+      : null;
+    const premiadoVisivel = !!progresso && poki.temAnuncios && !D.semAnuncio;
+    // depois da 1a partida da vida o cartao avanca rapido (o maior vazamento do Player Fit Test)
+    const auto = perfil.partidas === 1 && D.avanco > 0 ? Math.min(D.avanco, TEMPOS.avancoPrimeira) : D.avanco;
     const abrir = () => {
       if (cartaoPendente !== abrir) return;
       cartaoPendente = null;
       hud.cartao({
         titulo: titulo ? T('copa.campeao') : venceu ? T('ui.venceu') : T('ui.perdeu'), sub: `${e.placar[0]} · ${e.placar[1]}`, proxima: venceu, revanche: !venceu,
-        progresso, premiado: !!progresso && poki.temAnuncios && !D.semAnuncio, campeao: titulo, auto: D.avanco,
-        chave: ch ? { ...dadosChave(ch), animar: venceu } : null, proxCopa,
+        progresso, premiado: premiadoVisivel, campeao: titulo, auto,
+        chave: ch ? { ...dadosChave(ch), animar: venceu } : null, proxCopa, presente: presenteCartao,
       });
+      // a exposicao de cada botao do cartao (o toque mede o interact: proximaPartida, irParaMenu...)
+      poki.measure('cartao', venceu ? 'proxima' : 'revanche', 'visible');
+      poki.measure('cartao', 'menu', 'visible');
+      if (premiadoVisivel) poki.measure('rewarded', 'dobrar', 'visible');
+      if (presenteCartao && presenteCartao.novo) poki.measure('cartao', 'vestiario', 'visible');
     };
     cartaoPendente = abrir;
     setTimeout(abrir, titulo ? 2600 : 400);
@@ -693,7 +770,7 @@ const TRATADORES = {
   },
   // falas em balao: o balbucio no tom de cada slime (o texto a cena desenha)
   'fala': (e) => mesa.balbuciar(vozDaFala(e.id), { nivel: tons[e.i] }),
-  'tutorial-cortada': () => { tMao = 0; },
+  'tutorial-cortada': () => { tMao = 0; passoTutorial('cortada', 'start'); },
   'texto': () => {},
   'lenta': () => {},
   'cortada-cancela': () => {},
@@ -827,8 +904,11 @@ function desenharMao(dt) {
   const acao = pulo ? { x: pulo.x, y: pulo.y } : L.painel ? { x: W * 0.75, y: L.painel.y + L.painel.h * 0.45 } : { x: W * 0.78, y: window.innerHeight * 0.72 };
   if (!primeiraInteracao) m = { ...acao, texto: toque ? T('dica.toque') : T('dica.teclas'), gesto: 'toque' };
   else if (D.auto) m = null;
-  else if (P.estado === 'saque' && P.sacador === 0 && P.saque.fase === 'pronto' && (P.saque.t >= TEMPOS.pulsoSaque || perfil.partidas < 2)) m = { ...acao, texto: toque ? T('dica.sacar') : T('dica.sacarTecla'), gesto: 'toque' };
-  else if (P.estado === 'saque' && P.sacador === 0 && P.saque.fase === 'levantada' && perfil.partidas < 3) m = { ...acao, texto: T('dica.bater'), gesto: 'toque' };
+  else if (P.estado === 'saque' && P.sacador === 0 && P.saque.fase === 'pronto' && (P.saque.t >= TEMPOS.pulsoSaque || perfil.partidas < 2)) {
+    // na 1a partida o saque e de um toque (a batida sai sozinha): "toque para sacar"
+    const k = P.saqueSimples ? (toque ? 'dica.sacarSimples' : 'dica.sacarTeclaSimples') : toque ? 'dica.sacar' : 'dica.sacarTecla';
+    m = { ...acao, texto: T(k), gesto: 'toque' };
+  } else if (P.estado === 'saque' && P.sacador === 0 && P.saque.fase === 'levantada' && !P.saqueSimples && perfil.partidas < 3) m = { ...acao, texto: T('dica.bater'), gesto: 'toque' };
   else if (P.tutorialCortada === 'oferecida' && P.estado === 'jogo' && !P.cortada) m = { ...acao, texto: T('dica.cortada'), gesto: 'duplo' };
   else if (P.esperaToque && P.estado === 'saque' && P.sacador === 1) m = { ...acao, texto: T('dica.receber'), gesto: 'toque' };
   hud.mao(m);

@@ -54,7 +54,8 @@ const intencaoVazia = () => ({ eixo: 0, botao: false, borda: false, superBorda: 
  * @property {number} [semente]
  * @property {'cpu'|'dois'|'demo'} [modo]     demo: os dois lados pela IA (prints, testes)
  * @property {string} [rival]                 id do rival (src/jogo/rivais.js)
- * @property {boolean} [primeira]             primeira partida da vida (alvo 5, imperdivel, onboarding)
+ * @property {boolean} [primeira]             primeira partida da vida (alvo 5, imperdivel, onboarding, saque de um toque)
+ * @property {boolean} [curta]                a 2a partida da vida (alvo 5 sem vai-a-2)
  * @property {number} [copa]
  * @property {number} [partidaN]              quantas partidas o jogador ja comecou (protecao)
  * @property {{ vento?: number, teto?: number, eAlambrado?: number }} [ginasio]
@@ -80,7 +81,10 @@ export function criarPartida(o = {}) {
   const T = criarTempo();
   const riv = acharRival(o.rival || 'gota');
   const copa = o.copa || riv.copa || 1;
-  const regras = alvoDaPartida({ primeira: !!o.primeira, chefe: !!riv.chefe, copa, modo: modo === 'dois' ? 'dois' : o.alvo ? 'rapida' : 'circuito', alvo: o.alvo });
+  const regras = alvoDaPartida({ primeira: !!o.primeira, curta: !!o.curta, chefe: !!riv.chefe, copa, modo: modo === 'dois' ? 'dois' : o.alvo ? 'rapida' : 'circuito', alvo: o.alvo });
+  // saque de um toque na 1a partida da vida (retencao, 2026-10-22): o toque levanta e a batida sai
+  // sozinha no instante ideal (sempre PERFEITO); o anel e o 2o toque comecam na 2a partida
+  const saqueSimples = !!o.primeira;
   const ginasio = { vento: 0, teto: Infinity, eAlambrado: undefined, ...(o.ginasio || {}) };
   const gatilho = o.gatilho || 'novo';
   const assist = { ima: true, devolucao: true, ...(o.assist || {}) };
@@ -290,6 +294,8 @@ export function criarPartida(o = {}) {
     // a mira vem da posicao: a bola a frente do corpo vai funda, em cima media, atras curta
     const s = slimes[sacador];
     saque.prof = profundidadePorPosicao((bola.x - s.x) * -s.lado);
+    // saque de um toque (1a partida): o humano pula sozinho no instante ideal
+    if (saqueSimples && humano[sacador] && saque.fase === 'levantada' && saque.tL >= TS.ideal) bater(sacador);
     // batendo: o pulo encontra a bola na cupula, ou bate de todo jeito depois de 0,7 s ou quando a
     // bola voltaria para a mao (o pulo cedo demais vira o fraco); so com a bola ao alcance: longe do
     // corpo ela passa e volta para a mao
@@ -366,7 +372,7 @@ export function criarPartida(o = {}) {
     amassar(s, -0.35);
     tSaqueSolto = T.tMundo;
     novaJogadaIAs();
-    ev({ tipo: 'saque', i, tipoSaque: tipo, alvo, x: bola.x, y: bola.y, erro });
+    ev({ tipo: 'saque', i, tipoSaque: tipo, alvo, x: bola.x, y: bola.y, erro, simples: saqueSimples && humano[i] });
     if (tipo === 'perfeito') falar(i, 'saque');
   }
 
@@ -605,7 +611,7 @@ export function criarPartida(o = {}) {
     novaJogadaIAs();
     caretar(i, 'feliz', 0.8);
     const quick = c.tTotal < Cort.CORTADA.devolucao + Cort.CORTADA.entrada && c.mexido < 1;
-    ev({ tipo: 'cortada-solta', i, x: c.bx, y: c.by, vx: c.vx, vy: c.vy, alvoX: c.alvoX, auto: !c.mexeu, rapida: quick, tMira: c.tTotal });
+    ev({ tipo: 'cortada-solta', i, x: c.bx, y: c.by, vx: c.vx, vy: c.vy, alvoX: c.alvoX, auto: !c.mexeu, rapida: quick, toque: c.toque, tMira: c.tTotal, humano: humano[i] });
     falar(i, 'cortada');
     if (gatilho === 'segura' && quick && !c.gratis) J[i].med.v = Math.min(300, J[i].med.v + CUSTO.cortada);
     if (tutorialCortada === 'oferecida' && humano[i]) tutorialCortada = 'feito';
@@ -647,7 +653,10 @@ export function criarPartida(o = {}) {
     if (c.fase === 'entrando') {
       if (c.t >= (lenta.entrada ?? Cort.CORTADA.entrada)) { c.fase = 'mirando'; c.t = 0; ev({ tipo: 'cortada-mira', i: c.i }); }
     } else if (c.fase === 'mirando') {
-      const soltou = humano[c.i] ? !Jm.it.botao : c.t >= (c.cpuSegura || 0.5);
+      // o humano: soltar antes do tMinToque (o toque simples) segura a camera lenta ate la (gatilho novo)
+      const minimo = gatilho === 'novo' ? Cort.CORTADA.tMinToque : 0;
+      if (humano[c.i] && !Jm.it.botao && c.t < minimo) c.toque = true;
+      const soltou = humano[c.i] ? !Jm.it.botao && c.t >= minimo : c.t >= (c.cpuSegura || 0.5);
       if (soltou || c.t >= c.tMax) soltarCortada();
     } else if (c.fase === 'soltando') {
       if (c.t >= Cort.CORTADA.hitstop + Math.max(0.08, Cort.CORTADA.saida)) terminarCortada();
@@ -899,7 +908,7 @@ export function criarPartida(o = {}) {
       if (!saque.valendo || esperaToque) { it.borda = false; return; }
       if (saque.fase === 'pronto') {
         if (it.borda) levantar(i);
-      } else if (it.borda && saque.fase === 'levantada' && saque.tL >= SAQUE.ignora) bater(i);
+      } else if (it.borda && saque.fase === 'levantada' && saque.tL >= SAQUE.ignora && !saqueSimples) bater(i);
       it.borda = false;
       return;
     }
@@ -1212,6 +1221,8 @@ export function criarPartida(o = {}) {
     get esperaToque() { return esperaToque; },
     get tPartida() { return tPartida; },
     get tutorialCortada() { return tutorialCortada; },
+    /** o saque do humano e de um toque (1a partida da vida) */
+    get saqueSimples() { return saqueSimples; },
     get anterior() { return anterior; },
     get resultado() { return resultado; },
     /** Previsao de queda da bola agora (sombra, mao fantasma). */

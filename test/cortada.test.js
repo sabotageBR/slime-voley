@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { criarSlime, criarBola, prever, LARG, REDE_R } from '../src/fisica/volei.js';
 import { elegivel, iniciar, escalas, resolverTiro, faixaAlvo, CORTADA } from '../src/jogo/cortada.js';
+import { criarPartida } from '../src/jogo/partida.js';
+import { PASSO } from '../src/fisica/volei.js';
 
 function cena() {
   const s = criarSlime(-1, -3);
@@ -64,4 +66,37 @@ test('o tiro cai sempre dentro da faixa do outro lado, com vento maximo', () => 
       }
     }
   }
+});
+
+/** Cortada armada (roteiro) e o tempo real ate ela soltar, com o botao solto em `soltaEm` s. */
+function tempoAteSoltar(soltaEm, o = {}) {
+  const p = criarPartida({ modo: 'cpu', semente: 3, ...o });
+  p.interacao();
+  assert.ok(p.roteiro('cortada'));
+  let t = 0;
+  for (let k = 0; k < 120 * 4; k++) {
+    p.intencao(0, { botao: t < soltaEm });
+    p.passo();
+    t += PASSO;
+    for (const e of p.eventos) if (e.tipo === 'cortada-solta') return { t, e };
+    p.eventos.length = 0;
+  }
+  return { t: Infinity, e: null };
+}
+
+test('o toque simples segura a camera lenta ate o tMinToque e corta com a mira padrao', () => {
+  const toque = tempoAteSoltar(0);
+  assert.ok(toque.e, 'soltou');
+  assert.ok(toque.t >= CORTADA.entrada + CORTADA.tMinToque - PASSO, `soltou em ${toque.t.toFixed(3)} s`);
+  assert.ok(toque.t <= CORTADA.entrada + CORTADA.tMinToque + 3 * PASSO, `soltou em ${toque.t.toFixed(3)} s`);
+  assert.equal(toque.e.toque, true);
+  assert.equal(toque.e.auto, true);
+  assert.equal(toque.e.humano, true);
+  // segurando alem do minimo: solta quando o dedo sai (nao e toque)
+  const segurou = tempoAteSoltar(0.8);
+  assert.ok(Math.abs(segurou.t - 0.8) <= 2 * PASSO, `soltou em ${segurou.t.toFixed(3)} s`);
+  assert.equal(segurou.e.toque, false);
+  // a variante "segura" nao tem minimo (a soltura rapida devolve o medidor)
+  const segura = tempoAteSoltar(0, { gatilho: 'segura' });
+  assert.ok(segura.t < CORTADA.entrada + 0.1, `soltou em ${segura.t.toFixed(3)} s`);
 });

@@ -13,6 +13,14 @@ test('alvo: 1a da vida 5 imperdivel; rivais 7 vai-a-2 teto 9; chefes das Copas 2
   assert.equal(alvoDaPartida({ chefe: true, copa: 2 }).teto, 11);
 });
 
+test('a 2a partida da vida (curta) vai a 5 sem vai-a-2; o 2P e a rapida ignoram', () => {
+  assert.deepEqual(alvoDaPartida({ curta: true }), { alvo: 5, vaiA2: false, teto: 5, imperdivel: false });
+  assert.equal(alvoDaPartida({ curta: true, modo: 'dois', alvo: 9 }).alvo, 9);
+  const p = criarPartida({ modo: 'cpu', semente: 2, rival: 'pingo', curta: true });
+  assert.equal(p.regras.alvo, 5);
+  assert.equal(vencedor([5, 4], p.regras), -1);
+});
+
 test('vai-a-2 ate o teto', () => {
   const r = alvoDaPartida({});
   assert.equal(vencedor([7, 6], r), 0);
@@ -54,6 +62,30 @@ test('saque: sem o 2o toque a bola volta para a mao (sem falta, sem saque automa
   assert.equal(p.saque.fase, 'pronto');
   assert.ok(tipos.includes('saque-pega'));
   assert.ok(!tipos.includes('saque') && !tipos.includes('ponto'));
+});
+
+test('1a partida: o saque e de um toque (a batida sai sozinha, PERFEITO) e o 2o toque nao conta', () => {
+  const p = criarPartida({ modo: 'cpu', semente: 4, primeira: true, sacaPrimeiro: 0 });
+  assert.equal(p.saqueSimples, true);
+  p.interacao();
+  p.passo();
+  p.intencao(0, { borda: true, botao: true });
+  p.passo();
+  assert.equal(p.saque.fase, 'levantada');
+  p.intencao(0, { botao: false });
+  const saques = [];
+  for (let k = 0; k < 120 * 3 && !saques.length; k++) {
+    // um 2o toque cedo (que daria o FRACO no saque normal) e ignorado
+    if (k === 30) p.intencao(0, { borda: true, botao: true });
+    if (k === 31) p.intencao(0, { botao: false });
+    p.passo();
+    for (const e of p.eventos) if (e.tipo === 'saque') saques.push(e);
+    p.eventos.length = 0;
+  }
+  assert.equal(saques.length, 1);
+  assert.equal(saques[0].tipoSaque, 'perfeito');
+  assert.equal(saques[0].simples, true);
+  assert.equal(criarPartida({ modo: 'cpu', semente: 4 }).saqueSimples, false);
 });
 
 test('saque: depois do 1o toque o slime anda e a posicao mira (frente = fundo, em cima = medio, atras = curto)', () => {

@@ -29,6 +29,11 @@ export const TEMPOS = Object.freeze({
   coyote: 0.07,
   /** o fim da partida: palavra, replay (re-simulado) e o cartao */
   fimPartida: 2.6,
+  /**
+   * o cartao depois da 1a partida da vida avanca sozinho nisto (os outros: ?avanco, 8 s). O Player
+   * Fit Test de 2026-10-21 perdeu 47% de quem venceu a 1a partida antes de terminar a 2a.
+   */
+  avancoPrimeira: 3,
 });
 
 /**
@@ -125,12 +130,14 @@ export function profundidadeSaque(rumo) {
 }
 
 /**
- * Alvo da partida.
- * @param {{ primeira?: boolean, chefe?: boolean, copa?: number, modo?: string, alvo?: number }} o
+ * Alvo da partida. curta: a 2a partida da vida (as oitavas da Copa 1) vai a 5 sem vai-a-2, para a
+ * passagem do tutorial para o circuito ser curta (retencao, 2026-10-22).
+ * @param {{ primeira?: boolean, curta?: boolean, chefe?: boolean, copa?: number, modo?: string, alvo?: number }} o
  * @returns {{ alvo: number, vaiA2: boolean, teto: number, imperdivel: boolean }}
  */
 export function alvoDaPartida(o = {}) {
   if (o.primeira) return { alvo: 5, vaiA2: false, teto: 5, imperdivel: true };
+  if (o.curta && o.modo !== 'rapida' && o.modo !== 'dois') return { alvo: 5, vaiA2: false, teto: 5, imperdivel: false };
   if (o.modo === 'rapida' || o.modo === 'dois') { const a = o.alvo || 7; return { alvo: a, vaiA2: false, teto: a, imperdivel: false }; }
   if (o.chefe && (o.copa || 1) >= 2) return { alvo: 9, vaiA2: true, teto: 11, imperdivel: false };
   return { alvo: 7, vaiA2: true, teto: 9, imperdivel: false };

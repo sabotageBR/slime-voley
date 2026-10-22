@@ -51,7 +51,7 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
   - `juiz.js`: o juiz da rede (olhar, apontar e a bolada sorteada; nunca muda a bola);
   - `falas.js`: as falas em balão (catálogo fixo por gatilho, recarga e rng próprio);
   - `torneio.js` (a Copa Gosma: chave de 32 em todas as Copas, derivada do save) e `paises.js` (os 195 códigos);
-  - `perfil.js`: XP, nível, trilha, Gotas e o save normalizado;
+  - `perfil.js`: XP, nível, trilha, Gotas, os presentes das 3 primeiras vitórias e o save normalizado;
   - `visual.js`: o visual do vestiário (paleta de pigmentos, padrões, acessórios, arquétipos, compra e o save);
   - `rivais.js`: os níveis T, os 31 rivais (20 nos caminhos das Copas e 11 figurantes só da chave), as cores da paleta com a reserva (`corDoRival`) e as Copas;
   - `humor.js` (porte sem uso), `medidor.js` e `skins.js`.
@@ -94,7 +94,8 @@ Sem teste, por convenção: no jogo, o `preventDefault` fica no `controles.js` e
 - Não existe saque automático.
 - Portão de 30 s sem interação: até o saque da CPU espera um toque.
 - `commercialBreak` só no toque em Próxima/Revanche (a partir da 3ª partida) e ao despausar; nunca no rali.
-- O cartão de fim avança sozinho em 8 s sem toque (`?avanco=N`, 0 desliga), **sem anúncio**; a partida nova espera o toque para sacar.
+- O cartão de fim avança sozinho em 8 s sem toque (3 s depois da 1ª partida da vida; `?avanco=N`, 0 desliga), **sem anúncio**; a partida nova espera o toque para sacar.
+- `measure`: `level/m<N>/start` no 1º `gameplayStart` de cada partida, e `complete`/`fail` no fim. Os botões do cartão mandam `visible`/`interact`. Tabela completa no desenho §3.8.
 
 ## Ferramentas
 Portas: 5380 (servir), 4380–4385, CDP 9380–9382. É um Chrome por vez: o `shot` usa 4380/9380, a `thumb` usa 4384/9381, e o `gif` e o `medir` usam 4385/9382. Evite as portas 9222, 9503 e 9666.

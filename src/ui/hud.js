@@ -13,9 +13,10 @@ import { desenharChave, desenharCaminho } from '../render/chave.js';
  * @param {(k: string) => string} T
  * @param {{ aoPausar: () => void, aoContinuar: () => void, aoProxima: () => void, aoRevanche: () => void, aoOpcao: (id: string, v?: any) => void, som: (id: string) => void, icone: (ctx: CanvasRenderingContext2D, id: string, lado: number) => void, carinha: (ctx: CanvasRenderingContext2D, id: string, lado: number) => void, aoReagir: (id: string) => void, aoReagirTecla: (k: number) => void, aoBotaoReacao: () => void,
  *   premio: (ctx: CanvasRenderingContext2D, pr: any, lado: number) => void, aoPremiado: () => void, aoMenu: () => void, aoAutoAvanco: (revanche: boolean) => void,
- *   caixaExtra?: () => HTMLElement|null, aoEscExtra?: () => void }} cb
+ *   aoPresente: () => void, caixaExtra?: () => HTMLElement|null, aoEscExtra?: () => void }} cb
  *   caixaExtra: o menu principal ou a chave abertos (src/ui/menu.js): o teclado navega por eles
  *   aoAutoAvanco: o cartao de fim avancou sozinho (ninguem tocou): a proxima partida sem anuncio
+ *   aoPresente: o toque no presente novo do cartao (abre o vestiario)
  */
 export function criarHud(raiz, T, cb) {
   raiz.insertAdjacentHTML('beforeend', `
@@ -38,6 +39,7 @@ export function criarHud(raiz, T, cb) {
         <canvas class="cvCaminho" hidden></canvas>
         <canvas class="cvChave" hidden></canvas>
         <div class="proxCopa" hidden></div>
+        <div class="presentes" hidden></div>
         <div class="progresso" hidden>
           <div class="ganhos"><span class="gotas"><canvas class="icGota" width="44" height="44"></canvas><b class="gTotal">0</b><em class="gMais"></em></span><span class="xpMais"></span></div>
           <div class="nivel"><span class="nNum"></span><div class="barraXp"><i></i></div><span class="nXp"></span></div>
@@ -65,7 +67,7 @@ export function criarHud(raiz, T, cb) {
     med0: $('.l0 .medidor'), med1: $('.l1 .medidor'), chips0: $('.l0 .chips'), chips1: $('.l1 .chips'), pausa: $('.pausa'), reagir: $('.reagir'), faixa: $('.faixa'),
     reacoes: $('.reacoes'), mao: $('.mao'), maoTexto: $('.mao .texto'), cartao: $('#cartao'), cTitulo: $('#cartao .titulo'), cSub: $('#cartao .sub'),
     proxima: $('#cartao .proxima'), revanche: $('#cartao .revanche'), premiado: $('#cartao .premiado'), menuBt: $('#cartao .menuBt'),
-    cvChave: /** @type {HTMLCanvasElement} */ ($('#cartao .cvChave')), cvCaminho: /** @type {HTMLCanvasElement} */ ($('#cartao .cvCaminho')), cCaixa: $('#cartao .caixa'), proxCopa: $('#cartao .proxCopa'), opMenu: $('[data-op="menu"]'),
+    cvChave: /** @type {HTMLCanvasElement} */ ($('#cartao .cvChave')), cvCaminho: /** @type {HTMLCanvasElement} */ ($('#cartao .cvCaminho')), cCaixa: $('#cartao .caixa'), proxCopa: $('#cartao .proxCopa'), presentes: $('#cartao .presentes'), opMenu: $('[data-op="menu"]'),
     prog: $('#cartao .progresso'), gTotal: $('#cartao .gTotal'), gMais: $('#cartao .gMais'), xpMais: $('#cartao .xpMais'),
     nNum: $('#cartao .nNum'), barraXp: $('#cartao .barraXp i'), nXp: $('#cartao .nXp'), subiu: $('#cartao .subiu'),
     subiuTit: $('#cartao .subiuTit'), subiuPremios: $('#cartao .subiuPremios'), trilha: $('#cartao .trilha'), menu: $('#menuPausa'), mTitulo: $('#menuPausa .titulo'),
@@ -134,7 +136,11 @@ export function criarHud(raiz, T, cb) {
     if (['ArrowDown', 'ArrowRight', 'KeyS', 'KeyD'].includes(e.code)) { e.preventDefault(); /** @type {HTMLElement} */ (bts[(i + 1 + bts.length) % bts.length]).focus(); }
     else if (['ArrowUp', 'ArrowLeft', 'KeyW', 'KeyA'].includes(e.code)) { e.preventDefault(); /** @type {HTMLElement} */ (bts[(i - 1 + bts.length) % bts.length]).focus(); }
     else if (e.code === 'Escape' && menuAberto) cb.aoContinuar();
-    else if ((e.code === 'Enter' || e.code === 'Space') && i < 0) { e.preventDefault(); /** @type {HTMLElement} */ (bts[0]).click(); }
+    else if ((e.code === 'Enter' || e.code === 'Space') && i < 0) {
+      // sem foco: o botao normal (o primeiro da fileira de baixo), nunca o presente que vem antes dela
+      e.preventDefault();
+      /** @type {HTMLElement} */ (box.querySelector('.botoes button:not([hidden])') || bts[0]).click();
+    }
   });
 
   function medidor(box, v) {
@@ -236,6 +242,7 @@ export function criarHud(raiz, T, cb) {
   /** Nome curto de um premio da trilha. */
   function nomePremio(pr) {
     if (pr.tipo === 'gotas') return `+${pr.gotas} ${T('ui.gotas')}`;
+    if (pr.tipo === 'acessorio') return T('ac.' + pr.id);
     return T((pr.tipo === 'reacao' ? 'reacao.' : pr.tipo === 'powerup' ? 'pwn.' : 'skin.') + pr.id);
   }
 
@@ -287,6 +294,44 @@ export function criarHud(raiz, T, cb) {
     el.nNum.textContent = `${T('ui.nivel')} ${p.antes.nivel}`;
     el.nXp.textContent = `${p.antes.xp}/${p.antes.req}`;
     requestAnimationFrame(animar);
+  }
+
+  /**
+   * Um presente no cartao: o rotulo, o slime do jogador vestindo o item e o nome. O novo e um botao
+   * (abre o vestiario); o da proxima vitoria so mostra.
+   */
+  function presenteEl(pr, rotulo, px, botao) {
+    const d = document.createElement(botao ? 'button' : 'div');
+    d.className = botao ? 'bt presente novo' : 'presente prox';
+    const b = document.createElement('b');
+    b.textContent = rotulo;
+    const cv = document.createElement('canvas');
+    const lado = Math.round(px * Math.min(2, window.devicePixelRatio || 1));
+    cv.width = lado;
+    cv.height = lado;
+    const ctx = cv.getContext('2d');
+    if (ctx) cb.premio(ctx, pr, lado);
+    const s = document.createElement('span');
+    s.textContent = nomePremio(pr);
+    d.append(b, cv, s);
+    if (botao) d.addEventListener('click', () => { cb.som('botao'); pararAuto(); cb.aoPresente(); });
+    return d;
+  }
+
+  /**
+   * Presentes das primeiras vitorias (src/jogo/perfil.js PRESENTES): o que acabou de ganhar e o da
+   * proxima vitoria. Com eles, a trilha de niveis sai do cartao (volta quando acabam).
+   * @param {{ novo?: { pr: any }|null, proximo?: { pr: any, rival: string }|null }|null} p
+   */
+  function presentes(p) {
+    const tem = !!p && (!!p.novo || !!p.proximo);
+    el.presentes.hidden = !tem;
+    el.cCaixa.classList.toggle('comPresente', tem);
+    if (!p || !tem) { el.presentes.replaceChildren(); return; }
+    const l = [];
+    if (p.novo) l.push(presenteEl(p.novo.pr, T('ui.presenteNovo'), 60, true));
+    if (p.proximo) l.push(presenteEl(p.proximo.pr, T('ui.presenteProximo').replace('{rival}', p.proximo.rival), 52, false));
+    el.presentes.replaceChildren(...l);
   }
 
   /** Chips dos power-ups: "id:pontos" (sem pontos: espera o uso). */
@@ -406,6 +451,7 @@ export function criarHud(raiz, T, cb) {
         requestAnimationFrame(animarChave);
       }
       progresso(c.progresso || null);
+      presentes(c.presente || null);
       requestAnimationFrame(() => (c.proxima ? el.proxima : el.revanche).focus());
       autoSeg = c.auto || 0;
       iniciarAuto(autoSeg);

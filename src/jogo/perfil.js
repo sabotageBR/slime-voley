@@ -143,6 +143,32 @@ function liberar(n, pr) {
 }
 
 /**
+ * Presentes das primeiras vitorias (retencao, 2026-10-22): um acessorio do vestiario por vitoria,
+ * anunciado no cartao antes ("Vença o Pingo: Óculos redondos") e vestido na hora quando o encaixe
+ * esta livre (ou com outro presente). Lista fixa, sem sorteio.
+ */
+export const PRESENTES = Object.freeze(['ac:cabeca:orelhasGato', 'ac:rosto:oculosRedondos', 'ac:cabeca:coroa']);
+
+/** O presente da vitoria numero n da vida (1, 2, ...), ou ''. @param {number} n */
+export const presenteDaVitoria = (n) => PRESENTES[n - 1] || '';
+
+/**
+ * Da o presente da vitoria numero n (o perfil ja contou a vitoria). Devolve o perfil novo e a chave
+ * do item ('' sem presente, ou se o jogador ja tinha o item).
+ * @param {ReturnType<typeof normalizarPerfil>} p @param {number} n
+ */
+export function darPresente(p, n) {
+  const chave = presenteDaVitoria(n);
+  if (!chave || p.liberados.itens.includes(chave)) return { perfil: p, chave: '' };
+  const q = structuredClone(p);
+  q.liberados.itens.push(chave);
+  const [, enc, id] = chave.split(':');
+  const atual = q.visual[enc];
+  if (!atual || PRESENTES.includes(`ac:${enc}:${atual}`)) q.visual = { ...q.visual, [enc]: id };
+  return { perfil: q, chave };
+}
+
+/**
  * Os proximos marcos da trilha a partir do nivel atual (para o cartao).
  * @param {number} nivel @param {number} [quantos]
  */

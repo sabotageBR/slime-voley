@@ -324,6 +324,7 @@ O slime subindo soma vy (×1,0) e verticaliza a saída. O teste mede a normal e 
 | Partida | Alvo | Vai-a-2 | Teto |
 |---|---|---|---|
 | 1ª da vida (Gota) | 5, **imperdível** | não | — |
+| 2ª da vida (Pingo, oitavas da Copa 1; 2026-10-22) | 5 | não | 5 |
 | Rivais | 7 | sim | 9 |
 | Chefe da Copa 1 | 7 | sim | 9 |
 | Chefes das Copas 2–4 | 9 | sim | 11 |
@@ -345,6 +346,7 @@ O slime subindo soma vy (×1,0) e verticaliza a saída. O teste mede a normal e 
 | fora disso (o 2º toque não conta nos primeiros 0,15 s) | **FRACO**: lob alto, no máximo ±6 |
 | sem 2º toque | a bola volta para a mão em cerca de 1,2 s, **sem falta** |
 
+- **Na 1ª partida da vida, o saque do humano é de um toque** (2026-10-22, retenção; ver §3.9): o toque levanta e a batida sai sozinha no instante ideal, sempre PERFEITO. O 2º toque não conta. O anel aparece igual e mostra o tempo, e a dica diz "toque para sacar". O "levantar e bater" completo começa na 2ª partida. Telemetria: `saque/simples/humano`.
 - **CPU:** levanta de 0,5 a 0,8 s depois do saque valer. O erro de tempo é quase normal, com desvio `saqueErro` por nível, de 0,15 s no T0 a 0,035 s no T5. A mira (`rumo` do `planoSaque`) foge do receptor; a personalidade `lob` prefere o curto. Na levantada, a CPU anda até a posição desse rumo (`posicaoParaRumo`), o que também telegrafa o saque. Na 1ª partida, a CPU saca sempre o bom e nunca fecha a partida no saque (erra na rede).
 - **Telemetria:** `saque/<perfeito|bom|fraco>/humano`.
 - Esperando o saque humano: aos 4 s a bola pulsa e a mão fantasma aparece. **O jogo espera sem limite.**
@@ -369,6 +371,15 @@ O slime subindo soma vy (×1,0) e verticaliza a saída. O teste mede a normal e 
 - no máximo 1 botão premiado, menor.
 
 Evolução, Gotas contando e replay podem ser pulados com um toque. **Meta medida pelo bot:** no máximo 2 toques e 4 s, sem anúncio, entre o fim de uma partida e o saque da próxima.
+
+**Avanço automático** (2026-10-22): sem toque, o cartão avança sozinho em 8 s (`?avanco=N`), sem anúncio. Depois da 1ª partida da vida, em 3 s (`TEMPOS.avancoPrimeira`, mais 1,5 s de espera antes da barra encher). No Player Fit Test de 2026-10-21 (build 0.1.1, sem avanço), 47% de quem venceu a 1ª partida não terminou a 2ª.
+
+**Presentes das primeiras vitórias** (2026-10-22, `PRESENTES` em `src/jogo/perfil.js`): nas 3 primeiras vitórias da vida, um acessório do vestiário por vitória (Orelhas de gato, Óculos redondos e Coroa).
+- O cartão mostra o presente novo ("NOVO!", o slime do jogador vestindo o item) e o da próxima vitória ("Vença Pingo").
+- Com eles, a trilha de níveis sai do cartão; ela volta quando os presentes acabam.
+- O presente é vestido na hora, se o encaixe estiver livre ou com outro presente.
+- Um toque no presente novo abre o vestiário nos acessórios. O Pronto volta ao menu, e o JOGAR segue para a próxima partida.
+- A lista é fixa e anunciada antes: não é caixa aleatória.
 
 **Fluxo do SDK**
 
@@ -413,7 +424,7 @@ Evolução, Gotas contando e replay podem ser pulados com um toque. **Meta medid
 |---|---|---|
 | `elegivel` | — | Todas as condições juntas: (1) **uma pressão nova começada no ar** (ou, na variante "segura", 180 ms ou mais depois da janela); (2) no ar há 60 ms ou mais; (3) bola a até **1,6 u** da cúpula (+0,1 u por nível; +0,4 u se o toque anterior foi do próprio lado; 2,4 u no onboarding); (4) bola com y ≥ 4,0; (5) **centro da bola no próprio lado**; (6) não é o 4º toque; (7) **não é recepção de saque nem bola marcada como super ou cortada**; (8) medidor ≥ 100 ou "Cortada grátis". Com o medidor vazio, os pips tremem |
 | `entrando` | 100 ms, easeOutCubic | O mundo vai de 1000 a 70; o **defensor** vai de 1000 a **300**. **A bola é puxada por mola até o "ponto de batida"** (0,9 u acima da cúpula e 0,4 u à frente, rumo à rede). **A colisão bola-cortador fica desligada.** Push-in de 1,00 a 1,04 (desligado em "reduzir movimento"). Evento `camera-lenta{entra}` |
-| `mirando` | até 1,2 s (0,7 no 2P; 3,0 na 1ª vez do tutorial) | O cortador fica congelado (pose esticada, rosto `focado`). **A bola anda no máximo 60 ms de mundo no total** (escala da bola = 60 ms / tMax) e respira. O rival anda a 0,30 e **a IA lê a retícula desde a entrada**, com o tempo de reação dela; a bola nunca está ao alcance dela. A plateia e o confete ficam a 7%. Sem vinheta. Nos últimos 0,3 s as gotas pulsam. Ao esgotar o tempo, solta com a mira atual |
+| `mirando` | até 1,2 s (0,7 no 2P; 3,0 na 1ª vez do tutorial); o humano fica **pelo menos 0,5 s** (`tMinToque`, gatilho "novo", 2026-10-22): soltar antes (o toque simples) segura a câmera lenta até lá e corta com a mira padrão | O cortador fica congelado (pose esticada, rosto `focado`). **A bola anda no máximo 60 ms de mundo no total** (escala da bola = 60 ms / tMax) e respira. O rival anda a 0,30 e **a IA lê a retícula desde a entrada**, com o tempo de reação dela; a bola nunca está ao alcance dela. A plateia e o confete ficam a 7%. Sem vinheta. Nos últimos 0,3 s as gotas pulsam. Ao esgotar o tempo, solta com a mira atual |
 | `soltando` | 50 ms de hitstop + 80 ms | Contato resolvido no ponto de batida. **Bote de até 2,0 u, limitado ao próprio lado** (\|x\| ≥ REDE_R + a). **Coroa de respingo** na cor do time: anel de gotas de 0,5 a 2,8 u em 220 ms, mais um anel de tinta fino 40 ms depois (valores substituídos pela captura). A bola sai na velocidade resolvida, sem `VMAX` até o 1º contato. Escalas voltam a 1000. Vibração [30, 40, 60]. **Variante "segura":** soltura em menos de 200 ms sem a mira andar mais de 1 u devolve os 100 e cancela |
 | `turbinada` | até o contato | **Rastro de gotas que escorrem**: 1 a cada 30 ms, no máximo 8, vida de 240 ms (substituídos pela captura), na cor do rastro equipado |
 
@@ -453,11 +464,11 @@ Evolução, Gotas contando e replay podem ser pulados com um toque. **Meta medid
 - eventos na ordem certa;
 - `hash` com escala 1000.
 
-**Telemetria:**
-- `measure('powerup','cortada-lenta','visible')` **uma vez por partida** (na 1ª vez que fica elegível), mais `interact`.
-- `cortada/mira/auto|manual`, `cortada/lenta/ponto`.
-- `cortada/lenta/sem-querer`: soltura em menos de 150 ms com a mira parada, **ou** disparo automático com a mira intocada.
-- Na variante "segura", também `cortada/lenta/segurou-do-chao`. Se passar de cerca de 30% sem mira, fica a pressão nova.
+**Telemetria** (só o humano; até 2026-10-22 a CPU entrava na conta):
+- `cortada/gesto/toque|segurou`: soltou antes do `tMinToque` (o toque simples) ou segurou;
+- `cortada/mira/auto|manual`: a mira padrão ou mexida (o mouse sempre mexe: a mira segue o cursor);
+- `cortada/lenta/sem-querer`: só na variante "segura" (soltura rápida com a mira parada, que devolve o medidor).
+- **Medido no Player Fit Test de 2026-10-21** (0.1.1, sem o mínimo): 36% das partidas tiveram uma cortada solta em menos de 0,26 s, que mal mostra a câmera lenta, e 38% tiveram mira automática. Daí o `tMinToque`.
 
 ### 2.6 Medidor de Gosma e super saques
 
@@ -914,7 +925,7 @@ O editor deste §3.6 continua no plano; o vestiário que existe hoje é este:
   - mostra as Gotas contando (+N), a barra de XP enchendo (volta a zero a cada nível), "NÍVEL N!" com os prêmios e os 4 próximos marcos;
   - um toque pula a contagem;
   - tem **Próxima/Revanche** e o **Prêmio ×2** (vídeo, dobra o XP e as Gotas da partida; §3.8).
-- **Telemetria:** `nivel/n<N>/subiu` e `rewarded/dobrar/<premio|sem-premio>`.
+- **Telemetria:** `nivel/n<N>/subiu` e `rewarded/dobrar/<visible|interact>`. O SDK já mede o vídeo e o resultado; o `premio|sem-premio` de antes duplicava isso e saiu em 2026-10-22.
 
 ### 3.8 Anúncio premiado, intervalos e `measure()`
 
@@ -937,11 +948,36 @@ O editor deste §3.6 continua no plano; o vestiário que existe hoje é este:
 - nunca entre pontos nem no editor;
 - sem temporizador próprio.
 
-**`measure()`:** os nomes são os mesmos de antes. **Ajustes:**
-- `powerup/<super>/visible` sai uma vez por partida;
-- novos: `entrada/mouse/sem-clique`, `cortada/lenta/segurou-do-chao`, `fora/<lado>/ponto`.
+**`measure()`** (revisto em 2026-10-22 pela documentação da Poki, `developers.poki.com/guide/game-events`): `start`, `complete` e `fail` viram eventos de progresso; `visible` e `interact`, de interação; o resto, outros eventos. Nada de `/` nem `^` nos campos (o `core/poki.js` troca por `-`).
+
+| Evento | Quando |
+|---|---|
+| `level/m<N>/start` | no 1º `gameplayStart` da partida N da vida (o painel mostra quem saiu em cada partida) |
+| `level/m<N>/complete\|fail` | no fim da partida |
+| `tutorial/<receber\|saque\|cortada>/start\|complete` | só na 1ª partida: o saque da Gota e o 1º toque do jogador; o 1º saque dele; a cortada guiada |
+| `cartao/<proxima\|revanche\|menu\|vestiario>/visible` | o cartão de fim abriu (o `vestiario` só com presente novo) |
+| `cartao/<...>/interact`, `cartao/<proxima\|revanche>/auto` | o toque no botão; o avanço automático |
+| `rewarded/dobrar/visible\|interact` | a oferta do Prêmio ×2 (o SDK mede o vídeo) |
+| `presente/<id>/ganhou`, `vestiario/abrir/<menu\|cartao>` | os presentes e de onde o vestiário abriu |
+| `saque/<perfeito\|bom\|fraco\|simples>/humano`, `cortada/...` (§2.5), `powerup/<id>/<humano\|cpu>`, `reacao/<id>/humano`, `juiz/<reacao>/bolada`, `nivel/n<N>/subiu`, `copa/c<N>/titulo`, `fora/<lado>/ponto` | o resto, como antes |
+
+- Saiu o `powerup/cortada-lenta/interact`, que contava a CPU e nunca apareceu no painel de interações.
+- Ainda não existem: `powerup/<super>/visible` (os supers), `entrada/mouse/sem-clique` e `cortada/lenta/segurou-do-chao`.
 
 ### 3.9 Onboarding (sem texto) e arco de 7 minutos
+
+> **2026-10-22, Player Fit Test** (build 0.1.1, de 21/10, 500 gameplays). Passou raspando: média de 3m07s (o corte é 3 min) e 27% de engajados (o corte é 25%). Cada minuto do histograma era quase uma partida:
+> - 30% saíram antes de 1 min, e 44% dos loads não terminaram a 1ª partida (mediana de 65 s);
+> - 31% saíram entre 1 e 2 min: venceram a 1ª e não terminaram a 2ª (mediana de 155 s);
+> - quem passava da 3ª partida ficava (80% da 4ª para a 5ª).
+>
+> O que mudou (M2c):
+> - o saque de um toque na 1ª partida (§2.4);
+> - a 2ª partida a 5;
+> - o cartão de 3 s depois da 1ª (§2.4);
+> - os presentes das 3 primeiras vitórias;
+> - o mínimo de 0,5 s de câmera lenta no toque (§2.5);
+> - o funil por partida no `measure` (§3.8).
 
 > **2026-10-22:** com a chave de 32, a Copa 1 passou a ter 5 partidas (Gota, Pingo, Geleia, Mingau e Rei Gosma). A tabela abaixo é o arco original de 3 partidas e precisa ser refeita com o humano simulado.
 

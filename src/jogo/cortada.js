@@ -27,6 +27,12 @@ export const CORTADA = {
   tMira: 1.2,
   tMira2P: 0.7,
   tMiraTutorial: 3.0,
+  /**
+   * o humano fica pelo menos isto na mira (gatilho "novo"): soltar antes (o toque simples) segura a
+   * camera lenta ate aqui e corta com a mira padrao. No Player Fit Test de 2026-10-21, 36% das
+   * partidas tiveram cortada solta em menos de 0,26 s, sem ver a camera lenta (a CPU segura 0,4-0,6 s)
+   */
+  tMinToque: 0.5,
   /** a bola anda no maximo isto de mundo durante a mira inteira (s) */
   orcamentoBola: 0.06,
   /** elegibilidade */
@@ -72,6 +78,7 @@ export const CORTADA = {
  * @property {number} vy
  * @property {boolean} mexeu  o jogador mexeu na mira
  * @property {number} mexido  quanto a mira andou (u)
+ * @property {boolean} toque  o humano soltou antes do tMinToque (o toque simples)
  * @property {boolean} gratis veio do power-up (nao gastou medidor)
  * @property {number[]} caminho trajetoria prevista (x, y, ...)
  */
@@ -221,7 +228,7 @@ export function resolverTiro(bx, by, alvoX, lado, o = {}) {
  */
 export function iniciar(i, s, o) {
   const [bx, by] = pontoBatida(s);
-  const c = { fase: /** @type {'entrando'} */ ('entrando'), i, t: 0, tTotal: 0, tMax: o.tMax, alvoX: o.alvoX, bx, by, vx: 0, vy: 0, mexeu: false, mexido: 0, gratis: o.gratis, caminho: [] };
+  const c = { fase: /** @type {'entrando'} */ ('entrando'), i, t: 0, tTotal: 0, tMax: o.tMax, alvoX: o.alvoX, bx, by, vx: 0, vy: 0, mexeu: false, mexido: 0, toque: false, gratis: o.gratis, caminho: [] };
   resolver(c, s.lado, o.vento);
   return c;
 }
