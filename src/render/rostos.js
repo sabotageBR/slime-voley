@@ -21,7 +21,7 @@ export const OBJETOS = [
 ];
 
 /** Transformacao local -> mundo do slime (deformacao limitada, como no rosto). */
-function quadro(s) {
+export function quadro(s) {
   const R = s.raio0 * 0.9;
   const a11 = limitar(s.a11, 0.75, 1.3);
   const a22 = limitar(s.a22, 0.75, 1.3);

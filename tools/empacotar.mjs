@@ -44,6 +44,12 @@ for (const f of listar(join(dist, 'src')).filter((p) => p.endsWith('.js'))) {
 }
 
 const falhas = [];
+// o pacote local de personagens famosos (IP de terceiros) nunca vai para a Poki: sai a pasta, e
+// nada que ficou pode citar o modulo (o import dele so existe numa linha "// modelo")
+rmSync(join(dist, 'src/extra'), { recursive: true, force: true });
+for (const f of listar(join(dist, 'src')).filter((p) => p.endsWith('.js'))) {
+  if (/extra\/famosos/.test(semComentarios(readFileSync(f, 'utf8')))) falhas.push(`o pacote local (src/extra) ficou citado em ${relative(dist, f)} (falta "// modelo")`);
+}
 const textos = listar(dist).filter((p) => /\.(html|js|css)$/.test(p)).map((p) => readFileSync(p, 'utf8')).join('\n');
 // arte que nenhum codigo cita (pranchas do M1, ginasios de direcoes que nao vieram) fica fora
 for (const f of listar(join(dist, 'src/arte'))) if (!textos.includes(basename(f))) rmSync(f);

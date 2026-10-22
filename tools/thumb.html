@@ -69,7 +69,8 @@ Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: () 
 const sk = skin('laranjinha');
 const rv = rival('gota');
 const cores = [sk.hex, hexDaMistura(rv.pig)];
-const P = criarPartida({ semente: 5, modo: 'cpu', rival: rv.id, partidaN: 2, powerups: [] });
+// sem o juiz da rede (2026-10-22): na thumb ele ficaria no meio das setas da mira
+const P = criarPartida({ semente: 5, modo: 'cpu', rival: rv.id, partidaN: 2, powerups: [], juiz: false });
 const vista = criarVista(P);
 vista.vestir(0, sk.pig, cores[0]);
 vista.vestir(1, rv.pig, cores[1]);

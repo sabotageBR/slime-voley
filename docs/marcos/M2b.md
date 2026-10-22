@@ -105,3 +105,32 @@ O trabalho foi dividido em 5 etapas, cada uma com o seu commit.
   - O fluxo pausa → Menu → Chave → Esc → Jogar foi conferido com cliques reais pelo CDP.
 - **Parâmetros:** `?menu`, `?chave` e `?copa=N&fase=F`.
 - **Testes:** `test/torneio.test.js` (tamanhos, caminho, revelação, placares, revanche, título, Copa seguinte e save) e `test/bandeiras.test.js` (195 sem repetir, todas desenhadas, nomes nas 3 línguas e o país pelo idioma). São 78 testes.
+
+## Etapa 5: vestiário
+
+- **Vestiário** (`src/ui/vestiario.js`, aberto pelo menu): a vitrine mostra o slime grande pelo motor da gosma, e tudo vale na hora.
+  - **Prontas:** as skins, os 16 arquétipos e os famosos (local).
+  - **Bandeiras:** as 195, com busca.
+  - **Cores:** 24 pigmentos, 17 padrões e a 2ª cor.
+  - **Pintar:** pincel direto no slime, com borracha, balde, desfazer e limpar.
+  - **Acessórios:** 40, em 3 encaixes.
+- **Shader:** estampa RGBA por slime (`uT4`, 128×64 no espaço da cúpula) e os padrões 15 (faixas) e 16 (metades); as skins "faixa" e "metades" deixaram de virar degradê.
+- **Acessórios** (`src/render/acessorios.js`): no espaço do rosto, amassam junto. Os rivais passaram a usar o acessório deles (o Rei Gosma de coroa).
+- **Economia:** os arquétipos custam de 120 a 250 Gotas e os acessórios de 0 a 80; o resto é grátis. É o primeiro uso das Gotas.
+- **Famosos:** 16 personagens reais em `src/extra/famosos.js`, só no local, na LAN e na build de modelos. O empacotar apaga a pasta e falha se algo ainda a citar; o `estilo.test` vigia.
+- **Conferido com entrada real (CDP):**
+  - pincel na vitrine (3 riscos);
+  - busca "jap" → Japão aplicado no corpo;
+  - Pronto volta ao menu e grava `volei.perfil` e `volei.pintura`;
+  - os famosos (Mario, Pikachu, Vader) vestidos.
+- **Build:** `npm run empacotar` ok, com 842 KB (359 KB gzip), áudio de 51,8 KB e nada de `src/extra` no zip. A versão continua 0.1.1: o zip local foi refeito.
+- **Custo** (`medir.mjs 4`): o desenho foi de 4,5–4,9 ms para 5,4–6,1 ms, mais provavelmente pelo núcleo maior do campo (o Gosmão sólido) e pelo juiz. Fica para o M6, junto com o Android real.
+- **Thumb:** a oficial não mudou. Regenerada agora, sairia com os slimes mais cheios, a retícula nova e sem a bandeirinha. A `tools/thumb.html` passou a criar a partida sem o juiz; regenerar é decisão do usuário.
+- **Testes:** `test/vestiario.test.js` (save do visual, compra, desenhos e textos de todo item, a trilha mantendo os acessórios e o pacote local) e a regra nova do `estilo.test`. São 84 testes.
+
+## Fica para depois
+- Os ginásios Escola, Rua e Arena; as Copas 2 a 4 jogam na Praia.
+- As evoluções de skin (Pro, Craque, Lenda), a loja de bolas e as comemorações.
+- O código de compartilhar o visual (`GS1-`), que o desenho §3.6 prevê.
+- O pincel e a estampa no `?render=2d` (a reserva sem WebGL2 mostra só a cor e os acessórios).
+- A medida no Android real (`npm run lan`) do controle novo, do saque com movimento e do custo do campo maior.

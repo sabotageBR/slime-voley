@@ -143,6 +143,8 @@ export function criarControles(raiz, o) {
 
   /** @param {KeyboardEvent} e */
   function tecla(e, baixa) {
+    // digitando num campo (a busca de paises do vestiario): as teclas sao do campo
+    if (e.target instanceof HTMLElement && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     if (PREVENIR.has(e.code)) e.preventDefault();
     if (baixa) {
       if (e.repeat) return;

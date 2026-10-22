@@ -21,7 +21,7 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
 ## Rodar e testar
 - `npm run servir` abre o jogo em http://127.0.0.1:5380/. Os módulos ES não carregam por `file://`.
 - `npm run lan` faz o mesmo, aberto na rede local, para testar no celular pela Wi-Fi. Os parâmetros de teste também valem na LAN.
-- `npm test` roda todos os testes (`node --test test/*.test.js`, cerca de 3,5 s).
+- `npm test` roda todos os testes (`node --test test/*.test.js`, cerca de 4 s).
 - Um arquivo: `node --test test/fisica.test.js`. Um teste: `node --test --test-name-pattern="<regex>" test/*.test.js`.
 - `npm run calibrar` roda o bot contra bot (`tools/calibrar.mjs`, cerca de 4 s para 30 partidas). O humano simulado do desenho ainda não existe.
 
@@ -52,6 +52,7 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
   - `falas.js`: as falas em balão (catálogo fixo por gatilho, recarga e rng próprio);
   - `torneio.js` (a Copa Gosma: chave de 8 e de 16 derivada do save) e `paises.js` (os 195 códigos);
   - `perfil.js`: XP, nível, trilha, Gotas e o save normalizado;
+  - `visual.js`: o visual do vestiário (paleta de pigmentos, padrões, acessórios, arquétipos, compra e o save);
   - `humor.js` (porte sem uso), `medidor.js`, `rivais.js` e `skins.js`.
 - `src/core/`: laço, `rng.js`, save, áudio, vibração, o SDK (`poki.js`) e `depuracao.js`.
 - `src/cor/km.js`: a mistura de pigmentos Kubelka-Munk, que roda igual no shader da `composicao.js`. O `pigmentos.js` é gerado e não se edita à mão.
@@ -62,8 +63,10 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
   - `diretor.js` (câmera), `layout.js` (retrato, paisagem e desktop), `quadra.js`, `celebracao.js` e `plateia.js`;
   - `icones.js` (power-ups, bolha, gelo e prêmios), `carinhas.js` (as carinhas, o balão das reações e o das falas) e `juiz.js` (a cadeirinha e o juiz), em código;
   - `bandeiras.js` (as 195 bandeiras numa mini-linguagem de primitivas) e `chave.js` (a chave da Copa e a taça);
+  - `acessorios.js` (os 40 acessórios, no espaço do rosto), `estampas.js` (a estampa RGBA 128×64 do corpo: bandeira, pintura, arquétipos) e `vitrine.js` (a miniatura 2D dos cartões);
   - `ginasios/praia.js`.
-- `src/ui/`: `controles.js` (Metades e Botões, teclado e mouse), `hud.js` (placar, chips, barra e botão de reações e o cartão com a chave e a progressão), `menu.js` (o menu principal e a tela da chave) e `lab.js` (o laboratório da cortada).
+- `src/ui/`: `controles.js` (Metades e Botões, teclado e mouse), `hud.js` (placar, chips, barra e botão de reações e o cartão com a chave e a progressão), `menu.js` (o menu principal e a tela da chave), `vestiario.js` (a vitrine, as abas e o pincel) e `lab.js` (o laboratório da cortada).
+- `src/extra/famosos.js`: os personagens famosos (IP de terceiros). **Só no teste local:** o `main.js` importa numa linha `// modelo` e o `empacotar` apaga a pasta e falha se algo ainda a citar.
 - `src/som/mesa.js`: os eventos tocam receitas, as gravações `*Slime` do catálogo `arquivos.js` e o balbucio sintetizado das falas (`som/falas.js`). Não há música.
 - `src/i18n/textos.js`: todo texto visível.
 - `src/main.js` liga tudo e é o **único** dono do SDK (`core/poki.js`), do áudio, do save e do DOM.
@@ -109,7 +112,7 @@ Portas: 5380 (servir), 4380–4385, CDP 9380–9382. É um Chrome por vez: o `sh
 **Parâmetros de teste:**
 - Só valem em loopback e na LAN, ou pelo `window.__voleiModelo` da build de modelos.
 - O `core/depuracao.js` é o único módulo que lê a URL, e o cabeçalho dele tem a lista completa.
-- Os mais usados: `?semente ?roteiro=cortada|ponto|ponto-curto|reacao|saque|bolha|gelo|fogo|gosmao|juiz|juiz-<reação>|fim ?visual=a|b|c ?controle=a|b ?gatilho=novo|segura ?lab ?auto ?primeira ?menu ?chave ?copa=N&fase=F ?semblur ?semanuncio ?debug`.
+- Os mais usados: `?semente ?roteiro=cortada|ponto|ponto-curto|reacao|saque|bolha|gelo|fogo|gosmao|juiz|juiz-<reação>|fim ?visual=a|b|c ?controle=a|b ?gatilho=novo|segura ?lab ?auto ?primeira ?menu ?chave ?vestiario=aba ?look=id ?bandeira=XX ?copa=N&fase=F ?semblur ?semanuncio ?debug`.
 - Para um print parado num instante, use `?filme=1&cada=N`: N passos e um desenho, sem rAF.
 - `?fora=1` liga a regra antiga do fora; por padrão, a bola nunca sai.
 - Os roteiros `jornada`, `raio`, `rali8` e `onboarding`, citados no desenho, ainda não existem.
@@ -118,7 +121,7 @@ O headless perde o foco sozinho: as ferramentas passam `?semblur`.
 
 **Build da Poki:**
 - O `empacotar` corta de todo `.js` as linhas que terminam em `// modelo`. Todo código que lê o `__voleiModelo` precisa dessa marca, senão a build falha.
-- Ele também tira a arte que nenhum código cita e os sons que não estão no catálogo `src/som/arquivos.js`. Um som novo precisa entrar no catálogo; se um som do catálogo não tiver arquivo, a build falha.
+- Ele também tira o `src/extra/` (os famosos), a arte que nenhum código cita e os sons que não estão no catálogo `src/som/arquivos.js`. Um som novo precisa entrar no catálogo; se um som do catálogo não tiver arquivo, a build falha.
 - Ele falha com URL externa, `console.log`, `.map`, import quebrado ou se passar dos tetos do §4.9: fundo 250 KB, áudio 200 KB, inicial 1,5 MB e total 4,5 MB.
 - O `tools/artifact.mjs` acha a tag do SDK no `index.html` pelo comentário `<!-- Unico script externo permitido pela Poki. -->`. Se esse comentário mudar, o checkpoint não monta.
 

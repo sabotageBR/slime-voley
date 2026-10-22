@@ -4,7 +4,9 @@
 // (a interface entre as cores fica viva); brilho e sombra pela normal do gradiente;
 // costura entre slimes diferentes onde a dominancia de um slime sobre o outro cai a zero.
 // Skins (src/jogo/skins.js): a aparencia 0 segue o caminho de sempre (textura legada do nivel);
-// a aparencia k le a entrada k de uAp (procedural com cor, ou a imagem 16x16 do atlas uT3).
+// a aparencia k le a entrada k de uAp (procedural com cor, ou a imagem 16x16 do atlas uT3) e,
+// por cima, a estampa RGBA do slime (bandeira, pintura do jogador, personagem; atlas uT4 com uma
+// faixa de 128x64 por slime, no espaco de repouso da cupula: amassa e gira junto).
 // Sao dois programas do mesmo texto: o de sempre (sem SKINS, igual ao de antes) e o com SKINS,
 // compilado so quando alguma skin entra em jogo. Sem skin, nada muda (nem o custo).
 
@@ -31,7 +33,8 @@ uniform sampler2D uT1;
 uniform sampler2D uT2;
 #ifdef SKINS
 uniform sampler2D uT3;  // atlas das skins de pixel: 16 x 256, sRGB, o nivel k nas linhas 16k..16k+15
-uniform vec4 uAp[32];   // 16 aparencias x (procedural, escala, linha do atlas ou -1, modo) e (cor linear, -)
+uniform sampler2D uT4;  // estampas RGBA: 128 x 128, sRGB, o slot k nas linhas 64k..64k+63 (filtro linear)
+uniform vec4 uAp[32];   // 16 aparencias x (procedural, escala, linha do atlas ou -1, modo) e (cor linear, slot da estampa ou -1)
 #endif
 uniform vec4 uJanela;
 uniform vec2 uTam;      // celulas
@@ -293,6 +296,13 @@ vec3 procAp(int p, vec2 L, vec3 base, vec3 cor, float e, float r0, float fw, flo
     float i = floor(x);
     float w = clamp(fw * 6.0 / (2.0 * r0) * 1.5, 1e-3, 0.5);
     c = mix(faixa(i), faixa(i + 1.0), smoothstep(1.0 - w, 1.0, fract(x)) * step(i, 4.5));
+  } else if (p == 15) {
+    // faixas horizontais largas no corpo (a camisa listrada de lado)
+    float f = abs(fract(L.y / max(r0, 1e-3) * 2.6 * e * 0.5) - 0.5) - 0.18;
+    c = mix(base, cor, 1.0 - smoothstep(-aa * 2.6, aa * 2.6, f));
+  } else if (p == 16) {
+    // metades: a metade da frente na 2a cor
+    c = mix(base, cor, smoothstep(-aa * 2.0, aa * 2.0, L.x));
   } else if (p == 14) {
     // nebulosa na cor da skin, com estrelas
     float n = ruido(g * 0.75 + vec2(tempo * 0.04, 0.0)) * 0.6 + ruido(g * 1.9) * 0.4;
@@ -312,6 +322,16 @@ vec3 aparencia(int a, int t, vec2 L, vec3 base, float k, float r0, float fw, flo
   vec3 c = t > 0 ? textura(t, L, base, 1.0, tempo) : base;
   if (p0.z >= 0.0) c = pixelArte(L, c, int(p0.z + 0.5), int(p0.w + 0.5), p0.y, r0, fw);
   else if (p0.x > 0.5) c = procAp(int(p0.x + 0.5), L, c, p1.rgb, p0.y, r0, fw, tempo);
+  if (p1.w > -0.5) {
+    // estampa: u na largura da cupula (2R), v da base (y = -0,44 R no repouso) ao topo (0,56 R)
+    float R = r0 / 0.925;
+    float u = clamp(L.x / (2.0 * R) + 0.5, 0.0, 1.0);
+    float v = clamp((L.y + 0.44 * R) / R, 0.0, 1.0);
+    float s = floor(p1.w + 0.5);
+    float tv = clamp((s + 1.0 - v) * 0.5, s * 0.5 + 0.004, s * 0.5 + 0.496);
+    vec4 e = texture(uT4, vec2(u, tv));
+    c = mix(c, e.rgb, e.a);
+  }
   return mix(base, c, k);
 }
 #endif
@@ -380,7 +400,7 @@ const FRAG_SKINS = FRAG.replace('#version 300 es\n', '#version 300 es\n#define S
 
 /**
  * @param {HTMLCanvasElement} canvas
- * @returns {null | { desenhar: Function, definirAparencias: (lista: any[]) => void, perdeu: () => boolean, liberar: () => void }}
+ * @returns {null | { desenhar: Function, definirAparencias: (lista: any[]) => void, definirEstampa: (slot: 0|1, img: any) => void, perdeu: () => boolean, liberar: () => void }}
  */
 export function criarComposicao(canvas) {
   /** @type {WebGL2RenderingContext|null} */
@@ -401,10 +421,14 @@ export function criarComposicao(canvas) {
   let tex1 = null;
   let tex2 = null;
   let tex3 = null;
+  let tex4 = null;
   const km = uniformesKM();
+  // estampas (2 slots de 128 x 64 empilhados), guardadas para o contexto que volta
+  const estAtlas = new Uint8Array(128 * 128 * 4);
+  let estSuja = true;
   // aparencias (skins): uniformes e atlas guardados para reenviar quando o contexto volta
   const apUni = new Float32Array(32 * 4);
-  for (let a = 0; a < 16; a++) apUni[a * 8 + 2] = -1;
+  for (let a = 0; a < 16; a++) { apUni[a * 8 + 2] = -1; apUni[a * 8 + 7] = -1; }
   const apAtlas = new Uint8Array(16 * 256 * 4);
   let apChave = '';
   let apUsada = false;
@@ -428,7 +452,7 @@ export function criarComposicao(canvas) {
     gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS) && !gl.isContextLost()) throw new Error('link: ' + gl.getProgramInfoLog(prog));
     const loc = {};
-    for (const nome of ['uT0', 'uT1', 'uT2', 'uT3', 'uAp', 'uJanela', 'uCam', 'uTela', 'uTam', 'uCel', 'uPx', 'uLim', 'uTraco', 'uTempo', 'uBrilho', 'uKS', 'uM', 'uForca', 'uForcaB']) {
+    for (const nome of ['uT0', 'uT1', 'uT2', 'uT3', 'uT4', 'uAp', 'uJanela', 'uCam', 'uTela', 'uTam', 'uCel', 'uPx', 'uLim', 'uTraco', 'uTempo', 'uBrilho', 'uKS', 'uM', 'uForca', 'uForcaB']) {
       loc[nome] = gl.getUniformLocation(prog, nome);
     }
     gl.useProgram(prog);
@@ -440,6 +464,7 @@ export function criarComposicao(canvas) {
     gl.uniform1i(loc.uT1, 1);
     gl.uniform1i(loc.uT2, 2);
     if (loc.uT3) gl.uniform1i(loc.uT3, 3);
+    if (loc.uT4) gl.uniform1i(loc.uT4, 4);
     return { prog, loc };
   }
 
@@ -458,6 +483,8 @@ export function criarComposicao(canvas) {
     tex1 = novaTextura();
     tex2 = novaTextura();
     tex3 = gl.createTexture();
+    tex4 = gl.createTexture();
+    estSuja = true;
     // contexto recuperado com skins na partida: o programa delas volta junto
     if (apUsada) garantirSkins();
   }
@@ -498,6 +525,7 @@ export function criarComposicao(canvas) {
     if (chave === apChave) return;
     apChave = chave;
     apUni.fill(0);
+    for (let a = 0; a < 16; a++) apUni[a * 8 + 7] = -1;
     apAtlas.fill(0);
     const rgb = PALETA.map((h) => (h ? [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) : [0, 0, 0]));
     let alguma = false;
@@ -514,6 +542,7 @@ export function criarComposicao(canvas) {
       apUni[o + 4] = c[0];
       apUni[o + 5] = c[1];
       apUni[o + 6] = c[2];
+      apUni[o + 7] = ap.estampa === 0 || ap.estampa === 1 ? ap.estampa : -1;
       if (ap.px) {
         apUni[o + 2] = a;
         for (let p = 0; p < 256; p++) {
@@ -531,6 +560,18 @@ export function criarComposicao(canvas) {
     if (perdido) return;
     if (alguma) garantirSkins();
     enviarAparencias();
+  }
+
+  /**
+   * Estampa RGBA do slot (0 ou 1): 128 x 64 px (ImageData ou o que getImageData devolve, sRGB;
+   * a linha 0 e o topo da cupula). null limpa o slot.
+   * @param {0|1} slot @param {{ data: Uint8ClampedArray, width: number, height: number }|null} img
+   */
+  function definirEstampa(slot, img) {
+    const o = slot * 128 * 64 * 4;
+    if (!img) estAtlas.fill(0, o, o + 128 * 64 * 4);
+    else estAtlas.set(img.data.subarray(0, 128 * 64 * 4), o);
+    estSuja = true;
   }
 
   function novaTextura() {
@@ -579,6 +620,17 @@ export function criarComposicao(canvas) {
     if (P === comSkins) {
       gl.activeTexture(gl.TEXTURE3);
       gl.bindTexture(gl.TEXTURE_2D, tex3);
+      gl.activeTexture(gl.TEXTURE4);
+      gl.bindTexture(gl.TEXTURE_2D, tex4);
+      if (estSuja) {
+        estSuja = false;
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, 128, 128, 0, gl.RGBA, gl.UNSIGNED_BYTE, estAtlas);
+      }
       gl.activeTexture(gl.TEXTURE0);
     }
     const [x0, y0] = campo.janela;
@@ -611,6 +663,7 @@ export function criarComposicao(canvas) {
     desenhar,
     limpar,
     definirAparencias,
+    definirEstampa,
     perdeu: () => perdido,
     liberar() {
       try { gl.getExtension('WEBGL_lose_context')?.loseContext(); } catch { /* ignora */ }

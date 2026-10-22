@@ -7,6 +7,7 @@ import { INICIAIS as POWERUPS_INICIAIS } from './powerups.js';
 import { REACOES_INICIAIS } from './reacoes.js';
 import { normalizarCopa } from './torneio.js';
 import { ehPais } from './paises.js';
+import { normalizarVisual, visualDaSkin } from './visual.js';
 
 /** XP por partida. */
 export const XP = Object.freeze({ vitoria: 30, derrota: 12, ponto: 2, ace: 3, bomba: 3, rali10: 5 });
@@ -69,8 +70,12 @@ export function normalizarPerfil(salvo) {
       reacoes: lista(lib.reacoes, REACOES_INICIAIS),
       powerups: lista(lib.powerups, POWERUPS_INICIAIS),
       skins: lista(lib.skins, ['laranjinha']),
+      /** itens comprados no vestiario ('ac:<encaixe>:<id>', 'arq:<id>') */
+      itens: lista(lib.itens, []),
     },
   };
+  /** o visual do vestiario (src/jogo/visual.js); sem ele, o da skin equipada */
+  p.visual = normalizarVisual(s.visual, p.skin);
   if (!p.copa.pais && p.pais) p.copa.pais = p.pais;
   // o que a trilha ja deu ate o nivel atual fica liberado (save mexido ou trilha nova), sem trocar a skin
   for (let n = 2; n <= p.nivel; n++) {
@@ -130,7 +135,9 @@ function liberar(n, pr) {
   else if (pr.tipo === 'powerup' && pr.id && !n.liberados.powerups.includes(pr.id)) n.liberados.powerups.push(pr.id);
   else if (pr.tipo === 'skin' && pr.id) {
     if (!n.liberados.skins.includes(pr.id)) n.liberados.skins.push(pr.id);
+    // a skin liberada ja e equipada (os acessorios ficam)
     n.skin = pr.id;
+    n.visual = { ...visualDaSkin(pr.id), cabeca: n.visual.cabeca, rosto: n.visual.rosto, boca: n.visual.boca };
   }
 }
 

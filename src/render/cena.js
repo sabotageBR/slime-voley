@@ -16,13 +16,14 @@ import { calcularLayout } from './layout.js';
 import { ESTILOS, desenharPiso, desenharTopo } from './quadra.js';
 import { desenharFundo, desenharArquibancada, desenharBiruta } from './ginasios/praia.js';
 import { cameraFesta, desenharFesta, desenharInicio } from './celebracao.js';
-import { paraMundo, paraTela, aplicar } from './camera.js';
+import { paraMundo, paraTela, aplicar, enquadrar } from './camera.js';
 import { CORTADA } from '../jogo/cortada.js';
 import { alfaCanal } from '../jogo/tempo.js';
 import { desenharCadeira, desenharJuiz } from './juiz.js';
 import { BOLHA } from '../jogo/powerups.js';
 import { REACAO } from '../jogo/reacoes.js';
 import { desenharFala } from './carinhas.js';
+import { desenharAcessorios } from './acessorios.js';
 
 /**
  * Raio do nucleo do campo (no passo normal da pele e raio 2; cada slime escala pelo escNucleo) e
@@ -137,6 +138,7 @@ export function criarCena(el, o = {}) {
    * @param {{ textos: (k: string) => string, cores: string[], festa?: any, inicio?: { t: number, txt: string }|null, pulsoSaque?: number, saque?: { k: number, q: string, alvo: number, depois: boolean }|null, alvoSaque?: number|null, mao?: any, feixe?: boolean }} o2
    *   feixe: false esconde o feixe da mira (a thumb desenha as setas dela; a reticula fica)
    *   falas: [{ i, texto, t, dur }] baloes de fala ja traduzidos
+   *   vitrine: { x, y, w, h } (px CSS): o vestiario enquadra so o slime do jogador nesse retangulo
    */
   function desenhar(P, vista, alfa, dtR, o2) {
     medir();
@@ -159,7 +161,15 @@ export function criarCena(el, o = {}) {
       zoom = Math.max(zoom, 1 + (CORTADA.pushIn - 1) * k);
       foco = foco || [C.bx, C.by];
     }
-    const { base, cam } = diretor.quadro(L, b, dtR, { zoom, foco, reduzir: o.reduzir });
+    let { base, cam } = diretor.quadro(L, b, dtR, { zoom, foco, reduzir: o.reduzir });
+    // vitrine do vestiario: o slime do jogador grande no retangulo dela (o rival, a bola e as
+    // festas saem); o pincel converte o ponteiro por esta camera (paraMundo)
+    const vit = o2.vitrine || null;
+    if (vit && vit.w > 10 && vit.h > 10) {
+      const sx = vista.slimes[0].x;
+      cam = enquadrar([sx - 3.3, -0.8, sx + 3.3, 4.5], vit);
+      base = cam;
+    }
     camBase = base;
     camQuadro = cam;
     // efeitos de mundo
@@ -172,11 +182,11 @@ export function criarCena(el, o = {}) {
     plateia.desenhar(ctxFundo, cam, dpr, W, est, { fileiras: 3, lotacao: 0.55, alt: 0.9 });
     desenharPiso(ctxFundo, cam, dpr, W, H, t, est, {
       sombras: vista.slimes.map((s) => ({ x: s.x, y: s.y, a: s.a })),
-      bola: P.estado !== 'ponto' || (F && F.t < 0.6) ? b : null,
+      bola: vit ? null : P.estado !== 'ponto' || (F && F.t < 0.6) ? b : null,
       alvoSaque: o2.alvoSaque,
       atrasDaRede: P.juiz ? desenharCadeira : undefined,
     });
-    if (L.plateia) plateia.desenharFaixa(ctxFundo, dpr, L.plateia, est, 0.8);
+    if (L.plateia && !vit) plateia.desenharFaixa(ctxFundo, dpr, L.plateia, est, 0.8);
     aplicar(ctxFundo, cam, dpr);
     desenharBiruta(ctxFundo, -11.6, 3.2, 0, t, Math.max(0.03, est.traco / cam.s));
     // o juiz em cima da cadeirinha (atras dos slimes e da bola: em profundidade)
@@ -187,6 +197,7 @@ export function criarCena(el, o = {}) {
       const cs = garantirCampos();
       let primeiro = true;
       for (const i of [0, 1]) {
+        if (vit && i === 1) continue;
         const s = vista.slimes[i];
         const cm = campoMovel(cs[i], m, i, s.x, s.y);
         comp.desenhar(cm, cam, dprSlime, { tempo: t, brilho: q.brilho * est.brilhoSlime, limiar: LIMIAR, traco: Math.max(1.4, Math.min(2.6, cam.s * 0.05)) * (est.traco / 1.9), limpar: primeiro });
@@ -200,7 +211,13 @@ export function criarCena(el, o = {}) {
     // ---------------- topo
     ctxTopo.setTransform(1, 0, 0, 1, 0, 0);
     ctxTopo.clearRect(0, 0, el.topo.width, el.topo.height);
-    desenharRostos(ctxTopo, m, cam, dpr, t, { olhar: [b.x, b.y], estilo: 'classico' });
+    const rival = m.slimes[1];
+    const rivalAtivo = rival.ativo;
+    if (vit) rival.ativo = false;
+    desenharRostos(ctxTopo, m, cam, dpr, t, { olhar: vit ? null : [b.x, b.y], estilo: 'classico' });
+    desenharAcessorios(ctxTopo, m, cam, dpr, t);
+    rival.ativo = rivalAtivo;
+    if (vit) { telaSuja = true; limparTela(); return; }
     const mira = C && (C.fase === 'entrando' || C.fase === 'mirando') ? { c: C, cor: o2.cores[C.i], final: C.fase === 'mirando' && C.tMax - C.t < 0.3, feixe: o2.feixe } : null;
     const bolaAlfa = P.estado === 'ponto' && F ? (F.t < 0.5 ? 1 : F.t < 0.8 ? 1 - (F.t - 0.5) / 0.3 : 0) : 1;
     // power-ups: gelo e avisos sobre cada slime
@@ -243,6 +260,12 @@ export function criarCena(el, o = {}) {
     }
     if (F) desenharFesta(ctxTela, cam, dT, W, H, F, { quadra: L.quadra, qualidade: q.nome, retrato: L.orient === 'retrato' });
     if (o2.inicio && o2.inicio.t < 1.4) desenharInicio(ctxTela, dT, o2.inicio.t, { quadra: L.quadra }, o2.inicio.txt, P.placar, o2.cores[0]);
+  }
+
+  /** Limpa o canvas de cima do HUD (a vitrine nao tem festa). */
+  function limparTela() {
+    ctxTela.setTransform(1, 0, 0, 1, 0, 0);
+    ctxTela.clearRect(0, 0, el.tela.width, el.tela.height);
   }
 
   /** Rastro, coroas e contagem (jogo-real). */
@@ -298,6 +321,10 @@ export function criarCena(el, o = {}) {
     get camera() { return camQuadro; },
     get cameraBase() { return camBase; },
     get usaGl() { return !!comp; },
+    /** aparencias dos slimes (src/render/composicao.js; sem WebGL2 nao faz nada) */
+    definirAparencias(lista) { if (comp) comp.definirAparencias(lista); },
+    /** estampa RGBA 128 x 64 do slot (0 o jogador) ou null */
+    definirEstampa(slot, img) { if (comp) comp.definirEstampa(slot, img); },
     /** tela -> mundo pela camera do ultimo quadro (o que o jogador ve: o cursor cai onde o slime esta) */
     paraMundo(px, py) { const c = camQuadro || camBase; return c ? paraMundo(c, px, py) : null; },
     paraTela(x, y) { return camQuadro ? paraTela(camQuadro, x, y) : null; },

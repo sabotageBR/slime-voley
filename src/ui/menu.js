@@ -1,7 +1,7 @@
 // Menu principal e tela da chave (DOM, pedido de 2026-10-22). O menu abre a partir da 2a sessao (a
 // 1a vai direto para a partida, onboarding do desenho §3.9), pelo cartao de fim e pela pausa:
-// JOGAR (o foco inicial; mostra a fase e o proximo rival da Copa Gosma), CHAVE e as opcoes de
-// controle e som. A chave e desenhada em canvas (src/render/chave.js). Teclado: o hud.js navega
+// JOGAR (o foco inicial; mostra a fase e o proximo rival da Copa Gosma), CHAVE, VESTIARIO
+// (src/ui/vestiario.js) e as opcoes de controle e som. A chave e desenhada em canvas (src/render/chave.js). Teclado: o hud.js navega
 // por estas caixas tambem (fase de bolha, sem stopPropagation).
 
 import { desenharChave } from '../render/chave.js';
@@ -14,7 +14,7 @@ import { desenharBandeirinha } from '../render/bandeiras.js';
 /**
  * @param {HTMLElement} raiz
  * @param {(k: string) => string} T
- * @param {{ aoJogar: () => void, aoOpcao: (id: string) => void, som: (id: string) => void }} cb
+ * @param {{ aoJogar: () => void, aoOpcao: (id: string) => void, aoVestiario: () => void, som: (id: string) => void }} cb
  */
 export function criarMenu(raiz, T, cb) {
   raiz.insertAdjacentHTML('beforeend', `
@@ -25,6 +25,7 @@ export function criarMenu(raiz, T, cb) {
         <div class="botoes">
           <button class="bt principal jogar"></button>
           <button class="bt verChave"></button>
+          <button class="bt vestiarioBt"></button>
           <div class="linha"><button class="bt op" data-op="controle"></button><button class="bt op" data-op="som"></button></div>
         </div>
       </div>
@@ -40,7 +41,7 @@ export function criarMenu(raiz, T, cb) {
   const $ = (s) => /** @type {HTMLElement} */ (raiz.querySelector(s));
   const el = {
     menu: $('#menuInicial'), logo: $('#menuInicial .logo'), icPais: /** @type {HTMLCanvasElement} */ ($('#menuInicial .icPais')),
-    copaNome: $('#menuInicial .copaNome'), copaFase: $('#menuInicial .copaFase'), jogar: $('#menuInicial .jogar'), verChave: $('#menuInicial .verChave'),
+    copaNome: $('#menuInicial .copaNome'), copaFase: $('#menuInicial .copaFase'), jogar: $('#menuInicial .jogar'), verChave: $('#menuInicial .verChave'), vestiario: $('#menuInicial .vestiarioBt'),
     opControle: $('#menuInicial [data-op="controle"]'), opSom: $('#menuInicial [data-op="som"]'),
     tela: $('#telaChave'), titulo: $('#telaChave .titulo'), cv: /** @type {HTMLCanvasElement} */ ($('#telaChave .cvChave')), sub: $('#telaChave .sub'), voltar: $('#telaChave .voltar'),
   };
@@ -52,6 +53,7 @@ export function criarMenu(raiz, T, cb) {
 
   el.jogar.addEventListener('click', () => { cb.som('botao'); cb.aoJogar(); });
   el.verChave.addEventListener('click', () => { cb.som('botao'); abrirChave(); });
+  el.vestiario.addEventListener('click', () => { cb.som('botao'); cb.aoVestiario(); });
   el.voltar.addEventListener('click', () => { cb.som('botao'); fecharChave(); });
   el.opControle.addEventListener('click', () => { cb.som('botao'); cb.aoOpcao('controle'); });
   el.opSom.addEventListener('click', () => { cb.som('botao'); cb.aoOpcao('som'); });
@@ -62,6 +64,7 @@ export function criarMenu(raiz, T, cb) {
     el.logo.textContent = T('titulo');
     el.jogar.textContent = T('ui.jogar');
     el.verChave.textContent = T('ui.chave');
+    el.vestiario.textContent = T('ui.vestiarioBt');
     el.copaNome.textContent = info.copa;
     el.copaFase.textContent = info.proxima || info.fase;
     el.opControle.textContent = `${T('ui.controle')}: ${info.controle === 'b' ? T('ui.botoes') : T('ui.metades')}`;

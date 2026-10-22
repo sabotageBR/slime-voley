@@ -112,6 +112,7 @@ export function criarHud(raiz, T, cb) {
 
   // teclado nos menus (fase de bolha, sem stopPropagation)
   window.addEventListener('keydown', (e) => {
+    if (e.target instanceof HTMLElement && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     const extra = cb.caixaExtra ? cb.caixaExtra() : null;
     const box = menuAberto ? el.menu : cartaoAberto ? el.cartao : extra;
     if (box && box === extra && e.code === 'Escape') { if (cb.aoEscExtra) cb.aoEscExtra(); return; }

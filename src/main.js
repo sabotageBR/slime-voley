@@ -16,7 +16,7 @@ import { criarHaptico } from './core/haptico.js';
 import { criarArmazem } from './core/armazenamento.js';
 import { criarLaco, PASSO } from './core/laco.js';
 import { lerDepuracao } from './core/depuracao.js';
-import { hexDaMistura } from './cor/km.js';
+import { hexDaMistura, linearDeHex } from './cor/km.js';
 import { criarPartida } from './jogo/partida.js';
 import { rival as acharRival } from './jogo/rivais.js';
 import { skin as acharSkin } from './jogo/skins.js';
@@ -25,6 +25,7 @@ import { REACOES } from './jogo/reacoes.js';
 import { vozDaFala, FALA } from './jogo/falas.js';
 import { chaveDaCopa, registrarVitoria, proximaCopa, trocarPais, normalizarCopa, GOTAS_TITULO, NUM_COPAS } from './jogo/torneio.js';
 import { paisDoIdioma } from './jogo/paises.js';
+import { visualDaSkin, visualDoArquetipo, comprar as comprarItem, normalizarVisual } from './jogo/visual.js';
 import { normalizarPerfil, rendimento, aplicarGanho, proximosMarcos } from './jogo/perfil.js';
 import { TEMPOS } from './jogo/regras.js';
 import { criarVista } from './render/vista.js';
@@ -32,9 +33,11 @@ import { criarCena } from './render/cena.js';
 import { tonalidade } from './render/celebracao.js';
 import { desenharIconeTela, desenharPremioTela } from './render/icones.js';
 import { desenharCarinhaTela } from './render/carinhas.js';
+import { desenharEstampa, EST_W, EST_H } from './render/estampas.js';
 import { criarControles } from './ui/controles.js';
 import { criarHud } from './ui/hud.js';
 import { criarMenu } from './ui/menu.js';
+import { criarVestiario } from './ui/vestiario.js';
 import { criarMesa } from './som/mesa.js';
 import { escolherIdioma, textos } from './i18n/textos.js';
 
@@ -43,6 +46,7 @@ const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const save = criarArmazem();
 /** perfil salvo: partidas, opcoes, nivel e XP, Gotas, skin e o que a trilha liberou (src/jogo/perfil.js) */
 const perfil = normalizarPerfil(save.ler('perfil', {}));
+if (D.bandeira) perfil.pais = D.bandeira.toUpperCase();
 // ?copa=N&fase=F (testes): a Copa na fase pedida
 if (D.copa) perfil.copa = normalizarCopa({ n: D.copa, semente: D.semente || 1, fase: D.fase, pais: perfil.pais });
 // a selecao do jogador: a regiao do idioma do navegador, ate ele escolher no vestiario
@@ -86,7 +90,7 @@ const controles = criarControles(raiz, {
   paraMundo: (px, py) => cena.paraMundo(px, py),
   layout: () => cena.layout,
   aoInteragir: (e) => interagir(e),
-  ativo: () => !pausado && !emAnuncio && !hud.cartaoAberto && !menu.aberto,
+  ativo: () => !pausado && !emAnuncio && !hud.cartaoAberto && !menu.aberto && !vestiario.aberto,
   toque,
 });
 controles.definirEsquema(esquema);
@@ -105,14 +109,121 @@ const hud = criarHud(raiz, T, {
   premio: (ctx, pr, lado) => desenharPremioTela(ctx, pr, lado, pr.tipo === 'skin' ? acharSkin(pr.id).hex : undefined),
   aoPremiado: () => premiado(),
   aoMenu: () => irParaMenu(),
-  caixaExtra: () => menu.caixa,
+  caixaExtra: () => vestiario.caixa || menu.caixa,
   aoEscExtra: () => menu.voltar(),
 });
 const menu = criarMenu(raiz, T, {
   aoJogar: () => jogarDoMenu(),
   aoOpcao: (id) => { trocarOpcao(id); menu.atualizar({ controle: controles.esquema, som: perfil.som }); },
+  aoVestiario: () => abrirVestiario(),
   som: (id) => mesa.tocar(id),
 });
+const vestiario = criarVestiario(raiz, T, {
+  visual: () => perfil.visual,
+  definir: (v) => { perfil.visual = normalizarVisual(v, perfil.skin); aplicarVisual(); },
+  perfil: () => perfil,
+  comprar: (chave) => {
+    const r = comprarItem(perfil, chave);
+    if (r.ok) { Object.assign(perfil, r.perfil); gravarPerfil(); poki.measure('vestiario', chave.replace(/:/g, '-'), 'compra'); }
+    return r.ok;
+  },
+  escolherPais: (cod) => { perfil.pais = cod; perfil.copa = trocarPais(perfil.copa, cod); },
+  nomePais: (cod) => nomePais(cod),
+  pintura: () => cvPintura,
+  pincel: {
+    definir: (p) => Object.assign(pincel, p),
+    desfazer: () => { const d = desfazer.pop(); if (d) { cvPintura.getContext('2d')?.putImageData(d, 0, 0); aplicarVisual(); } },
+    limpar: () => { guardarDesfazer(); cvPintura.getContext('2d')?.clearRect(0, 0, EST_W, EST_H); comecarPintura(false); aplicarVisual(); },
+    balde: () => {
+      guardarDesfazer();
+      comecarPintura(false);
+      const g = cvPintura.getContext('2d');
+      if (g) { g.globalCompositeOperation = 'source-over'; g.fillStyle = pincel.cor; g.fillRect(0, 0, EST_W, EST_H); }
+      aplicarVisual();
+    },
+  },
+  pintar: (x, y, fase) => pintarEm(x, y, fase),
+  aoFechar: () => fecharVestiario(),
+  som: (id) => mesa.tocar(id === 'compra' ? 'registradora' : id),
+  icone: (ctx, lado) => desenharPremioTela(ctx, { tipo: 'gotas' }, lado),
+});
+
+// ------------------------------------------------------------------ vestiario e pincel
+const pincel = { cor: '#17161c', tam: 6, borracha: false };
+/** @type {ImageData[]} */
+const desfazer = [];
+let ultimoPonto = null;
+
+function abrirVestiario() {
+  menu.fechar();
+  controles.soltarTudo();
+  vestiario.abrir();
+  poki.measure('vestiario', 'abrir', 'menu');
+}
+
+function fecharVestiario() {
+  gravarPerfil();
+  try { save.gravar('pintura', cvPintura.toDataURL('image/png')); } catch { /* sem espaco: a pintura fica so nesta sessao */ }
+  if (P) cores[0] = perfil.visual.hex;
+  abrirMenu();
+}
+
+function guardarDesfazer() {
+  const g = cvPintura.getContext('2d');
+  if (!g) return;
+  desfazer.push(g.getImageData(0, 0, EST_W, EST_H));
+  if (desfazer.length > 12) desfazer.shift();
+}
+
+/**
+ * A pintura passa a ser a estampa; a primeira pincelada parte da estampa atual (pinta por cima da
+ * bandeira ou do personagem).
+ * @param {boolean} copiar
+ */
+function comecarPintura(copiar = true) {
+  if (perfil.visual.estampa === 'pintura') return;
+  const g = cvPintura.getContext('2d');
+  if (g && copiar) { g.clearRect(0, 0, EST_W, EST_H); g.drawImage(cvEstampa, 0, 0); }
+  perfil.visual = { ...perfil.visual, estampa: 'pintura', pronta: '' };
+}
+
+/** Pincelada na vitrine: tela -> mundo -> repouso da cupula (como o campo.js) -> pixel da estampa. */
+function pintarEm(px, py, fase) {
+  if (!vista) return;
+  if (fase === 'fim') { ultimoPonto = null; return; }
+  const w = cena.paraMundo(px, py);
+  if (!w) return;
+  const s = vista.m.slimes[0];
+  const lim = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const a11 = lim(s.a11, 0.6, 1.6);
+  const a22 = lim(s.a22, 0.6, 1.6);
+  const a12 = lim(s.a12, -0.6, 0.6);
+  const a21 = lim(s.a21, -0.6, 0.6);
+  const det = a11 * a22 - a12 * a21 || 1;
+  const rx = w[0] - s.cx;
+  const ry = w[1] - s.cy;
+  const lx = (a22 * rx - a12 * ry) / det;
+  const ly = (-a21 * rx + a11 * ry) / det;
+  const R = s.raio0 / 0.925;
+  const X = (lx / (2 * R) + 0.5) * EST_W;
+  const Y = (1 - (ly + 0.44 * R) / R) * EST_H;
+  const g = cvPintura.getContext('2d');
+  if (!g) return;
+  if (fase === 'ini') { guardarDesfazer(); comecarPintura(true); ultimoPonto = null; }
+  g.save();
+  g.globalCompositeOperation = pincel.borracha ? 'destination-out' : 'source-over';
+  g.strokeStyle = pincel.cor;
+  g.fillStyle = pincel.cor;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  g.lineWidth = pincel.tam;
+  g.beginPath();
+  if (ultimoPonto) { g.moveTo(ultimoPonto[0], ultimoPonto[1]); g.lineTo(X, Y); g.stroke(); }
+  else { g.arc(X, Y, pincel.tam / 2, 0, Math.PI * 2); g.fill(); }
+  g.restore();
+  ultimoPonto = [X, Y];
+  aplicarVisual();
+}
 audio.definirMudo(!perfil.som);
 
 function gravarPerfil() { save.gravar('perfil', perfil); }
@@ -142,7 +253,7 @@ function nomePais(cod) {
 
 /** A chave pronta para desenhar (nomes, bandeiras e cores de cada vaga). */
 function dadosChave(ch = chaveDaCopa(perfil.copa)) {
-  const corJogador = acharSkin(perfil.skin || 'laranjinha').hex;
+  const corJogador = visualAtual().hex;
   const vagas = ch.vagas.map((v) => (v.jogador ? { nome: T('ui.voce'), pais: v.pais, cor: corJogador } : { nome: T('rival.' + v.id), pais: v.pais, cor: hexDaMistura(acharRival(v.id).pig) }));
   return { chave: ch, vagas, corJogador };
 }
@@ -209,13 +320,61 @@ let tMao = 0;
 let partidaN = perfil.partidas;
 let premiadoNaPausa = false;
 
+// ------------------------------------------------------------------ visual (vestiario)
+/** o canvas da estampa do jogador (128 x 64) e o da pintura (o pincel; so no aparelho) */
+const cvEstampa = document.createElement('canvas');
+cvEstampa.width = EST_W;
+cvEstampa.height = EST_H;
+const cvPintura = document.createElement('canvas');
+cvPintura.width = EST_W;
+cvPintura.height = EST_H;
+{
+  const salva = save.ler('pintura', '');
+  if (typeof salva === 'string' && salva.startsWith('data:image/png')) {
+    const img = new Image();
+    img.onload = () => { cvPintura.getContext('2d')?.drawImage(img, 0, 0); if (vista) aplicarVisual(); };
+    img.src = salva;
+  }
+}
+/** o visual em uso (?skin=, ?look= e ?bandeira= na URL trocam, para os prints) */
+function visualAtual() {
+  let v = D.skin ? visualDaSkin(D.skin) : D.look ? visualDoArquetipo(D.look) || perfil.visual : perfil.visual;
+  if (D.bandeira) v = { ...v, estampa: 'bandeira' };
+  return v;
+}
+
+/** Acessorio do rival (o campo acessorio de src/jogo/rivais.js) nos encaixes do vestiario. */
+function acessoriosDoRival(a) {
+  const mapa = { chapeu: ['cabeca', 'cartola'], faixa: ['cabeca', 'bandana'], coroa: ['cabeca', 'coroa'], oculos: ['rosto', 'oculosRedondos'], apito: ['boca', 'apito'], laco: ['cabeca', 'laco'], gorro: ['cabeca', 'gorro'], bone: ['cabeca', 'bone'] };
+  const m = mapa[a];
+  const r = { cabeca: '', rosto: '', boca: '' };
+  if (m) r[m[0]] = m[1];
+  return r;
+}
+
+/**
+ * Veste o slime do jogador com o visual (pigmento, padrao, estampa e acessorios): a vista, o shader
+ * (aparencia 1 e a estampa do slot 0) e as cores do desenho.
+ * @param {ReturnType<typeof visualDaSkin>} [v]
+ */
+function aplicarVisual(v = visualAtual()) {
+  if (!vista) return;
+  const g = cvEstampa.getContext('2d');
+  const temEstampa = !!g && desenharEstampa(g, v.estampa, { pais: perfil.pais, pintura: cvPintura });
+  const temAp = temEstampa || v.padrao > 0;
+  cores[0] = v.hex;
+  vista.vestir(0, v.pig, v.hex, temAp ? 1 : 0);
+  vista.m.slimes[0].dados.acessorios = { cabeca: v.cabeca, rosto: v.rosto, boca: v.boca };
+  cena.definirEstampa(0, temEstampa && g ? g.getImageData(0, 0, EST_W, EST_H) : null);
+  cena.definirAparencias(temAp ? [null, { ap: 1, chave: `${v.padrao}|${v.cor2}|${temEstampa}`, proc: v.padrao, escala: 1, modo: 0, corLin: linearDeHex(v.cor2), estampa: temEstampa ? 0 : -1 }] : []);
+}
+
 function novaPartida(revanche = false) {
   // a 1a partida da vida e as quartas da Copa 1, contra a Gota (imperdivel)
   const adversario = chaveDaCopa(perfil.copa).adversario || 'gota';
   const primeira = D.primeira ?? (perfil.partidas === 0 && adversario === 'gota');
   const idRival = D.rival || adversario;
   const riv = acharRival(idRival);
-  const sk = acharSkin(D.skin || perfil.skin || 'laranjinha');
   reacoesLiberadas = REACOES.map((r) => r.id).filter((id) => perfil.liberados.reacoes.includes(id));
   P = criarPartida({
     semente: D.semente || ((Date.now() / 1000) | 0) + partidaN * 7919,
@@ -231,9 +390,10 @@ function novaPartida(revanche = false) {
     qualidadeMinima: cena.nivelQualidade >= 3,
   });
   vista = criarVista(P);
-  cores = [sk.hex, hexDaMistura(riv.pig)];
-  vista.vestir(0, sk.pig, cores[0]);
+  cores = [visualAtual().hex, hexDaMistura(riv.pig)];
+  aplicarVisual();
   vista.vestir(1, riv.pig, cores[1]);
+  vista.m.slimes[1].dados.acessorios = acessoriosDoRival(riv.acessorio);
   nomes = [T('ui.voce'), T('rival.' + riv.id)];
   // tom do balbucio: o jogador agudo; o rival pelo nivel (os chefes falam grosso)
   tons = [3, riv.chefe ? 11 : 2 + Math.max(0, ['T0', 'T1', 'T1+', 'T2', 'T3', 'T4', 'T5'].indexOf(riv.nivel))];
@@ -256,7 +416,7 @@ let primeiraInteracao = false;
 function interagir(e) {
   tUltimaInteracao = performance.now();
   audio.iniciar();
-  if (!P || menu.aberto) return;
+  if (!P || menu.aberto || vestiario.aberto) return;
   P.interacao();
   if (!primeiraInteracao) {
     primeiraInteracao = true;
@@ -292,7 +452,7 @@ function pausar(v, motivo = 'botao') {
   if (v === pausado || emAnuncio) return;
   motivoPausa = motivo;
   if (v) {
-    if (hud.cartaoAberto || menu.aberto) return;
+    if (hud.cartaoAberto || menu.aberto || vestiario.aberto) return;
     pausado = true;
     pararJogo();
     controles.soltarTudo();
@@ -546,7 +706,9 @@ function passo(dt) {
     if (its[0].borda) { labSegura = false; its[0].borda = false; its[0].botao = false; } else its[0].botao = true;
     if (!P.cortada) labSegura = false;
   }
-  if (!D.auto) P.intencao(0, its[0]);
+  // com o menu, o vestiario ou o cartao abertos o slime fica parado (o mouse nao o arrasta por tras)
+  if (menu.aberto || vestiario.aberto || hud.cartaoAberto) P.intencao(0, { eixo: 0, botao: false, alvoX: null, miraX: null });
+  else if (!D.auto) P.intencao(0, its[0]);
   P.passo();
   for (const e of P.eventos) {
     const f = TRATADORES[e.tipo];
@@ -603,14 +765,14 @@ function desenhar(dtReal, alfa) {
     const f = P.jogadores[i].fala;
     if (f && !D.semHud) falas.push({ i, texto: T('fala.' + f.id), t: f.t, dur: FALA.dur });
   }
-  cena.desenhar(P, vista, alfa, dt, { cores, festa, inicio, saque: sq, pulsoSaque: pulso, alvoSaque, falas });
+  cena.desenhar(P, vista, alfa, dt, { cores, festa, inicio, saque: sq, pulsoSaque: pulso, alvoSaque, falas, vitrine: vestiario.aberto ? vestiario.vitrine() : null });
   // HUD
   const L = cena.layout;
   if (L) hud.posicionar(L);
-  hud.atualizar({ nomes, cores, placar: P.placar, medidor: [P.jogadores[0].med.v, P.jogadores[1].med.v], chips: P.jogadores.map(chipsDe), esconder: D.semHud });
+  hud.atualizar({ nomes, cores, placar: P.placar, medidor: [P.jogadores[0].med.v, P.jogadores[1].med.v], chips: P.jogadores.map(chipsDe), esconder: D.semHud || vestiario.aberto });
   // barra de reacoes: depois do ponto ou pelo botao, fora da recarga; o botao fica na partida toda
   const pronto = P.jogadores[0].recargaReacao <= 0;
-  const naPartida = !D.semHud && !D.auto && P.humano[0] && !hud.cartaoAberto && !menu.aberto && P.estado !== 'fim';
+  const naPartida = !D.semHud && !D.auto && P.humano[0] && !hud.cartaoAberto && !menu.aberto && !vestiario.aberto && P.estado !== 'fim';
   const comBarra = naPartida && pronto && tReal >= barra.de && tReal < barra.ate;
   hud.reacoes(comBarra ? reacoesLiberadas : null, !toque);
   hud.botaoReacao(naPartida, pronto);
@@ -628,7 +790,7 @@ function desenhar(dtReal, alfa) {
 
 /** Mao fantasma: comeco da partida, espera do saque e cortada guiada. */
 function desenharMao(dt) {
-  if (D.semHud || !P || !cena.layout || menu.aberto) { hud.mao(null); return; }
+  if (D.semHud || !P || !cena.layout || menu.aberto || vestiario.aberto) { hud.mao(null); return; }
   tMao += dt;
   const L = cena.layout;
   const W = window.innerWidth;
@@ -647,10 +809,13 @@ function desenharMao(dt) {
 // ------------------------------------------------------------------ comeco
 novaPartida();
 const laco = criarLaco({ passo, desenhar });
+// personagens famosos (pacote local, fora do zip da Poki: o empacotar corta esta linha "// modelo")
+if (D.local || D.modelo) import('./extra/famosos.js').then((m) => { m.instalar(); aplicarVisual(); vestiario.atualizar(); }).catch(() => {}); // modelo
 // o menu abre a partir da 2a sessao (a 1a vai direto para a partida); ?menu e ?chave nos testes
-if (D.menu || D.chave || (perfil.partidas > 0 && !D.roteiro && !D.auto && !D.filme && !D.semHud && !D.lab)) {
+if (D.menu || D.chave || D.vestiario || (perfil.partidas > 0 && !D.roteiro && !D.auto && !D.filme && !D.semHud && !D.lab)) {
   abrirMenu();
   if (D.chave) menu.abrirChave();
+  if (D.vestiario) { menu.fechar(); vestiario.abrir(D.vestiario); }
 }
 
 // modo filme (ferramentas): N quadros deterministicos em <pre id="filme">, sem rAF

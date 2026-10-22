@@ -77,3 +77,12 @@ test('pointermove nunca dispara gameplayStart (so pointerdown/keydown chamam int
   const mover = t.slice(t.indexOf('function mover'), t.indexOf('function cima'));
   assert.ok(!/aoInteragir/.test(mover));
 });
+
+test('o pacote local de personagens (src/extra) so e citado em linha "// modelo" (fora da build da Poki)', () => {
+  for (const p of fontes) {
+    if (rel(p).startsWith('src/extra/')) continue;
+    for (const linha of ler(p).split('\n')) {
+      if (/extra\//.test(linha) && !/\/\/ modelo\s*$/.test(linha) && !/^\s*(\/\/|\/?\*)/.test(linha)) assert.fail(`${rel(p)}: ${linha.trim()}`);
+    }
+  }
+});

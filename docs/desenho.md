@@ -833,6 +833,22 @@ Os chefes usam o nível igual ao índice da Copa. No 2P, tudo fica no nível 1. 
 
 **Resto:** Aleatório harmônico, 3 slots, itens de 30 a 80 Gotas. O SDK só entre partidas.
 
+### 3.6.1 Vestiário feito (2026-10-22)
+
+O editor deste §3.6 continua no plano; o vestiário que existe hoje é este:
+- **Onde:** botão VESTIÁRIO no menu principal (`src/ui/vestiario.js`). A vitrine mostra o slime do jogador grande, pelo próprio motor da gosma (a cena enquadra o slime nela; o rival, a bola e as festas saem), e tudo vale na hora.
+- **Visual** (`src/jogo/visual.js`, puro): `{ pig, hex, padrao, cor2, estampa, cabeca, rosto, boca, pronta }` no `perfil.visual`; o hex sempre sai do pigmento. A skin liberada pela trilha veste na hora sem tirar os acessórios.
+- **Abas:**
+  - **Prontas:** as 5 skins da trilha (as travadas mostram o nível), os 16 **arquétipos** (Goleiro Mascarado, Pesadelo Listrado, Vampiro, Múmia, Monstro Costurado, Abóbora, Abelha, Pirata, Ninja, Viking, Astronauta, Robô, Mago, Herói Mascarado, Luchador, Saci; 120 a 250 Gotas) e, só no teste local, os **famosos**;
+  - **Bandeiras:** as 195, com busca pelo nome (sem acento); a bandeira vira a estampa do corpo e a seleção da Copa;
+  - **Cores:** cor base (24 pigmentos KM achados por um solucionador de ΔE; o gamut deixa verdes, cianos e roxos mais pastel), padrão (0 a 16; o 15 são faixas horizontais e o 16 metades, que antes viravam degradê) e a cor do padrão;
+  - **Pintar:** pincel direto no slime (16 cores, 3 tamanhos, borracha, balde, desfazer até 12 e limpar). A primeira pincelada parte da estampa atual (pinta por cima da bandeira). A pintura fica só no aparelho (chave `pintura` do save, PNG);
+  - **Acessórios:** 40, em 3 encaixes (cabeça 26, rosto 8, boca 6), de 0 a 80 Gotas; os rivais usam o `acessorio` que já tinham em `rivais.js` (o Rei Gosma de coroa).
+- **Shader:** a estampa RGBA é a textura `uT4` (dois slots de 128×64, filtro linear) no espaço de repouso da cúpula (amassa e gira junto), por cima do padrão. Os acessórios são Canvas2D no espaço do rosto (`src/render/acessorios.js`).
+- **Compra:** com Gotas, sem caixa aleatória; o que custa só entra comprado (`perfil.liberados.itens`). Telemetria `vestiario/<item>/compra`.
+- **Famosos (decisão do usuário: "faça as 2 opções"):** Jason, Freddy Krueger, Ghostface, Darth Vader, Stormtrooper, Mario, Pac-Man, Kirby, Pikachu, Bob Esponja, Minion, Homem-Aranha, Batman, Hulk, Shrek e Chaves, em `src/extra/famosos.js`. **Ficam fora do zip da Poki:** o import é uma linha `// modelo` (só loopback, LAN e a build de modelos), o empacotar apaga `src/extra/` e falha se algo ainda o citar, e o `estilo.test` vigia. Motivo: IP de terceiros, que a Poki recusa. Publicar com eles é decisão do dono do jogo.
+- **Parâmetros:** `?vestiario[=aba]`, `?look=<arquétipo ou famoso>`, `?bandeira=BR`.
+
 ### 3.7 Economia (uma moeda: Gotas)
 
 **Ganhos** (cerca de 30 por partida):
@@ -867,7 +883,7 @@ Os chefes usam o nível igual ao índice da Copa. No 2P, tudo fica no nível 1. 
 
 - **Onde está:** `src/jogo/perfil.js`, puro. O `main.js` grava a chave `perfil`. Um save antigo, sem nível, continua valendo, e o que a trilha já deu até o nível atual volta a ficar liberado.
 - **XP por partida:** vitória +30, derrota +12, ponto +2, ace +3, bomba +3, rali de 10 ou mais +5. Do nível n para o n+1 são 50 + 25·(n−1) XP.
-- **Gotas:** seguem a tabela acima. Ficam guardadas para o Vestiário e a loja, que ainda não existem.
+- **Gotas:** seguem a tabela acima. Desde 2026-10-22 são gastas no vestiário (arquétipos e acessórios, §3.6.1).
 - **Trilha:** o prêmio de cada nível é conhecido antes de chegar, e a skin liberada já é equipada.
 
 | Nível | Prêmio |
