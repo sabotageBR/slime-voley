@@ -121,7 +121,9 @@ Este plano junta as 3 propostas (jogabilidade, arquitetura, conteúdo/Poki), os 
 O slime subindo soma vy (×1,0) e verticaliza a saída. O teste mede a normal e a saída separadamente, com a bola vertical e com a bola a 45°.
 
 **Pele** (`jogo/pele.js`, em arrays próprios):
-- Usa o reticulado `meiaLua()` do protótipo, com cerca de 75 partículas (cerca de 55 na qualidade mínima).
+- Usa o reticulado `meiaLua()` do protótipo, com 59 partículas (44 na qualidade mínima). O contorno fica 0,22 u para dentro da cúpula (`RECUO_CONTORNO`, era 0,32) e o núcleo do campo tem 0,55 u (`RAIO_CAMPO`, era 0,48): o isocontorno da gosma cai em cima da cúpula física e a bola encosta na gosma.
+- **O núcleo escala com a pele** (`escNucleo` = Rv/R0 · passo/0,31, por slime): quando o raio muda (Gosmão, Encolher) o reticulado só se espalha, e com o núcleo fixo o Gosmão ficava oco, com contorno em volta dos buracos (2026-10-22). O `test/pele.test.js` mede o campo real: sem célula interna abaixo do limiar e topo a até 0,06 u de `b`, nos raios 1,6, 2 e 2,5 e nas duas qualidades.
+- **Raio do desenho** `Rv`: mola subamortecida (2,4 Hz, ζ 0,38) atrás do raio-alvo. O Gosmão incha passando uns 28% do degrau e assenta (som `inflar`); ao acabar, murcha do mesmo jeito. A colisão continua no `R`.
 - A cada passo:
   1. translação rígida;
   2. mola de forma para a elipse σ;
@@ -147,7 +149,7 @@ O slime subindo soma vy (×1,0) e verticaliza a saída. O teste mede a normal e 
 | Teto | 16,4 | aberto (Escola: y = 11, e = 0,6) |
 | `G_SLIME` / `PULO` | 50 / 15,5 | **68 / 23**: ápice de 3,89 u, 0,68 s no ar |
 | `G_BOLA` | 23 | **32** |
-| `VEL` | 10,5 | **11**; aceleração de 85 no chão, freio de 130, 45 no ar |
+| `VEL` | 10,5 | **11**; aceleração de 150 no chão, freio de 200; no ar, 90 para acelerar e 150 para frear (2026-10-22: antes 85/130/45, "parece que tem atrito com o chão") |
 | `E_SLIME` / `V_MIN` | 0,78 / 10 | **0,80 / 6** |
 | `E_REDE` / `E_PLACA` | 0,5 / 0,85 | **0,45 / 0,70** |
 | Passo | 60 Hz | lógica a 120 Hz; bola com 2 subpassos |
@@ -166,7 +168,8 @@ O slime subindo soma vy (×1,0) e verticaliza a saída. O teste mede a normal e 
 **Números derivados:**
 - O topo do slime fica 3,4 u acima da rede.
 - A janela de cortada dura 0,49 s.
-- **Cruzar a faixa livre (cerca de 8,05 u) com aceleração de 85 leva cerca de 0,80 s**, contra cerca de 1,0 s de um lob. Esse valor é recalculado dentro do `fisica.test`.
+- **Cruzar a faixa livre (cerca de 8,05 u) com aceleração de 150 leva cerca de 0,77 s** (era 0,80 s com 85), contra cerca de 1,0 s de um lob. Esse valor é recalculado dentro do `fisica.test`.
+- **Controle firme (2026-10-22):** de 0 a 11 u/s no chão em 73 ms, parada em 55 ms, inversão no ar em 0,2 s (antes, 0,49 s de um pulo de 0,68 s). O mouse não usa mais ganho proporcional: a intenção leva `alvoX` e a partida acha o eixo com `seguirAlvo` (a maior velocidade que ainda freia até o alvo), convertendo o cursor pela câmera do quadro desenhado. Atraso de 0,11 u com o cursor a 8 u/s e parada sem passar do ponto. No stick, a origem acompanha o dedo a partir de 40 px (era 56) e a curva vai a `^0,65`.
 
 **Assistências** (ligadas no toque, desligáveis):
 - **Ímã:** +0,25 u só contra bola descendente (+0,10 no teclado).
@@ -327,13 +330,13 @@ O slime subindo soma vy (×1,0) e verticaliza a saída. O teste mede a normal e 
 | Rápida e 2P | 5, 7 ou 9 | — | — |
 
 **Saque "levantar e bater"** (decisão do usuário de 2026-10-21; substitui o segurar e soltar; sem saque automático):
-- O sacador anda entre |x| 6,5 e 10. A bola fica 1,7 u acima da cúpula.
-- **1º toque:** levanta a bola, que sobe 5 u numa parábola sem colisão. O sacador fica parado, e o stick ou o arrasto mira:
-  - para trás = curto (±4,5); neutro = médio (±8); rumo ao rival = fundo (±11);
-  - no mouse, vale o x do cursor no lado do rival.
-  Um marcador no piso do rival mostra a queda.
+- O sacador anda entre |x| 6,5 e 10. A bola fica 1,7 u acima da cúpula e 0,25 u à frente do centro.
+- **1º toque:** levanta a bola, que sobe 5 u na vertical, sem colisão. **Depois dele o sacador anda** (pedido de 2026-10-22), entre |x| 6,0 e 10,5, e **a mira vem da posição** da bola em relação ao corpo no contato:
+  - bola à frente do corpo (rumo à rede) = fundo (±11), chapado; em cima = médio (±8); atrás = curto (±4,5); entre esses pontos, interpola (`profundidadePorPosicao`, 0,9 u além dos 0,25 u já é o extremo);
+  - o mouse, o stick e as setas só movem o slime (saíram a mira pelo eixo, pelo cursor e pelo arrasto).
+  O marcador no piso do rival mostra a queda ao vivo, pela posição atual.
 - **Anel:** fecha em volta da bola até o 2º toque ideal, cerca de 0,64 s depois, com a bola começando a cair. Ele fica dourado na janela do perfeito.
-- **2º toque:** o slime pula, e a batida acontece no **contato da cúpula com a bola**. Por 0,2 s, a bola não colide com o sacador.
+- **2º toque:** o slime pula, e a batida acontece no **contato da cúpula com a bola** (a altura da cúpula na posição da bola) ou, com a bola ao alcance, depois de 0,7 s de pulo ou quando ela voltaria para a mão (o pulo cedo vira o fraco). **Só com a bola ao alcance** (|bola.x − s.x| ≤ 0,95a + 0,5RB): longe do corpo, a bola passa e volta para a mão, sem falta. Por 0,2 s, a bola não colide com o sacador.
 
 | Erro do 2º toque | Saque |
 |---|---|
@@ -342,7 +345,7 @@ O slime subindo soma vy (×1,0) e verticaliza a saída. O teste mede a normal e 
 | fora disso (o 2º toque não conta nos primeiros 0,15 s) | **FRACO**: lob alto, no máximo ±6 |
 | sem 2º toque | a bola volta para a mão em cerca de 1,2 s, **sem falta** |
 
-- **CPU:** levanta de 0,5 a 0,8 s depois do saque valer. O erro de tempo é quase normal, com desvio `saqueErro` por nível, de 0,15 s no T0 a 0,035 s no T5. A mira foge do receptor; a personalidade `lob` prefere o curto. Na 1ª partida, a CPU saca sempre o bom e nunca fecha a partida no saque (erra na rede).
+- **CPU:** levanta de 0,5 a 0,8 s depois do saque valer. O erro de tempo é quase normal, com desvio `saqueErro` por nível, de 0,15 s no T0 a 0,035 s no T5. A mira (`rumo` do `planoSaque`) foge do receptor; a personalidade `lob` prefere o curto. Na levantada, a CPU anda até a posição desse rumo (`posicaoParaRumo`), o que também telegrafa o saque. Na 1ª partida, a CPU saca sempre o bom e nunca fecha a partida no saque (erra na rede).
 - **Telemetria:** `saque/<perfeito|bom|fraco>/humano`.
 - Esperando o saque humano: aos 4 s a bola pulsa e a mão fantasma aparece. **O jogo espera sem limite.**
 - **Saque da CPU:** de 0,5 a 0,8 s depois do "saque valendo". Nunca antes da 1ª interação do humano. Se o portão de interação estiver ativo (30 s sem `pointerdown`/`keydown`), a CPU espera um toque ("toque para receber").
@@ -419,14 +422,14 @@ Evolução, Gotas contando e replay podem ser pulados com um toque. **Meta medid
 - **Mira padrão:** um ponto no fundo da quadra a pelo menos 3 u da posição prevista do rival (posição + 0,3 s de velocidade). Se não houver, o ponto válido mais longe dele.
 - **Resolvedor (por tiro):**
   - para cada ângulo de −75° a +30°, em passos de 2°, faz bissecção na velocidade com `fisica/volei.prever`, o mesmo integrador, **com vento e sem `VMAX`**, até o ponto de queda bater no alvo;
-  - descarta o que passa de `V_CORTADA` = 29 ou cruza a rede abaixo de `REDE_H + RB + 0,25`;
-  - fica com o mais íngreme. Se nenhum servir, levanta o arco.
-- **Desenho:**
-  - **9 gotas** na cor do time, com contorno de tinta de 1,2 px e brilho branco, crescendo de 0,07 a 0,24 u;
-  - **a última é uma gota maior que aponta** (no lugar da flecha);
-  - `L = 2,5 + 4,5·(|v|/V_CORTADA)`;
-  - as gotas respiram ±6% a 2 Hz.
-- **Retícula** no ponto de queda: anel de 0,6 u com 4 marcas.
+  - descarta o que passa de `V_CORTADA` = 29, cruza a rede abaixo de `REDE_H + RB + 0,25` ou **raspa o topo do poste em qualquer ponto do voo** (2026-10-22: o tiro curto que descia logo depois da rede batia nela);
+  - fica com o mais íngreme. Se nenhum servir, levanta o arco mais baixo que passa limpo. O `cortada.test` confere que todo alvo da faixa cai a até 0,3 u da retícula.
+- **Desenho (2026-10-22, "direto e reto no objetivo"):** um **feixe reto** do ponto de batida até a retícula, no lugar das gotas pela trajetória:
+  - halo na cor do time; corpo afilado (mais grosso quanto mais forte o tiro), com contorno de tinta e núcleo claro, nascendo claro na bola;
+  - chevrons brancos andando rumo ao alvo, mais rápidos com a força;
+  - ponta de flecha grande com risco de brilho, encostada na retícula; tudo pulsa nos 0,3 s finais;
+  - tamanho mínimo na tela: 1× no desktop, cerca de 1,3× em paisagem, até 1,8× no retrato.
+- **Retícula** no ponto de queda, em perspectiva: sombra, zona na cor do time, anel com tinta, anel interno claro, 4 marcas, miolo pulsando e uma onda que abre a cada 0,6 s; nos 0,3 s finais o anel pisca em branco. A thumb (`tools/thumb.html`) passa `feixe: false` e desenha as setas dela nos pontos de `gotasDaMira`.
 
 **Áudio (nosso):**
 - Entrada: swell reverso, passa-baixa de 18 kHz a 700 Hz em 100 ms, plateia a 0,6, "tum" a cada 450 ms.
@@ -502,7 +505,7 @@ Catálogo aprovado pelo usuário em 2026-10-21. O código está em `src/jogo/pow
 |---|---|---|---|---|
 | Cortada Grátis | seu | 14 | início | a próxima cortada lenta não gasta medidor |
 | Pulo Mola | seu | 9 | início | pulo ×1,3 por 2 pontos |
-| Gosmão | seu | 8 | início | R ×1,25 por 2 pontos (o raio muda aos poucos e a pele acompanha) |
+| Gosmão | seu | 8 | início | R ×1,25 por 2 pontos (o raio muda aos poucos; o desenho incha passando do ponto e assenta, com o núcleo do campo na escala da pele, §2.1) |
 | +1 Segmento | seu | 8 | início | +100 de medidor |
 | **Congelar** | rival | 9 | início | aviso de 0,5 s; **0,6 s preso no gelo** (sem andar nem pular, a gravidade continua); depois 1,5 s escorregando (aceleração no chão a 30%) |
 | **Bola de Fogo** | bola | 10 | início | o seu próximo toque que cruza a rede é re-mirado para a mesma queda, chapado e até 1,5× mais rápido, com rastro de chama. Quem recebe é empurrado (vx 7, σ +0,6) e a bola sai fraca (×0,4), a não ser na manchete perfeita |
@@ -651,20 +654,22 @@ Catálogo aprovado pelo usuário em 2026-10-21. O código está em `src/jogo/pow
 - Faixa "PONTO DA PARTIDA" antes do saque de match point.
 - **`regras.test`:** tempo morto médio entre pontos ≤ 1,4 s em 100 pontos de bot, sem contar a espera do saque humano.
 
-### 2.10 Reações (emoji) depois do ponto (decisão do usuário de 2026-10-21)
+### 2.10 Reações (emoji) (decisão do usuário de 2026-10-21; a qualquer hora desde 2026-10-22)
 
 - **Onde estão:** o catálogo em `src/jogo/reacoes.js`, as carinhas em `src/render/carinhas.js` (uma gota amarela com rosto, desenhada em código e sem os emoji do sistema) e a barra no `hud.js`.
 - **Catálogo:** 6 da base (Rindo, Gargalhada, Convencido, Bravo, Chorando e Coração) e 4 da trilha (Óculos escuros no nível 2, Sono no 5, Pegando fogo no 8 e Coroa no 11). Não há texto livre.
 - **Barra:**
-  - fica embaixo do placar; aparece 150 ms depois de **cada** ponto e some aos 2,2 s, quando o saque é levantado ou quando o jogador reage;
-  - no desktop, aceita as teclas 1 a 9 e 0, com o número em cada botão; no retrato, quebra em até 2 linhas;
-  - o toque na barra conta como interação, mas não pula (`controles.js` usa `closest('.reacoes')`, sem `stopPropagation`).
+  - fica embaixo do placar, com botões de 64 px (56 abaixo de 520 px); aparece 150 ms depois de **cada** ponto e some aos 2,2 s ou quando o jogador reage;
+  - **botão fixo** (uma carinha) embaixo da pausa: abre e fecha a barra a qualquer hora (ela fecha sozinha em 2,5 s) e fica apagado na recarga;
+  - no desktop, as teclas 1 a 9 e 0 reagem **a qualquer hora** (fora dos menus), com o número em cada botão; no retrato, a barra quebra em até 2 linhas;
+  - o toque na barra e no botão conta como interação, mas não pula (`controles.js` usa `closest('.reacoes, .reagir')`, sem `stopPropagation`).
 - **Reação:**
-  - vale 1 por ponto, só fora do rali (estados `ponto`, `saque` e `fim`);
-  - o rosto do slime faz a expressão junto (`caretar`), e um balão de gosma sobe sobre ele por 1,6 s.
+  - o jogador reage a qualquer hora, inclusive no rali, com **recarga de 2,5 s** (`REACAO.recarga`); a CPU continua com 1 por ponto, só fora do rali;
+  - o rosto do slime faz a expressão junto (`caretar`; na cortada lenta fica o `focado`), e um balão de gosma sobe sobre ele por 1,6 s;
+  - o balão tem raio de 1,32 u, com mínimo de 32 px no retrato e 40 px em paisagem (64 a 136 px de diâmetro); no rali sai a 75%, para não tapar a bola.
 - **CPU:**
   - reage sozinha com 35% de chance (20% se for distraída, 50% se for chefe), de 0,5 a 0,9 s depois do ponto;
-  - responde ao jogador com 35% de chance, 0,6 s depois;
+  - responde ao jogador com 35% de chance, 0,6 s depois (só fora do rali);
   - usa um rng próprio (`hashTexto('reacoes')`);
   - quando ganha o ponto, fica convencida ou ri; quando perde, fica brava ou chora; e responde coração com coração.
 - **Telemetria:** `reacao/<id>/humano`.

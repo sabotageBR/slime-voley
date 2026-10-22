@@ -197,8 +197,9 @@ export function criarIA(p, rng, o = {}) {
     /** a CPU quer a cortada lenta agora? (no ar, na janela: a partida confere a elegibilidade) */
     querCortar() { return ia.corte; },
     /**
-     * Plano do saque: erro de tempo da batida (s, perto de uma normal com desvio p.saqueErro) e a
-     * profundidade (a mira foge do receptor; o lob prefere o curto).
+     * Plano do saque: erro de tempo da batida (s, perto de uma normal com desvio p.saqueErro) e o
+     * rumo (-1 curto .. 1 fundo; a mira foge do receptor; o lob prefere o curto). Na levantada a
+     * CPU anda ate a posicao desse rumo (a mira do saque vem da posicao da bola no corpo).
      * @param {number} outroX x do receptor
      */
     planoSaque(outroX) {
@@ -206,7 +207,7 @@ export function criarIA(p, rng, o = {}) {
       let rumo = rng() * 2 - 1;
       if (perso.includes('mira')) rumo = Math.abs(outroX) > 8 ? -1 : 1;
       else if (perso.includes('lob')) rumo = -0.6;
-      return { erro, prof: profundidadeSaque(rumo) };
+      return { erro, rumo, prof: profundidadeSaque(rumo) };
     },
   };
 }

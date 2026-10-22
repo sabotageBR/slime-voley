@@ -101,7 +101,9 @@ const hud = criarHud(raiz, T, {
   som: (id) => mesa.tocar(id),
   icone: desenharIconeTela,
   carinha: desenharCarinhaTela,
-  aoReagir: (id) => { if (P && P.reagir(0, id)) hud.reacoes(null); },
+  aoReagir: (id) => reagirJogador(id),
+  aoReagirTecla: (k) => { if (reacoesLiberadas[k]) reagirJogador(reacoesLiberadas[k]); },
+  aoBotaoReacao: () => { barra = tReal < barra.ate && tReal >= barra.de ? { de: 0, ate: 0 } : { de: tReal, ate: tReal + 2.5 }; },
   premio: (ctx, pr, lado) => desenharPremioTela(ctx, pr, lado, pr.tipo === 'skin' ? acharSkin(pr.id).hex : undefined),
   aoPremiado: () => premiado(),
 });
@@ -330,7 +332,7 @@ const TRATADORES = {
     if (e.matchPoint) hud.faixa(T('grito.matchPoint'));
     else hud.faixa('');
     if (e.motivo === 'fora') poki.measure('fora', e.lado < 0 ? 'esquerda' : 'direita', 'ponto');
-    if (!e.fim && !D.auto && P.humano[0]) barra = { de: tReal + 0.15, ate: tReal + 2.2, ponto: P.pontoN };
+    if (!e.fim && !D.auto && P.humano[0]) barra = { de: tReal + 0.15, ate: tReal + 2.2 };
   },
   'match-point': () => {},
   'fim': (e) => {
@@ -362,6 +364,7 @@ const TRATADORES = {
   'powerup': (e) => {
     const s = P.slimes[e.alvo];
     cena.vfx.texto(s.x, s.y + 4.2, T('pw.' + e.id), cores[e.i], 1);
+    if (e.id === 'gosmao') { mesa.tocar('inflar', {}, { max: 1 }); cena.vfx.respingo(s.x, s.y + 2.4, cores[e.alvo], 10, 6); }
     if (e.humano && tReal - tVozPw > 20) { tVozPw = tReal; mesa.falar('vozPowerUpSlime'); }
     if (e.alvo === 0 || e.i === 0) vibrar(e.alvo === 0 && e.i !== 0 ? [20, 30, 20] : 25);
     poki.measure('powerup', e.id, e.humano ? 'humano' : 'cpu');
@@ -370,7 +373,7 @@ const TRATADORES = {
     mesa.tocar(e.id === 'congelar' ? 'vidro' : e.id === 'cola' ? 'splat' : 'murcho', {}, { max: 1 });
     if (e.id === 'congelar') cena.vfx.respingo(e.x, e.y + 1.2, '#bfeaff', 8, 5);
   },
-  'powerup-fim': () => {},
+  'powerup-fim': (e) => { if (e.id === 'gosmao') mesa.tocar('murcho', {}, { max: 1 }); else if (e.id === 'encolher') mesa.tocar('inflar', {}, { max: 1 }); },
   'gelo-quebra': (e) => { mesa.tocar('gelatinaTreme', {}, { max: 1 }); cena.vfx.respingo(e.x, e.y + 1, '#dff6ff', 10, 6); },
   'piso-mola': (e) => { mesa.tocar('pulo', {}, { max: 2 }); mesa.tocar('tilim', {}, { max: 1 }); cena.coroa(e.x, 0.15, '#2fc7a0', { chao: true, r1: 2.2, n: 10, esc: 0.8 }); },
   'bola-poder': (e) => { mesa.tocar(e.id === 'fogo' ? 'missilZuum' : 'tum', {}, { max: 1 }); if (e.id === 'fogo') cena.diretor.tremer(0.25); },
@@ -388,8 +391,15 @@ const TRATADORES = {
 // ------------------------------------------------------------------ laco
 let tReal = 0;
 let tVozPw = -99;
-/** barra de reacoes depois do ponto: aparece de `de` ate `ate` (jogo-real) */
-let barra = { de: 0, ate: 0, ponto: -1 };
+/** barra de reacoes: aparece de `de` ate `ate` (jogo-real), depois do ponto ou pelo botao */
+let barra = { de: 0, ate: 0 };
+
+/** O jogador reage (barra, botao ou tecla): a qualquer hora, com a recarga da partida. */
+function reagirJogador(id) {
+  if (!P || !P.reagir(0, id)) return;
+  barra = { de: 0, ate: 0 };
+  hud.reacoes(null);
+}
 /** @type {string[]} */
 let reacoesLiberadas = [];
 /** o que a ultima partida rendeu (o premiado dobra) */
@@ -468,10 +478,12 @@ function desenhar(dtReal, alfa) {
   const L = cena.layout;
   if (L) hud.posicionar(L);
   hud.atualizar({ nomes, cores, placar: P.placar, medidor: [P.jogadores[0].med.v, P.jogadores[1].med.v], chips: P.jogadores.map(chipsDe), esconder: D.semHud });
-  // barra de reacoes: depois do ponto, ate o saque ser levantado (1 por ponto)
-  const comBarra = !D.semHud && tReal >= barra.de && tReal < barra.ate && barra.ponto === P.pontoN && P.jogadores[0].reagiuEm !== P.pontoN
-    && (P.estado === 'ponto' || (P.estado === 'saque' && P.saque.fase === 'pronto'));
+  // barra de reacoes: depois do ponto ou pelo botao, fora da recarga; o botao fica na partida toda
+  const pronto = P.jogadores[0].recargaReacao <= 0;
+  const naPartida = !D.semHud && !D.auto && P.humano[0] && !hud.cartaoAberto && P.estado !== 'fim';
+  const comBarra = naPartida && pronto && tReal >= barra.de && tReal < barra.ate;
   hud.reacoes(comBarra ? reacoesLiberadas : null, !toque);
+  hud.botaoReacao(naPartida, pronto);
   controles.desenhar();
   controles.mostrarSuper(false);
   desenharMao(dt);

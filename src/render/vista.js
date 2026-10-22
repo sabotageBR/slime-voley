@@ -4,13 +4,15 @@
 //
 // Contrato (o mesmo do motor da gosma):
 //   m.{ n, x, y, pig, membros, iniSl, slimes }
-//   s.{ ativo, idx, n, a11, a12, a21, a22, raio0, cx, cy, esq, dir, base, topo, dados: { hex, expr, ap, apModo, textura, texturaT } }
+//   s.{ ativo, idx, n, a11, a12, a21, a22, raio0, cx, cy, esq, dir, base, topo, escNucleo, dados: { hex, expr, ap, apModo, textura, texturaT } }
 // a11 = 1 + 0,18 sigma e a22 = 1 - 0,22 sigma (a deformacao da cupula). O rosto fica em
-// base + 0,44 b, com raio0 = 0,925 R (olhos a 1,15 u da base num slime de raio 2).
+// base + 0,44 b, com raio0 = 0,925 R (olhos a 1,15 u da base num slime de raio 2). escNucleo
+// multiplica o raio do nucleo do campo (o reticulado da pele so se espalha quando o raio muda).
 
 import { N_PIG } from '../fisica/constantes.js';
 import { eixosVisuais, limitar } from '../fisica/volei.js';
 import { alfaCanal } from '../jogo/tempo.js';
+import { PASSO_PELE } from '../jogo/pele.js';
 
 /**
  * @param {ReturnType<typeof import('../jogo/partida.js').criarPartida>} partida
@@ -29,7 +31,7 @@ export function criarVista(partida) {
     iniSl: [0, n0, n],
     slimes: [0, 1].map((idx) => ({
       ativo: true, idx, n: idx ? n1 : n0, nivel: 1,
-      a11: 1, a12: 0, a21: 0, a22: 1, raio0: 1.85, cx: 0, cy: 0, esq: 0, dir: 0, base: 0, topo: 0,
+      a11: 1, a12: 0, a21: 0, a22: 1, raio0: 1.85, cx: 0, cy: 0, esq: 0, dir: 0, base: 0, topo: 0, escNucleo: 1,
       dados: { hex: '#ff8a2a', expr: '', ap: 0, apModo: 0, textura: 0, texturaT: 1 },
     })),
     paredes: [],
@@ -84,7 +86,8 @@ export function criarVista(partida) {
       v.x = sa.x + (s.x - sa.x) * al;
       v.y = sa.y + (s.y - sa.y) * al;
       v.sig = sa.sig + (s.sig - sa.sig) * al;
-      const [ea, eb] = eixosVisuais({ ...s, sig: v.sig });
+      const Rv = sa.Rv + (s.Rv - sa.Rv) * al;
+      const [ea, eb] = eixosVisuais({ ...s, sig: v.sig, Rv });
       v.a = ea;
       v.b = eb;
       const sm = m.slimes[i];
@@ -94,9 +97,11 @@ export function criarVista(partida) {
       sm.topo = topo;
       sm.cx = v.x;
       sm.cy = v.y + 0.44 * eb;
-      sm.a11 = limitar(ea / s.R, 0.75, 1.3);
-      sm.a22 = limitar(eb / s.R, 0.75, 1.3);
-      sm.raio0 = 0.925 * s.R;
+      sm.a11 = limitar(ea / Rv, 0.75, 1.3);
+      sm.a22 = limitar(eb / Rv, 0.75, 1.3);
+      sm.raio0 = 0.925 * Rv;
+      // nucleo do campo na escala da pele (o reticulado so se espalha quando o raio muda)
+      sm.escNucleo = (Rv / p.R0) * (p.passo / PASSO_PELE.normal);
       const J = partida.jogadores[i];
       sm.dados.expr = J.expr;
     }

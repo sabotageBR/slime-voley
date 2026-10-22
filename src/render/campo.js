@@ -21,7 +21,8 @@ import { N_PIG } from '../fisica/constantes.js';
 
 /**
  * @param {{ janela: number[], celula: number, raio: number }} o
- *   janela [x0, y0, x1, y1] do mundo coberta pelo campo; celula em u; raio do nucleo em u
+ *   janela [x0, y0, x1, y1] do mundo coberta pelo campo; celula em u; raio do nucleo em u (cada
+ *   slime o multiplica pelo proprio s.escNucleo)
  */
 export function criarCampo({ janela, celula, raio }) {
   const [x0, y0, x1, y1] = janela;
@@ -38,8 +39,6 @@ export function criarCampo({ janela, celula, raio }) {
   const tD = new Float32Array(N);
   const tW = new Float32Array(N);
   const tC = new Float32Array(N * N_PIG);
-  const h2 = raio * raio;
-  const alcance = Math.ceil(raio / celula);
   let sujo = [0, 0, nx - 1, ny - 1];
   /** algum slime do ultimo acumular tem aparencia (skin): a composicao usa o programa delas */
   let comAp = false;
@@ -70,6 +69,10 @@ export function criarCampo({ janela, celula, raio }) {
       const a0 = iniSl[s.idx];
       const a1 = iniSl[s.idx + 1];
       if (a1 <= a0) continue;
+      // nucleo na escala da pele do slime (Gosmao, Encolher, qualidade minima): a soma fica igual
+      const h = raio * (s.escNucleo || 1);
+      const h2 = h * h;
+      const alcance = Math.ceil(h / celula);
       // caixa do slime em celulas
       let bx0 = Math.floor((s.esq - x0) * inv) - alcance;
       let bx1 = Math.ceil((s.dir - x0) * inv) + alcance;

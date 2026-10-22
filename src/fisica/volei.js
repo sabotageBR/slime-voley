@@ -32,13 +32,18 @@ export const RAIO = 2.0;
 /** Bola. */
 export const RB = 0.75;
 export const G_BOLA = 28;
-/** Slime: gravidade, pulo (apice de 3,89 u, 0,68 s no ar), velocidade e aceleracoes. */
+/**
+ * Slime: gravidade, pulo (apice de 3,89 u, 0,68 s no ar), velocidade e aceleracoes (u/s2). Desde
+ * 2026-10-22 o controle e firme: 0 a 11 u/s no chao em 73 ms, parada em 55 ms, e no ar a inversao
+ * leva 0,2 s (antes, 0,49 s de um pulo de 0,68 s: "parece que tem atrito com o chao").
+ */
 export const G_SLIME = 68;
 export const PULO = 23;
 export const VEL = 11;
-export const ACEL_CHAO = 85;
-export const FREIO = 130;
-export const ACEL_AR = 45;
+export const ACEL_CHAO = 150;
+export const FREIO = 200;
+export const ACEL_AR = 90;
+export const FREIO_AR = 150;
 /** Restituicao e saida minima contra o slime; rede, placa e rede de fundo. */
 export const E_SLIME = 0.9;
 export const V_MIN = 8;
@@ -75,6 +80,8 @@ export const limitar = (v, a, b) => (v < a ? a : v > b ? b : v);
  * @property {number} sigV
  * @property {number} sigAlvo
  * @property {number} R     raio de repouso (Gosmao muda)
+ * @property {number} Rv    raio do desenho: mola atras do R (o Gosmao incha passando do ponto); a colisao usa o R
+ * @property {number} RvV
  * @property {boolean} noChao
  * @property {number} tAr   s desde que saiu do chao (coyote)
  * @property {number} multPulo
@@ -87,7 +94,7 @@ export const limitar = (v, a, b) => (v < a ? a : v > b ? b : v);
  * @returns {Slime}
  */
 export function criarSlime(lado, x = lado * 6) {
-  return { lado, x, y: 0, vx: 0, vy: 0, sig: 0, sigV: 0, sigAlvo: 0, R: RAIO, noChao: true, tAr: 0, multPulo: 1, congelado: false };
+  return { lado, x, y: 0, vx: 0, vy: 0, sig: 0, sigV: 0, sigAlvo: 0, R: RAIO, Rv: RAIO, RvV: 0, noChao: true, tAr: 0, multPulo: 1, congelado: false };
 }
 
 /** Semi-eixos da cupula para a colisao (sigma limitado). @param {Slime} s @returns {number[]} [a, b] */
@@ -96,10 +103,11 @@ export function eixos(s) {
   return [s.R * (1 + 0.18 * q), s.R * (1 - 0.22 * q)];
 }
 
-/** Semi-eixos do desenho (sigma cru ate +-1). @param {Slime} s @returns {number[]} */
+/** Semi-eixos do desenho (sigma cru ate +-1, raio do desenho). @param {Slime} s @returns {number[]} */
 export function eixosVisuais(s) {
   const q = limitar(s.sig, -SIG_VIS, SIG_VIS);
-  return [s.R * (1 + 0.18 * q), s.R * (1 - 0.22 * q)];
+  const R = s.Rv || s.R;
+  return [R * (1 + 0.18 * q), R * (1 - 0.22 * q)];
 }
 
 /**
@@ -116,6 +124,20 @@ export function limitesX(s) {
 /** Soma um chute no amassado (pouso, toque). @param {Slime} s @param {number} d */
 export function amassar(s, d) {
   s.sig = limitar(s.sig + d, -SIG_VIS, SIG_VIS);
+}
+
+/**
+ * Eixo para chegar num x no menor tempo sem passar do ponto (o mouse: o slime segue o cursor). A
+ * velocidade pedida e a maior que ainda freia ate o alvo (freio do chao ou do ar, com o atrito do
+ * gelo); dentro de 0,04 u o eixo zera.
+ * @param {Slime} s @param {number} xAlvo @param {number} [vmax] @param {number} [atrito]
+ */
+export function seguirAlvo(s, xAlvo, vmax = VEL, atrito = 1) {
+  const d = xAlvo - s.x;
+  const ad = Math.abs(d);
+  if (ad < 0.04) return 0;
+  const freio = s.noChao ? FREIO * atrito : FREIO_AR;
+  return (Math.sign(d) * Math.min(vmax, Math.sqrt(2 * freio * (ad - 0.02)))) / vmax;
 }
 
 /**
@@ -136,9 +158,8 @@ export function passoSlime(s, it, dt, o = {}) {
   if (s.congelado) return null;
   const vmax = o.vel ?? VEL;
   const alvo = limitar(it.eixo, -1, 1) * vmax;
-  let acc;
-  if (s.noChao) acc = (alvo === 0 || alvo * s.vx < 0 || Math.abs(alvo) < Math.abs(s.vx) ? FREIO : ACEL_CHAO) * (o.atrito ?? 1);
-  else acc = ACEL_AR;
+  const freando = alvo === 0 || alvo * s.vx < 0 || Math.abs(alvo) < Math.abs(s.vx);
+  const acc = s.noChao ? (freando ? FREIO : ACEL_CHAO) * (o.atrito ?? 1) : freando ? FREIO_AR : ACEL_AR;
   const dv = alvo - s.vx;
   const passo = acc * dt;
   s.vx = Math.abs(dv) <= passo ? alvo : s.vx + Math.sign(dv) * passo;

@@ -16,14 +16,14 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
 - as referências medidas do Blumgi, em `docs/referencias/`;
 - o que cada marco entregou e o que ficou para depois, em `docs/marcos/`.
 
-**O desenho vai além do código.** Ele descreve o jogo inteiro, até o M5. Muitos módulos, testes e ferramentas citados nele ainda não existem (`poderes.js`, `torneio.js`, `layout.test`, `fluxo.test`, `calibrar`, `sdkcheck`, `npm run poki`...). Antes de supor que algo existe, confira em `docs/marcos/`. Os comentários dos arquivos portados de projetos irmãos também citam coisas que não estão aqui, como `tools/pigmentos.mjs` e `test/cor.test.js`.
+**O desenho vai além do código.** Ele descreve o jogo inteiro, até o M5. Muitos módulos, testes e ferramentas citados nele ainda não existem (`poderes.js`, `torneio.js`, `layout.test`, `fluxo.test`, o humano simulado, `sdkcheck`, `npm run poki`...). Antes de supor que algo existe, confira em `docs/marcos/`. Os comentários dos arquivos portados de projetos irmãos também citam coisas que não estão aqui, como `tools/pigmentos.mjs` e `test/cor.test.js`.
 
 ## Rodar e testar
 - `npm run servir` abre o jogo em http://127.0.0.1:5380/. Os módulos ES não carregam por `file://`.
 - `npm run lan` faz o mesmo, aberto na rede local, para testar no celular pela Wi-Fi. Os parâmetros de teste também valem na LAN.
 - `npm test` roda todos os testes (`node --test test/*.test.js`, cerca de 3,5 s).
 - Um arquivo: `node --test test/fisica.test.js`. Um teste: `node --test --test-name-pattern="<regex>" test/*.test.js`.
-- `npm run calibrar` aponta para `tools/calibrar.mjs`, que ainda não existe (ficou para o M2).
+- `npm run calibrar` roda o bot contra bot (`tools/calibrar.mjs`, cerca de 4 s para 30 partidas). O humano simulado do desenho ainda não existe.
 
 ## Como um quadro anda
 1. O `core/laco.js` roda passos fixos de 1/120 s (a bola faz 2 subpassos de 1/240 s), no máximo 6 por quadro. Depois chama `desenhar(dtReal, alfa)` uma vez.
@@ -105,7 +105,7 @@ Portas: 5380 (servir), 4380–4385, CDP 9380–9382. É um Chrome por vez: o `sh
 **Parâmetros de teste:**
 - Só valem em loopback e na LAN, ou pelo `window.__voleiModelo` da build de modelos.
 - O `core/depuracao.js` é o único módulo que lê a URL, e o cabeçalho dele tem a lista completa.
-- Os mais usados: `?semente ?roteiro=cortada|ponto|ponto-curto|reacao|saque|bolha|gelo|fogo|fim ?visual=a|b|c ?controle=a|b ?gatilho=novo|segura ?lab ?auto ?primeira ?semblur ?semanuncio ?debug`.
+- Os mais usados: `?semente ?roteiro=cortada|ponto|ponto-curto|reacao|saque|bolha|gelo|fogo|gosmao|fim ?visual=a|b|c ?controle=a|b ?gatilho=novo|segura ?lab ?auto ?primeira ?semblur ?semanuncio ?debug`.
 - Para um print parado num instante, use `?filme=1&cada=N`: N passos e um desenho, sem rAF.
 - `?fora=1` liga a regra antiga do fora; por padrão, a bola nunca sai.
 - Os roteiros `jornada`, `raio`, `rali8` e `onboarding`, citados no desenho, ainda não existem.
@@ -121,8 +121,9 @@ O headless perde o foco sozinho: as ferramentas passam `?semblur`.
 ## Git
 Faça um commit no fim de cada marco, com as notas em `docs/marcos/M<n>.md`. Push só com o OK do usuário. As mensagens usam o prefixo `M<n>:`, `build:` ou `docs:`, em português sem acento.
 
-## Calibragem atual (bot contra bot, 2026-10-21)
-- **Constantes** (em `src/fisica/volei.js`): `E_SLIME` 0,9, `G_BOLA` 28, `V_MIN` 8, `SOMA_Y` 0,7.
-- **Resultado:** com a parede e o saque novo, ralis com mediana de cerca de 5,9 s (p90 de 15 s) e 0% de fora.
-- **Saque:** o `saqueErro` de cada nível está em `src/jogo/rivais.js`; o bot T2 acerta cerca de 61% de perfeitos.
+## Calibragem atual (bot contra bot, 2026-10-22)
+- **Rodar:** `npm run calibrar` (`tools/calibrar.mjs [N=30]`): rali, motivos dos pontos, travessias, saques e, quando houver, boladas no juiz.
+- **Constantes** (em `src/fisica/volei.js`): `E_SLIME` 0,9, `G_BOLA` 28, `V_MIN` 8, `SOMA_Y` 0,7; controle firme com `ACEL_CHAO` 150, `FREIO` 200, `ACEL_AR` 90 e `FREIO_AR` 150.
+- **Resultado (30 partidas):** ralis com mediana de cerca de 5,8 s (p90 de 15,6 s), 0% de fora e cerca de 33% de pontos na rede.
+- **Saque:** o `saqueErro` de cada nível está em `src/jogo/rivais.js`; o bot T2 acerta cerca de 65% de perfeitos (100 partidas; com 30 a amostra oscila de 61% a 70%).
 - A câmera lenta usa mundo a 0,06 (medido no Blumgi) e defensor a 0,30: `escalaMundo: 60` e `escalaDefensor: 300` (em milésimos), no `src/jogo/cortada.js`.

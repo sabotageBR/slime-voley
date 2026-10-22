@@ -2,20 +2,22 @@
 //
 // Esquema A, "Metades" (padrao no celular): cada pointerId fica com a zona onde encostou.
 //   Esquerda: stick horizontal flutuante (zona morta 8 px, velocidade maxima a 36 px na curva
-//   ((|dx| - 8) / 28)^0,8; a origem acompanha o dedo alem de 56 px).
+//   ((|dx| - 8) / 28)^0,65; a origem acompanha o dedo alem de 40 px: inverter responde na hora).
 //   Direita: acao. pointerdown pula na hora; um NOVO pointerdown no ar, segurado, e a cortada
 //   lenta; arrastar mira ("mais fundo" = para cima OU rumo ao adversario).
 // Esquema B, "Botoes": ◀ ▶, PULO e SUPER (o 2o toque em PULO no ar corta).
 // Teclado: A/D ou ←/→ anda, W/↑/Espaco pula (de novo no ar e segurar = cortada), S/↓/Shift super;
-//   no 2P o jogador 1 usa A/D/W/S e o 2, as setas. Mouse: o slime segue o x do cursor e o
-//   clique pula; na mira, o cursor projetado no piso e a reticula.
+//   no 2P o jogador 1 usa A/D/W/S e o 2, as setas. Mouse: o slime segue o x do cursor (alvoX: a
+//   partida acha o eixo que chega mais rapido sem passar, src/fisica/volei.js seguirAlvo), pela
+//   camera do quadro desenhado; o clique pula; na mira, o cursor projetado no piso e a reticula.
 //
 // Regras da Poki (vigiadas pelo test/estilo.test.js): ouvintes em fase de bolha, nenhum
 // stopPropagation, preventDefault so em touchmove, wheel, contextmenu, setas e Espaco.
 
 const ZONA_MORTA = 8;
 const VMAX_PX = 36;
-const ARRASTA_ORIGEM = 56;
+const ARRASTA_ORIGEM = 40;
+const CURVA = 0.65;
 const TECLAS = Object.freeze({
   p1: { esq: ['KeyA'], dir: ['KeyD'], acao: ['KeyW'], super: ['KeyS'] },
   p2: { esq: ['ArrowLeft'], dir: ['ArrowRight'], acao: ['ArrowUp'], super: ['ArrowDown'] },
@@ -71,8 +73,8 @@ export function criarControles(raiz, o) {
   function baixo(e) {
     if (!o.ativo()) return;
     o.aoInteragir(e);
-    // toque na barra de reacoes: conta como interacao, mas nao pula
-    if (e.target instanceof Element && e.target.closest('.reacoes')) return;
+    // toque na barra ou no botao de reacao: conta como interacao, mas nao pula
+    if (e.target instanceof Element && e.target.closest('.reacoes, .reagir')) return;
     via = e.pointerType === 'mouse' ? 'mouse' : 'toque';
     if (via === 'mouse') {
       mouse.ativo = true;
@@ -109,7 +111,7 @@ export function criarControles(raiz, o) {
     d.x = e.clientX;
     d.y = e.clientY;
     if (d.zona === 'stick') {
-      // a origem acompanha o dedo alem de 56 px
+      // a origem acompanha o dedo alem de 40 px
       const off = d.x - d.x0;
       if (Math.abs(off) > ARRASTA_ORIGEM) d.x0 = d.x - Math.sign(off) * ARRASTA_ORIGEM;
     } else if (d.zona === 'acao' || d.zona === 'pulo') {
@@ -176,7 +178,7 @@ export function criarControles(raiz, o) {
     const a = Math.abs(dx);
     if (a <= ZONA_MORTA) return 0;
     const k = Math.min(1, (a - ZONA_MORTA) / (VMAX_PX - ZONA_MORTA));
-    return Math.sign(dx) * Math.pow(k, 0.8);
+    return Math.sign(dx) * Math.pow(k, CURVA);
   }
 
   /**
@@ -197,6 +199,7 @@ export function criarControles(raiz, o) {
       const tA = mp.acao.some((c) => teclas.has(c));
       let botao = J.botao || tA;
       let miraX = null;
+      let alvoX = null;
       if (k === 0 && esquema === 'b') {
         const ds = [...dedos.values()];
         const e = ds.some((d) => d.zona === 'esq');
@@ -208,12 +211,12 @@ export function criarControles(raiz, o) {
       if (k === 0 && via === 'mouse' && mouse.dentro && !tE && !tD) {
         const w = o.paraMundo(mouse.x, mouse.y);
         if (w && slimes[0]) {
-          const d = w[0] - slimes[0].x;
-          eixo = Math.abs(d) < 0.15 ? 0 : Math.max(-1, Math.min(1, d * 1.6));
+          eixo = 0;
+          alvoX = w[0];
           miraX = w[0];
         }
       }
-      out.push({ eixo, botao, borda: J.borda, superBorda: J.superBorda, miraDx: J.miraDx, miraX, via });
+      out.push({ eixo, botao, borda: J.borda, superBorda: J.superBorda, miraDx: J.miraDx, miraX, alvoX, via });
       J.borda = false;
       J.superBorda = false;
       J.miraDx = 0;

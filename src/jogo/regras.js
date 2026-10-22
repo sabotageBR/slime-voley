@@ -57,9 +57,37 @@ export const SAQUE = Object.freeze({
   /** o perfeito (VIAGEM) sobe so isto acima do contato: chapado e rapido */
   subidaViagem: 0.6,
   apiceFraco: 11,
-  /** o sacador fica entre estes |x| no proprio lado */
+  /** o sacador fica entre estes |x| no proprio lado (na levantada ele anda: zonaLevantada) */
   zona: [6.5, 10],
+  zonaLevantada: [6.0, 10.5],
+  /** a bola parada fica isto a frente do centro do sacador (rumo a rede) */
+  frente: 0.25,
+  /**
+   * Mira pela posicao (decisao de 2026-10-22: depois do 1o toque o slime anda): a bola a frente
+   * do corpo vai funda e chapada, em cima vai media, atras vai curta. desvioMira u alem do
+   * `frente` ja e o fundo (ou o curto, para tras).
+   */
+  desvioMira: 0.9,
+  /** a batida precisa da bola ao alcance da cupula: |bola.x - s.x| <= alcanceA * a + alcanceRB * RB */
+  alcanceA: 0.95,
+  alcanceRB: 0.5,
 });
+
+/**
+ * Profundidade do saque pela posicao da bola em relacao ao corpo no contato.
+ * @param {number} dBola (bola.x - s.x) * -lado: positivo com a bola a frente (rumo a rede)
+ */
+export function profundidadePorPosicao(dBola) {
+  return profundidadeSaque((dBola - SAQUE.frente) / SAQUE.desvioMira);
+}
+
+/**
+ * Onde o sacador fica para mirar `rumo` (-1 curto .. 1 fundo) com a bola levantada em x0.
+ * @param {number} x0 @param {number} lado @param {number} rumo
+ */
+export function posicaoParaRumo(x0, lado, rumo) {
+  return x0 + lado * (SAQUE.frente + Math.max(-1, Math.min(1, rumo)) * SAQUE.desvioMira);
+}
 
 /**
  * Tempos do levantamento (s depois do 1o toque): o apice da bola, o 2o toque ideal (o pulo encontra

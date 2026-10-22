@@ -11,10 +11,10 @@
 // vale a regra antiga (fora so no ataque estourado, por cima da placa do lado que NAO tocou por
 // ultimo), mantida para comparar.
 
-import { criarSlime, criarBola, passoSlime, passoBola, eixos, prever, pertoCupula, amassar, limitesX, limitar, RB, PASSO, PULO, G_BOLA, G_SLIME, LARG, REDE_R, REDE_H, RAIO, VEL } from '../fisica/volei.js';
+import { criarSlime, criarBola, passoSlime, passoBola, eixos, prever, pertoCupula, amassar, limitesX, limitar, seguirAlvo, RB, PASSO, PULO, G_BOLA, G_SLIME, LARG, REDE_R, REDE_H, RAIO, VEL } from '../fisica/volei.js';
 import { criarTempo, passoReal, escalarTudo } from './tempo.js';
 import { criarPele, passoPele, assentar, marcarCovinha, PASSO_PELE } from './pele.js';
-import { TEMPOS, SAQUE, temposSaque, qualidadeSaque, profundidadeSaque, alvoDaPartida, vencedor, pontoDaPartida, TOQUES } from './regras.js';
+import { TEMPOS, SAQUE, temposSaque, qualidadeSaque, profundidadePorPosicao, posicaoParaRumo, alvoDaPartida, vencedor, pontoDaPartida, TOQUES } from './regras.js';
 import { criarMedidor, ganhar, gastar, tem, CUSTO } from './medidor.js';
 import { criarIA, irPara } from './ia.js';
 import { BOT, paramsIA, rival as acharRival } from './rivais.js';
@@ -29,6 +29,8 @@ const V_BOMBA = 24;
 const TS = temposSaque({ g: G_BOLA, gSlime: G_SLIME, pulo: PULO, rb: RB });
 /** Assistencias. */
 const IMA = Object.freeze({ toque: 0.25, teclado: 0.1 });
+/** Mola do raio do desenho (1/s2, 1/s): ~2,4 Hz com zeta 0,38; o Gosmao passa uns 28% do degrau. */
+const MOLA_RAIO = Object.freeze({ k: 227, c: 11.5 });
 
 /**
  * @typedef {Object} Intencao
@@ -38,11 +40,12 @@ const IMA = Object.freeze({ toque: 0.25, teclado: 0.1 });
  * @property {boolean} [superBorda]
  * @property {number} [miraDx]   u para a reticula (+ = mais fundo)
  * @property {number|null} [miraX] reticula num x absoluto (mouse)
+ * @property {number|null} [alvoX] o slime segue este x (mouse; a partida acha o eixo pelo freio)
  * @property {'toque'|'teclado'|'mouse'} [via]
  */
 
 /** @returns {Intencao} */
-const intencaoVazia = () => ({ eixo: 0, botao: false, borda: false, superBorda: false, miraDx: 0, miraX: null, via: 'teclado' });
+const intencaoVazia = () => ({ eixo: 0, botao: false, borda: false, superBorda: false, miraDx: 0, miraX: null, alvoX: null, via: 'teclado' });
 
 /**
  * @typedef {Object} OpcoesPartida
@@ -131,8 +134,10 @@ export function criarPartida(o = {}) {
     pisoMola: 0,
     /** reacao (emoji) no balao: { id, t } */
     reacao: /** @type {{ id: string, t: number }|null} */ (null),
-    /** ponto (pontoN) em que ja reagiu: 1 reacao por ponto */
+    /** ponto (pontoN) em que reagiu por ultimo (a CPU: 1 por ponto) */
     reagiuEm: -1,
+    /** s de jogo-real ate o humano poder reagir de novo (a qualquer hora, com recarga) */
+    recargaReacao: 0,
   }));
 
   /** @type {'saque'|'jogo'|'ponto'|'fim'} */
@@ -145,7 +150,7 @@ export function criarPartida(o = {}) {
    * saque: pronto (a bola sobre a cabeca) -> levantada (tL s no ar; prof = |x| do alvo) -> batendo
    * (o 2o toque pulou com a qualidade q; bate no contato)
    */
-  const saque = { valendo: true, t: 0, fase: /** @type {'pronto'|'levantada'|'batendo'} */ ('pronto'), tL: 0, x0: 0, y0: 0, prof: SAQUE.prof.medio, q: /** @type {'perfeito'|'bom'|'fraco'} */ ('bom'), erro: 0, tPulo: 0, cpuEm: 0, plano: { erro: 0, prof: SAQUE.prof.medio }, tipo: '' };
+  const saque = { valendo: true, t: 0, fase: /** @type {'pronto'|'levantada'|'batendo'} */ ('pronto'), tL: 0, x0: 0, y0: 0, prof: SAQUE.prof.medio, q: /** @type {'perfeito'|'bom'|'fraco'} */ ('bom'), erro: 0, tPulo: 0, cpuEm: 0, plano: { erro: 0, rumo: 0, prof: SAQUE.prof.medio }, tipo: '' };
   /** rali */
   const rali = { toques: 0, lado: 0, ultimo: -1, ultimoLado: 0, travessias: 0, bateuRede: false, ultimaSaida: 0, ultimaVy: 0, ultimaCortada: false, ultimoNoAr: false, ultimoX: 0, ultimoContatoX: 0, tPresa: 0, recepcaoSaque: false, saqueDeQuem: 0 };
   /** comemoracao */
@@ -191,7 +196,7 @@ export function criarPartida(o = {}) {
     const s = slimes[sacador];
     const [, b] = eixos(s);
     bola.solta = false;
-    bola.x = s.x - s.lado * 0.25;
+    bola.x = s.x - s.lado * SAQUE.frente;
     bola.y = s.y + b + SAQUE.folga + Math.sin(T.tJogo * 3.2) * 0.12;
     bola.vx = 0;
     bola.vy = 0;
@@ -256,10 +261,13 @@ export function criarPartida(o = {}) {
     ev({ tipo: 'saque-levanta', i, x: bola.x, y: bola.y });
   }
 
-  /** Bola do levantamento no instante tL; sem batida ela volta para a mao. */
+  /** Bola do levantamento no instante tL; sem batida (ou se o pulo nao alcancou) ela volta para a mao. */
   function passoLevantada(dtM) {
     saque.tL += dtM;
-    if (saque.fase === 'levantada' && saque.tL >= TS.pega) {
+    const sb = slimes[sacador];
+    const [ab] = eixos(sb);
+    const aoAlcance = Math.abs(bola.x - sb.x) <= ab * SAQUE.alcanceA + RB * SAQUE.alcanceRB;
+    if (saque.tL >= TS.pega && (saque.fase === 'levantada' || !aoAlcance)) {
       saque.fase = 'pronto';
       saque.tL = 0;
       bolaNoSacador();
@@ -270,21 +278,21 @@ export function criarPartida(o = {}) {
     bola.x = saque.x0;
     bola.y = saque.y0 + TS.vy * t - (G_BOLA * t * t) / 2;
     bola.ang += 4 * dtM;
-    // batendo: o pulo encontra a bola (topo da cupula), ou desiste depois de 0,7 s
+    // a mira vem da posicao: a bola a frente do corpo vai funda, em cima media, atras curta
+    const s = slimes[sacador];
+    saque.prof = profundidadePorPosicao((bola.x - s.x) * -s.lado);
+    // batendo: o pulo encontra a bola na cupula, ou bate de todo jeito depois de 0,7 s ou quando a
+    // bola voltaria para a mao (o pulo cedo demais vira o fraco); so com a bola ao alcance: longe do
+    // corpo ela passa e volta para a mao
     if (saque.fase === 'batendo') {
       saque.tPulo += dtM;
-      const s = slimes[sacador];
-      const [, b] = eixos(s);
-      if (bola.y - RB <= s.y + b + 0.05 || saque.tPulo >= 0.7) executarSaque(sacador, saque.q, saque.prof, saque.erro);
+      if (aoAlcance) {
+        const [a, b] = eixos(s);
+        const k = (bola.x - s.x) / (a + RB * SAQUE.alcanceRB);
+        const topo = s.y + b * Math.sqrt(Math.max(0, 1 - k * k));
+        if (bola.y - RB <= topo + 0.05 || saque.tPulo >= 0.7 || saque.tL >= TS.pega - dtM) executarSaque(sacador, saque.q, saque.prof, saque.erro);
+      }
     }
-  }
-
-  /** Mira do saque humano durante o levantamento: stick, arrasto ou o cursor no lado de la. */
-  function mirarSaque(i, it) {
-    const s = slimes[i];
-    if (it.miraX !== null && it.miraX !== undefined && it.miraX * s.lado < 0) saque.prof = limitar(Math.abs(it.miraX), SAQUE.profMin, SAQUE.profMax);
-    else if (Math.abs(it.eixo) >= 0.2) saque.prof = profundidadeSaque(it.eixo * -s.lado);
-    if (it.miraDx) saque.prof = limitar(saque.prof + it.miraDx * 0.8, SAQUE.profMin, SAQUE.profMax);
   }
 
   /** 2o toque: o sacador pula; a qualidade sai do erro de tempo em relacao ao ideal. */
@@ -430,19 +438,24 @@ export function criarPartida(o = {}) {
   }
 
   /**
-   * Reacao (emoji) de `i`: so fora do rali e 1 por ponto. O rosto faz a expressao junto e a CPU
-   * as vezes responde.
+   * Reacao (emoji) de `i`. O humano reage a qualquer hora, inclusive no rali, com recarga de
+   * REACAO.recarga s (pedido de 2026-10-22); a CPU, 1 por ponto e so fora do rali. O rosto faz a
+   * expressao junto (na cortada lenta fica o `focado`) e a CPU as vezes responde fora do rali.
    */
   function reagir(i, id) {
     const r = acharReacao(id);
-    if (!r || pontoN === 0 || J[i].reagiuEm === pontoN) return false;
-    if (estado !== 'ponto' && estado !== 'saque' && estado !== 'fim') return false;
-    J[i].reagiuEm = pontoN;
-    J[i].reacao = { id, t: 0 };
-    caretar(i, r.expr, REACAO.dur);
+    const Ji = J[i];
+    if (!r) return false;
+    if (humano[i]) {
+      if (Ji.recargaReacao > 0) return false;
+    } else if (pontoN === 0 || Ji.reagiuEm === pontoN || estado === 'jogo') return false;
+    Ji.reagiuEm = pontoN;
+    Ji.recargaReacao = REACAO.recarga;
+    Ji.reacao = { id, t: 0 };
+    if (!(cortada && cortada.i === i)) caretar(i, r.expr, REACAO.dur);
     ev({ tipo: 'reacao', i, id, humano: humano[i] });
     const c = outroI(i);
-    if (humano[i] && ias[c] && modo === 'cpu' && J[c].reagiuEm !== pontoN && !reacaoCpu && rngR() < REACAO.chanceResposta) {
+    if (humano[i] && estado !== 'jogo' && ias[c] && modo === 'cpu' && J[c].reagiuEm !== pontoN && !reacaoCpu && rngR() < REACAO.chanceResposta) {
       reacaoCpu = { t: REACAO.resposta, id: escolherReacaoCpu(rngR, { ganhou: sacador === c, resposta: id }) };
     }
     return true;
@@ -451,6 +464,7 @@ export function criarPartida(o = {}) {
   /** Baloes e a reacao planejada da CPU (jogo-real). */
   function passoReacoes(dtR) {
     for (const Jx of J) {
+      if (Jx.recargaReacao > 0) Jx.recargaReacao = Math.max(0, Jx.recargaReacao - dtR);
       if (!Jx.reacao) continue;
       Jx.reacao.t += dtR;
       if (Jx.reacao.t >= REACAO.dur) Jx.reacao = null;
@@ -812,6 +826,8 @@ export function criarPartida(o = {}) {
     }
     if (a) {
       if (estado === 'saque') {
+        // na levantada a CPU se posiciona sob a bola para a profundidade do plano (telegrafa o saque)
+        if (i === sacador && saque.fase !== 'pronto' && saque.plano) return { eixo: 0, pular: false, alvoX: posicaoParaRumo(saque.x0, s.lado, saque.plano.rumo) };
         if (i === sacador) return { eixo: irPara(s.x, s.lado * 8, 6), pular: false };
         return { eixo: irPara(s.x, s.lado * 6.5, 8), pular: false };
       }
@@ -829,7 +845,7 @@ export function criarPartida(o = {}) {
       Jm.bufferPulo -= dtM;
       if (s.noChao && estado !== 'saque') { pular = true; Jm.bufferPulo = 0; }
     }
-    return { eixo: Jm.it.eixo, pular };
+    return { eixo: Jm.it.eixo, pular, alvoX: Jm.it.alvoX };
   }
 
   /** Bordas de entrada de um humano (no passo real: jogo-real). */
@@ -841,10 +857,7 @@ export function criarPartida(o = {}) {
       if (!saque.valendo || esperaToque) { it.borda = false; return; }
       if (saque.fase === 'pronto') {
         if (it.borda) levantar(i);
-      } else {
-        mirarSaque(i, it);
-        if (it.borda && saque.fase === 'levantada' && saque.tL >= SAQUE.ignora) bater(i);
-      }
+      } else if (it.borda && saque.fase === 'levantada' && saque.tL >= SAQUE.ignora) bater(i);
       it.borda = false;
       return;
     }
@@ -877,31 +890,34 @@ export function criarPartida(o = {}) {
     const s = slimes[i];
     const Jm = J[i];
     const it = intencaoMundo(i, dtM);
-    let eixo = it.eixo;
+    // power-ups: pulo, tamanho (aos poucos, a pele acompanha), velocidade e gelo
+    passoPoderes(i, dtM);
+    const ef = Jm.efeitos;
+    const velBase = (ias[i] ? ias[i].estado.p.vel : VEL) * (ef.turbo ? EFEITO.turbo : 1) * (ef.cola ? EFEITO.cola.vel : 1);
+    const atrito = Jm.gelo && Jm.gelo.fase === 'escorrega' ? EFEITO.gelo.atrito : 1;
+    let eixo = it.alvoX != null ? seguirAlvo(s, it.alvoX, velBase, atrito) : it.eixo;
     if (Jm.bote > 0) {
       Jm.bote -= dtM;
       eixo = -s.lado;
     }
-    // o sacador fica na zona de saque (e parado no levantamento: o stick vira a mira)
-    if (estado === 'saque' && i === sacador && saque.fase !== 'pronto') eixo = 0;
+    // o sacador fica na zona de saque (na levantada ele anda para mirar pela posicao)
+    const zonaSaque = saque.fase === 'pronto' ? SAQUE.zona : SAQUE.zonaLevantada;
     if (estado === 'saque' && i === sacador) {
-      const [z0, z1] = SAQUE.zona;
+      const [z0, z1] = zonaSaque;
       const ax = Math.abs(s.x);
       if ((ax <= z0 && eixo * s.lado < 0) || (ax >= z1 && eixo * s.lado > 0)) eixo = 0;
     }
-    // power-ups: pulo, tamanho (aos poucos, a pele acompanha), velocidade e gelo
-    passoPoderes(i, dtM);
-    const ef = Jm.efeitos;
     s.multPulo = (ef.puloMola ? EFEITO.pulo : 1) * (ef.cola ? EFEITO.cola.pulo : 1);
     const alvoR = RAIO * (ef.gosmao ? EFEITO.gosmao : 1) * (ef.encolher ? EFEITO.encolher : 1);
     s.R += (alvoR - s.R) * Math.min(1, dtM * 6);
+    // raio do desenho: mola subamortecida (incha passando do ponto e assenta; murcha do mesmo jeito)
+    s.RvV += ((alvoR - s.Rv) * MOLA_RAIO.k - s.RvV * MOLA_RAIO.c) * dtM;
+    s.Rv += s.RvV * dtM;
     const preso = !!Jm.gelo && Jm.gelo.fase === 'preso';
     if (preso) eixo = 0;
-    const velBase = (ias[i] ? ias[i].estado.p.vel : VEL) * (ef.turbo ? EFEITO.turbo : 1) * (ef.cola ? EFEITO.cola.vel : 1);
-    const atrito = Jm.gelo && Jm.gelo.fase === 'escorrega' ? EFEITO.gelo.atrito : 1;
     const r = passoSlime(s, { eixo, pular: it.pular && estado !== 'saque' && !preso }, dtM, { vel: Jm.bote > 0 ? 14 : velBase, atrito });
     if (estado === 'saque' && i === sacador) {
-      const [z0, z1] = SAQUE.zona;
+      const [z0, z1] = zonaSaque;
       const ax = limitar(Math.abs(s.x), z0, z1);
       s.x = s.lado * ax;
     }
@@ -1004,7 +1020,7 @@ export function criarPartida(o = {}) {
   // ------------------------------------------------------------------ API
 
   const anterior = {
-    slimes: slimes.map((s) => ({ x: s.x, y: s.y, sig: s.sig })),
+    slimes: slimes.map((s) => ({ x: s.x, y: s.y, sig: s.sig, Rv: s.Rv })),
     bola: { x: bola.x, y: bola.y, ang: 0 },
     peles: peles.map((p) => ({ x: new Float64Array(p.x), y: new Float64Array(p.y) })),
   };
@@ -1012,7 +1028,7 @@ export function criarPartida(o = {}) {
   function guardar(i) {
     const s = slimes[i];
     const a = anterior.slimes[i];
-    a.x = s.x; a.y = s.y; a.sig = s.sig;
+    a.x = s.x; a.y = s.y; a.sig = s.sig; a.Rv = s.Rv;
     anterior.peles[i].x.set(peles[i].x);
     anterior.peles[i].y.set(peles[i].y);
   }
@@ -1059,7 +1075,6 @@ export function criarPartida(o = {}) {
           if (saque.t >= espera) levantar(sacador);
         } else {
           // bate com o erro de tempo do plano (sempre antes da bola voltar para a mao)
-          saque.prof = saque.plano.prof;
           if (saque.fase === 'levantada' && saque.tL >= limitar(TS.ideal + saque.plano.erro, SAQUE.ignora + 0.01, TS.pega - 0.25)) bater(sacador);
         }
       }
@@ -1094,6 +1109,7 @@ export function criarPartida(o = {}) {
       if (it.superBorda) a.superBorda = true;
       a.miraDx = it.miraDx || 0;
       a.miraX = it.miraX ?? null;
+      a.alvoX = it.alvoX ?? null;
       if (it.via) a.via = it.via;
     },
     /** pointerdown/keydown real (portao de interacao, primeiro saque). */
@@ -1150,7 +1166,7 @@ export function criarPartida(o = {}) {
     },
     /** Tempos do levantamento (dicas e testes). */
     get temposSaque() { return TS; },
-    /** Reacao (emoji) do jogador i; devolve se valeu (1 por ponto, so fora do rali). */
+    /** Reacao (emoji) do jogador i; devolve se valeu (humano: a qualquer hora, com recarga). */
     reagir(i, id) { return reagir(i, id); },
     /**
      * Resumo da partida para o jogador i (o perfil converte em XP e Gotas).
@@ -1181,8 +1197,8 @@ export function criarPartida(o = {}) {
      * Roteiros de teste (prints, GIFs, laboratorio): poe a partida num estado conhecido.
      * cortada: o jogador no ar sob a bola alta, medidor cheio, a mira armada.
      * ponto | ponto-curto: o ponto acabou de sair (festa completa ou curta); reacao: o curto com o
-     * balao da CPU. bolha | gelo | fogo: power-ups no rali. saque: a bola no ar,
-     * logo antes do ideal.
+     * balao da CPU. bolha | gelo | fogo: power-ups no rali. gosmao: o Gosmao inchando (e o rival
+     * encolhido). saque: a bola no ar, logo antes do ideal, com o sacador recuado (saque fundo).
      * @param {string} nome
      */
     roteiro(nome) {
@@ -1237,10 +1253,25 @@ export function criarPartida(o = {}) {
         if (nome === 'fogo') { bola.x = -1.5; bola.y = 5.5; bola.vx = 15; bola.vy = 2; bola.estado = 'fogo'; }
         return true;
       }
+      if (nome === 'gosmao') {
+        // o jogador acabou de pegar o Gosmao (incha passando do ponto e assenta); o rival encolhido
+        estado = 'jogo';
+        rali.lado = -1; rali.toques = 1; rali.ultimo = 0; rali.ultimoLado = -1; rali.recepcaoSaque = false;
+        slimes[0].x = -6; slimes[1].x = 6;
+        assentar(peles[0], slimes[0]);
+        assentar(peles[1], slimes[1]);
+        bola.solta = true; bola.x = -1.5; bola.y = 9; bola.vx = 3; bola.vy = 4;
+        J[0].efeitos.gosmao = 2;
+        J[1].efeitos.encolher = 2;
+        ev({ tipo: 'powerup', i: 0, id: 'gosmao', alvo: 0, humano: humano[0] });
+        return true;
+      }
       if (nome === 'saque') {
         prepararSaque(0);
         levantar(0);
-        saque.prof = SAQUE.prof.fundo;
+        // o sacador recuou: a bola fica a frente do corpo (saque fundo)
+        slimes[0].x = posicaoParaRumo(saque.x0, slimes[0].lado, 1);
+        assentar(peles[0], slimes[0]);
         passoLevantada(TS.ideal - 0.1);
         return true;
       }

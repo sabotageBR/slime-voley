@@ -102,6 +102,14 @@ export const RECEITAS_VOLEI = Object.freeze({
     [1318.5, 1760, 2093].forEach((f, i) => tom(v, t + 0.04 + i * 0.05, { f, vol: 0.05, ataque: 0.002, queda: 0.3 }));
     return 0.5;
   },
+  /** Gosmao inchando: bloop que sobe com squish de gelatina */
+  inflar(v, t) {
+    tom(v, t, { f: 140, f2: 420, glide: 0.22, vol: 0.2, ataque: 0.01, queda: 0.16 });
+    tom(v, t + 0.05, { f: 280, f2: 760, glide: 0.18, vol: 0.08, ataque: 0.01, queda: 0.14, tipo: 'triangle' });
+    sopro(v, t + 0.02, { f: 500, f2: 1400, glide: 0.2, q: 2.2, vol: 0.07, ataque: 0.02, queda: 0.16, filtro: 'bandpass' });
+    tom(v, t + 0.3, { f: 520, f2: 380, glide: 0.08, vol: 0.06, ataque: 0.004, queda: 0.1 });
+    return 0.45;
+  },
   /** botao da UI */
   botao(v, t) {
     tom(v, t, { f: 620, f2: 880, glide: 0.04, vol: 0.06, ataque: 0.002, queda: 0.06 });

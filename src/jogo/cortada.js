@@ -3,8 +3,8 @@
 //
 // O TEMPO e a SENSACAO vem da captura (docs/referencias/blumgi-camera-lenta.md: mundo a ~0,06,
 // entrada e saida em ~1 quadro, chutador congelado, linha que cresce com a forca, anel de impacto
-// de 1,7x a 2,5x a bola em ~230 ms). A FORMA e nossa: gotas na cor do time seguindo a trajetoria,
-// coroa de respingo, rastro de gotas que escorrem.
+// de 1,7x a 2,5x a bola em ~230 ms). A FORMA e nossa: um feixe reto na cor do time da bola ate a
+// reticula (pedido de 2026-10-22; src/render/quadra.js), coroa de respingo, rastro de gotas.
 //
 // Puro: a partida chama elegivel(), iniciar(), passo() e mirar(); este modulo nunca toca no DOM.
 // Estados: entrando -> mirando -> soltando -> (fim; a bola fica 'cortada' ate o primeiro contato).
@@ -44,7 +44,10 @@ export const CORTADA = {
   bote: 2.0,
   vCortada: 29,
   pushIn: 1.04,
-  /** desenho (medidos: pontos de ~0,8% da tela = raio 0,13-0,28 u, espacamento 1,7x, ponta 2x; anel 1,7x-2,5x da bola, 230 ms) */
+  /**
+   * desenho (medidos: anel 1,7x-2,5x da bola, 230 ms). gotas/gotaMin/gotaMax so servem a thumb
+   * (tools/thumb.html desenha setas nos pontos de gotasDaMira); o jogo desenha o feixe reto.
+   */
   gotas: 9,
   coroa: { r0: 0.5, r1: 2.8, dur: 0.23 },
   rastro: { cada: 0.03, max: 8, vida: 0.24 },
@@ -70,7 +73,7 @@ export const CORTADA = {
  * @property {boolean} mexeu  o jogador mexeu na mira
  * @property {number} mexido  quanto a mira andou (u)
  * @property {boolean} gratis veio do power-up (nao gastou medidor)
- * @property {number[]} caminho trajetoria prevista (x, y, ...) para as gotas
+ * @property {number[]} caminho trajetoria prevista (x, y, ...)
  */
 
 /**
@@ -125,8 +128,9 @@ export function miraPadrao(lado, rivalX, rivalVx) {
 
 /**
  * Resolve o tiro: o angulo mais ingreme (de -75 a +30 graus da horizontal, rumo ao outro lado)
- * cuja velocidade (bisseccao analitica, com vento) leva a bola ao alvo, sem passar de V_CORTADA
- * e cruzando a rede acima de REDE_H + RB + 0,25. Sem solucao, levanta o arco.
+ * cuja velocidade (bisseccao analitica, com vento) leva a bola ao alvo, sem passar de V_CORTADA,
+ * cruzando a rede acima de REDE_H + RB + 0,25 e sem raspar o topo do poste em nenhum ponto do
+ * voo (o tiro curto que desce logo depois da rede batia nela). Sem solucao, levanta o arco.
  * @param {number} bx @param {number} by @param {number} alvoX @param {number} lado de quem corta
  * @param {{ vento?: number }} [o]
  * @returns {{ vx: number, vy: number, ok: boolean }}
@@ -136,7 +140,30 @@ export function resolverTiro(bx, by, alvoX, lado, o = {}) {
   const dir = -lado;
   const g = G_BOLA;
   const livre = REDE_H + RB + 0.25;
-  /** queda e altura na rede para (v, ang) */
+  // topo do poste (capsula de raio REDE_R ate REDE_H - REDE_R) e a folga minima do centro da bola
+  const topoPoste = REDE_H - REDE_R;
+  const folga = REDE_R + RB + 0.08;
+  /**
+   * O voo (vx, vy) por t s passa longe do poste? Distancia do centro ao segmento do poste em 20
+   * amostras do trecho em que a bola esta a menos de `folga` dele em x (o vento entra so no x).
+   */
+  const limpo = (vx, vy, t) => {
+    if (vx === 0) return Math.abs(bx) > folga;
+    let tA = (-folga - bx) / vx;
+    let tB = (folga - bx) / vx;
+    if (tA > tB) [tA, tB] = [tB, tA];
+    tA = Math.max(0, tA - 0.05);
+    tB = Math.min(t, tB + 0.05);
+    for (let k = 0; k <= 20 && tA <= tB; k++) {
+      const tk = tA + ((tB - tA) * k) / 20;
+      const xk = bx + vx * tk + 0.5 * w * tk * tk;
+      const yk = by + vy * tk - (g * tk * tk) / 2;
+      const dy = yk > topoPoste ? yk - topoPoste : 0;
+      if (xk * xk + dy * dy < folga * folga) return false;
+    }
+    return true;
+  };
+  /** queda, altura na rede e se o voo passa longe do poste, para (v, ang) */
   const voo = (v, ang) => {
     const vx = Math.cos(ang) * v * dir;
     const vy = Math.sin(ang) * v;
@@ -151,7 +178,7 @@ export function resolverTiro(bx, by, alvoX, lado, o = {}) {
       const tr = -bx / vx;
       if (tr > 0 && tr < t) yRede = by + vy * tr - (g * tr * tr) / 2;
     }
-    return { x, yRede };
+    return { x, yRede, limpo: () => limpo(vx, vy, t) };
   };
   for (let graus = -75; graus <= 30; graus += 2) {
     const ang = (graus * Math.PI) / 180;
@@ -172,13 +199,18 @@ export function resolverTiro(bx, by, alvoX, lado, o = {}) {
     }
     const v = (lo + hi) / 2;
     const f = voo(v, ang);
-    if (!f || f.yRede < livre) continue;
+    if (!f || f.yRede < livre || !f.limpo()) continue;
     return { vx: Math.cos(ang) * v * dir, vy: Math.sin(ang) * v, ok: true };
   }
-  // sem solucao: lob alto ate o alvo
-  const t = 1.1;
-  const vy = (RB - by + (g * t * t) / 2) / t;
-  return { vx: (alvoX - bx) / t, vy, ok: false };
+  // sem solucao: lob ate o alvo, o mais baixo que passa limpo (o alvo colado na rede pede o arco
+  // que desce quase na vertical)
+  for (let t = 1.1; t <= 2.4; t += 0.1) {
+    const vy = (RB - by + (g * t * t) / 2) / t;
+    const vx = (alvoX - bx - 0.5 * w * t * t) / t;
+    if (limpo(vx, vy, t)) return { vx, vy, ok: false };
+  }
+  const t = 2.4;
+  return { vx: (alvoX - bx - 0.5 * w * t * t) / t, vy: (RB - by + (g * t * t) / 2) / t, ok: false };
 }
 
 /**
@@ -194,7 +226,7 @@ export function iniciar(i, s, o) {
   return c;
 }
 
-/** Recalcula o tiro e a trajetoria das gotas. @param {Cortada} c @param {number} lado @param {number} [vento] */
+/** Recalcula o tiro e a trajetoria prevista. @param {Cortada} c @param {number} lado @param {number} [vento] */
 export function resolver(c, lado, vento = 0) {
   const r = resolverTiro(c.bx, c.by, c.alvoX, lado, { vento });
   c.vx = r.vx;
@@ -250,7 +282,7 @@ export function escalas(c, aj = {}) {
   return { mundo: Math.round(em + (1000 - em) * k), defensor: Math.round(ed + (1000 - ed) * k), bola: 1000 };
 }
 
-/** Os pontos das gotas ao longo da trajetoria: [x, y, r] x n (a ultima e a gota maior que aponta). */
+/** Pontos ao longo da trajetoria: [x, y, r] x n (so a thumb usa: as setas dela vao nestes pontos). */
 export function gotasDaMira(c) {
   const n = CORTADA.gotas;
   const v = Math.hypot(c.vx, c.vy);

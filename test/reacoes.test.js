@@ -1,5 +1,5 @@
-// Reacoes (emoji) depois do ponto: 1 por ponto, nunca no rali, o rosto acompanha e a CPU responde
-// de forma deterministica (rng proprio).
+// Reacoes (emoji): o jogador reage a qualquer hora (inclusive no rali) com recarga, o rosto
+// acompanha (menos na cortada lenta) e a CPU responde fora do rali, de forma deterministica.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { REACOES, REACOES_INICIAIS, REACAO, escolherReacaoCpu } from '../src/jogo/reacoes.js';
@@ -12,18 +12,29 @@ test('catalogo: 6 da base e 4 da trilha, cada uma com expressao', () => {
   for (const r of REACOES) assert.ok(r.expr, r.id);
 });
 
-test('reagir: so fora do rali e 1 por ponto; o rosto faz a expressao', () => {
+test('reagir: a qualquer hora, com recarga; o rosto faz a expressao e o balao some', () => {
   const p = criarPartida({ modo: 'cpu', semente: 3 });
   p.interacao();
-  assert.equal(p.reagir(0, 'rindo'), false, 'antes do 1o ponto nao vale');
+  assert.equal(p.reagir(0, 'rindo'), true, 'antes do 1o ponto ja vale');
+  assert.equal(p.reagir(0, 'bravo'), false, 'na recarga nao vale');
+  for (let k = 0; k < 120 * (REACAO.recarga + 0.05); k++) p.passo();
+  assert.equal(p.jogadores[0].reacao, null, 'o balao sumiu');
   p.roteiro('ponto-curto');
-  assert.equal(p.reagir(0, 'bravo'), true);
+  assert.equal(p.reagir(0, 'bravo'), true, 'depois da recarga vale de novo');
   assert.equal(p.jogadores[0].expr, 'furioso');
-  assert.equal(p.reagir(0, 'rindo'), false, 'uma por ponto');
   assert.ok(p.eventos.some((e) => e.tipo === 'reacao' && e.id === 'bravo'));
-  // o balao some sozinho
-  for (let k = 0; k < 120 * (REACAO.dur + 0.1); k++) p.passo();
-  assert.equal(p.jogadores[0].reacao, null);
+});
+
+test('reagir no rali: vale para o jogador, nunca para a CPU; na cortada lenta o rosto fica focado', () => {
+  const p = criarPartida({ modo: 'cpu', semente: 5 });
+  p.interacao();
+  p.roteiro('cortada');
+  assert.ok(p.cortada, 'a mira armou');
+  assert.equal(p.estado, 'jogo');
+  assert.equal(p.reagir(0, 'gargalhada'), true);
+  assert.equal(p.jogadores[0].expr, 'focado', 'a cortada segura o rosto focado');
+  assert.ok(p.jogadores[0].reacao, 'o balao sobe mesmo assim');
+  assert.equal(p.reagir(1, 'rindo'), false, 'a CPU nao reage no rali');
 });
 
 test('a CPU responde as vezes, igual nas duas rodadas com a mesma semente', () => {

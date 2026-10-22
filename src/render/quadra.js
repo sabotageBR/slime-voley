@@ -1,12 +1,12 @@
 // Quadra do Volei de Gosma (em u, pela camera): piso e linhas, placas, parede de fundo, poste da
-// rede, sombras; por cima dos slimes: bola, rastro, mira em gotas, reticula, coroa de respingo,
+// rede, sombras; por cima dos slimes: bola, rastro, mira (feixe reto), reticula, coroa de respingo,
 // anel de tempo e marcador do saque e a sombra-alvo. Tres direcoes visuais (checkpoint M1) pelo objeto ESTILOS:
 // A (Gel Premium), B (Brinquedo de Vinil), C (Transmissao Esportiva). Tudo nitido em codigo.
 
 import { aplicar, paraTela } from './camera.js';
 import { TINTA } from './fundo.js';
 import { LARG, REDE_H, REDE_R, PLACA_X, PLACA_H, FUNDO_X, RB } from '../fisica/volei.js';
-import { gotasDaMira, CORTADA } from '../jogo/cortada.js';
+import { CORTADA } from '../jogo/cortada.js';
 import { desenharBolha, desenharGelo, desenharAviso } from './icones.js';
 import { desenharBalao } from './carinhas.js';
 
@@ -299,7 +299,169 @@ function gota(ctx, x, y, r, dx, dy, cor, tr, ponta = 1.6) {
 }
 
 /**
- * Por cima dos slimes: rastro, bola, mira em gotas, reticula, coroa, anel do saque e efeitos.
+ * Reticula da cortada no piso (em perspectiva): sombra, anel na cor do time com tinta, 4 marcas,
+ * miolo pulsando e uma onda que abre a cada 0,6 s; nos 0,3 s finais o anel pisca em branco.
+ */
+function desenharReticula(ctx, x, cor, t, tr, pulso, final) {
+  const y = 0.05;
+  const ach = 0.32;
+  const elipse = (r) => { ctx.beginPath(); ctx.ellipse(x, y, r, r * ach, 0, 0, Math.PI * 2); };
+  elipse(1.35 * pulso);
+  ctx.fillStyle = 'rgba(40, 20, 10, 0.22)';
+  ctx.fill();
+  // onda que abre
+  const k = (t / 0.6) % 1;
+  ctx.globalAlpha = 0.6 * (1 - k);
+  ctx.lineWidth = tr * 1.6;
+  ctx.strokeStyle = cor;
+  elipse(0.45 + 1.35 * k);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // zona e anel
+  const r = 1.05 * pulso;
+  elipse(r);
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = cor;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = tr * 3.6;
+  ctx.strokeStyle = TINTA;
+  ctx.stroke();
+  ctx.lineWidth = tr * 2.1;
+  ctx.strokeStyle = final && Math.sin(t * 22) > 0 ? '#ffffff' : cor;
+  ctx.stroke();
+  elipse(r * 0.62);
+  ctx.lineWidth = tr * 1.2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.stroke();
+  // marcas (as de cima e de baixo achatadas pela perspectiva)
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, ach], [0, -ach]]) {
+    ctx.beginPath();
+    ctx.moveTo(x + dx * (r + 0.12), y + dy * (r + 0.12));
+    ctx.lineTo(x + dx * (r + 0.46), y + dy * (r + 0.46));
+    ctx.lineWidth = tr * 3.2;
+    ctx.strokeStyle = TINTA;
+    ctx.stroke();
+    ctx.lineWidth = tr * 1.6;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+  }
+  // miolo
+  elipse(0.36 * (1 + 0.14 * Math.sin(t * 6)) * pulso);
+  ctx.fillStyle = cor;
+  ctx.fill();
+  ctx.lineWidth = tr * 1.4;
+  ctx.strokeStyle = TINTA;
+  ctx.stroke();
+}
+
+/**
+ * Feixe reto da mira (pedido de 2026-10-22: "direto e reto no objetivo"): sai da bola e acaba
+ * numa ponta de flecha encostada na reticula. Halo na cor do time, corpo afilado (mais grosso
+ * quanto mais forte o tiro) com contorno de tinta e nucleo claro, chevrons andando rumo ao alvo
+ * (mais rapidos com a forca) e um risco de brilho na aba da ponta.
+ */
+function desenharFeixe(ctx, c, cor, t, tr, pulso, esc = 1) {
+  const tx = c.alvoX;
+  const ty = 0.12;
+  let ux = tx - c.bx;
+  let uy = ty - c.by;
+  const dist = Math.hypot(ux, uy) || 1;
+  ux /= dist;
+  uy /= dist;
+  const nx = -uy;
+  const ny = ux;
+  const f = Math.min(1, Math.hypot(c.vx, c.vy) / CORTADA.vCortada);
+  const inicio = RB + 0.2;
+  const cab = 1.45 * pulso * esc;
+  const abaL = 0.82 * pulso * esc;
+  const corpo = dist - inicio - cab * 0.7;
+  if (corpo <= 0.2) return;
+  const wA = 0.09 * esc;
+  const wB = (0.22 + 0.1 * f) * esc;
+  const ax = c.bx + ux * inicio;
+  const ay = c.by + uy * inicio;
+  const bx = tx - ux * cab * 0.7;
+  const by = ty - uy * cab * 0.7;
+  const hx = tx - ux * cab;
+  const hy = ty - uy * cab;
+  const contorno = () => {
+    ctx.beginPath();
+    ctx.moveTo(ax + nx * wA, ay + ny * wA);
+    ctx.lineTo(bx + nx * wB, by + ny * wB);
+    ctx.lineTo(hx + nx * abaL, hy + ny * abaL);
+    ctx.lineTo(tx, ty);
+    ctx.lineTo(hx - nx * abaL, hy - ny * abaL);
+    ctx.lineTo(bx - nx * wB, by - ny * wB);
+    ctx.lineTo(ax - nx * wA, ay - ny * wA);
+    // tampa redonda do lado da bola (o arco passa por A - u)
+    ctx.arc(ax, ay, wA, Math.atan2(-ny, -nx), Math.atan2(ny, nx), true);
+    ctx.closePath();
+  };
+  // halo
+  contorno();
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = cor;
+  ctx.globalAlpha = 0.14;
+  ctx.lineWidth = 0.9 * esc;
+  ctx.stroke();
+  ctx.globalAlpha = 0.26;
+  ctx.lineWidth = 0.45 * esc;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // corpo: nasce claro na bola e fica cheio na ponta
+  const g = ctx.createLinearGradient(ax, ay, tx, ty);
+  g.addColorStop(0, tom(cor, 0.55));
+  g.addColorStop(0.35, cor);
+  g.addColorStop(1, cor);
+  contorno();
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.lineWidth = tr * 1.4;
+  ctx.strokeStyle = TINTA;
+  ctx.stroke();
+  // nucleo claro no corpo
+  ctx.beginPath();
+  ctx.moveTo(ax + nx * wA * 0.35, ay + ny * wA * 0.35);
+  ctx.lineTo(bx + nx * wB * 0.32, by + ny * wB * 0.32);
+  ctx.lineTo(bx - nx * wB * 0.32, by - ny * wB * 0.32);
+  ctx.lineTo(ax - nx * wA * 0.35, ay - ny * wA * 0.35);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fill();
+  // chevrons andando rumo ao alvo
+  const esp = 0.8 * esc;
+  const vel = 2.5 + 6 * f;
+  const fase = (t * vel) % esp;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#ffffff';
+  for (let s = fase + 0.25; s < corpo - 0.15; s += esp) {
+    const k = s / corpo;
+    const w = (wA + (wB - wA) * k) * 0.85;
+    const px = ax + ux * s;
+    const py = ay + uy * s;
+    ctx.globalAlpha = Math.min(1, Math.sin(Math.PI * Math.min(1, k * 1.15)) * 1.2) * 0.95;
+    ctx.lineWidth = Math.max(tr * 1.2, w * 0.45);
+    ctx.beginPath();
+    ctx.moveTo(px - ux * w * 0.9 + nx * w, py - uy * w * 0.9 + ny * w);
+    ctx.lineTo(px, py);
+    ctx.lineTo(px - ux * w * 0.9 - nx * w, py - uy * w * 0.9 - ny * w);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  // brilho na aba de cima da ponta
+  const lado = ny >= 0 ? 1 : -1;
+  ctx.lineWidth = Math.max(tr * 1.2, 0.07);
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.beginPath();
+  ctx.moveTo(hx + nx * lado * abaL * 0.62 + ux * 0.12, hy + ny * lado * abaL * 0.62 + uy * 0.12);
+  ctx.lineTo(tx - ux * cab * 0.32 + nx * lado * 0.08, ty - uy * cab * 0.32 + ny * lado * 0.08);
+  ctx.stroke();
+}
+
+/**
+ * Por cima dos slimes: rastro, bola, mira (feixe reto e reticula), coroa, anel do saque e efeitos.
  * @param {CanvasRenderingContext2D} ctx
  * @param {import('./camera.js').Camera} cam
  * @param {number} dpr @param {number} t
@@ -362,39 +524,14 @@ export function desenharTopo(ctx, cam, dpr, t, est, vis) {
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
-  // mira da cortada: gotas na cor do time ao longo da trajetoria e a reticula no piso
+  // mira da cortada: a reticula no piso e o feixe reto da bola ate ela
   const m = vis.mira;
   if (m) {
-    const gs = gotasDaMira(m.c);
-    const n = gs.length / 3;
-    const pulso = m.final ? 1 + 0.12 * Math.sin(t * 22) : 1 + 0.06 * Math.sin(t * Math.PI * 4);
-    for (let k = 0; k < n; k++) {
-      const x = gs[k * 3];
-      const y = gs[k * 3 + 1];
-      const r = gs[k * 3 + 2] * pulso;
-      const px = k > 0 ? gs[(k - 1) * 3] : m.c.bx;
-      const py = k > 0 ? gs[(k - 1) * 3 + 1] : m.c.by;
-      gota(ctx, x, y, k === n - 1 ? r * 1.35 : r, x - px, y - py, m.cor, tr * 0.9, k === n - 1 ? 2.1 : 1.5);
-    }
-    // reticula: anel de 0,6 u com 4 marcas
-    const xr = m.c.alvoX;
-    ctx.save();
-    ctx.translate(xr, 0.03);
-    ctx.scale(1, 0.32);
-    ctx.lineWidth = tr * 2.6;
-    ctx.strokeStyle = TINTA;
-    ctx.beginPath();
-    ctx.arc(0, 0, 0.62, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.lineWidth = tr * 1.5;
-    ctx.strokeStyle = m.cor;
-    ctx.stroke();
-    ctx.lineWidth = tr * 2;
-    ctx.strokeStyle = TINTA;
-    ctx.beginPath();
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(dx * 0.48, dy * 0.48); ctx.lineTo(dx * 0.86, dy * 0.86); }
-    ctx.stroke();
-    ctx.restore();
+    const pulso = m.final ? 1 + 0.1 * Math.sin(t * 22) : 1 + 0.04 * Math.sin(t * Math.PI * 4);
+    // tamanho minimo na tela: 1x no desktop, ~1,3x em paisagem, ate 1,8x no retrato
+    const esc = Math.max(1, Math.min(1.8, 28 / cam.s));
+    desenharReticula(ctx, m.c.alvoX, m.cor, t, tr, pulso * esc, m.final);
+    if (m.feixe !== false) desenharFeixe(ctx, m.c, m.cor, t, tr, pulso, esc);
   }
   // power-ups: a bolha (atras da bola) e o gelo nos slimes
   if (vis.bolha) desenharBolha(ctx, vis.bolha, t, tr, vis.vidaBolha);

@@ -1,7 +1,7 @@
 // Regras: alvo, vai-a-2, saque ativo e a partida (rali, 3 toques, parede de fundo; o fora antigo so com { fora: true }).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alvoDaPartida, vencedor, pontoDaPartida, profundidadeSaque, qualidadeSaque, temposSaque, SAQUE } from '../src/jogo/regras.js';
+import { alvoDaPartida, vencedor, pontoDaPartida, profundidadeSaque, qualidadeSaque, temposSaque, posicaoParaRumo, SAQUE } from '../src/jogo/regras.js';
 import { criarIA } from '../src/jogo/ia.js';
 import { NIVEIS } from '../src/jogo/rivais.js';
 import { criarRng } from '../src/core/rng.js';
@@ -56,24 +56,28 @@ test('saque: sem o 2o toque a bola volta para a mao (sem falta, sem saque automa
   assert.ok(!tipos.includes('saque') && !tipos.includes('ponto'));
 });
 
-test('saque: o perfeito sai chapado, passa a rede e cai na profundidade pedida', () => {
+test('saque: depois do 1o toque o slime anda e a posicao mira (frente = fundo, em cima = medio, atras = curto)', () => {
   for (const rumo of [-1, 0, 1]) {
     const p = humanoSacando();
     p.intencao(0, { borda: true, botao: true });
     p.passo();
-    // mira pelo stick (rumo ao rival = +x para o jogador da esquerda) ate o instante ideal
+    assert.equal(p.saque.fase, 'levantada');
+    const x0 = p.saque.x0;
+    const xAlvo = posicaoParaRumo(x0, p.slimes[0].lado, rumo);
+    // o mouse leva o slime ate a posicao (a bola sobe na vertical sobre x0) e bate no ideal
     let saiu = null;
     const ts = p.temposSaque;
     for (let k = 0; k < 240 && !saiu; k++) {
       const borda = p.saque.fase === 'levantada' && p.saque.tL >= ts.ideal - 1 / 240;
-      p.intencao(0, { eixo: rumo, borda, botao: borda });
+      p.intencao(0, { alvoX: xAlvo, borda, botao: borda });
       p.passo();
       for (const e of p.eventos) if (e.tipo === 'saque') saiu = e;
       p.eventos.length = 0;
     }
     assert.ok(saiu, 'sacou');
     assert.equal(saiu.tipoSaque, 'perfeito');
-    assert.ok(Math.abs(saiu.alvo - profundidadeSaque(rumo)) < 1e-9, `alvo ${saiu.alvo}`);
+    assert.ok(Math.abs(saiu.x - x0) < 1e-9, 'a bola subiu na vertical');
+    assert.ok(Math.abs(saiu.alvo - profundidadeSaque(rumo)) < 0.35, `rumo ${rumo}: alvo ${saiu.alvo.toFixed(2)} (pedido ${profundidadeSaque(rumo)})`);
     // voo: apice baixo e a bola cai do lado de la, perto do alvo (o rival pode tocar antes)
     let apice = 0;
     let queda = null;
@@ -87,6 +91,41 @@ test('saque: o perfeito sai chapado, passa a rede e cai na profundidade pedida',
     assert.ok(queda && queda.tipo !== 'rede', `passou a rede (${queda && queda.tipo})`);
     if (queda.tipo === 'chao') assert.ok(Math.abs(queda.x - saiu.alvo) < 0.4, `caiu em ${queda.x.toFixed(2)}`);
   }
+});
+
+test('saque: longe da bola o pulo nao alcanca e ela volta para a mao (sem falta)', () => {
+  const p = humanoSacando();
+  p.intencao(0, { borda: true, botao: true });
+  p.passo();
+  const ts = p.temposSaque;
+  const tipos = [];
+  for (let k = 0; k < 120 * 2; k++) {
+    const borda = p.saque.fase === 'levantada' && p.saque.tL >= ts.ideal - 1 / 240;
+    p.intencao(0, { alvoX: -10.5, borda, botao: borda });
+    p.passo();
+    for (const e of p.eventos) tipos.push(e.tipo);
+    p.eventos.length = 0;
+  }
+  assert.ok(tipos.includes('pulo'), 'pulou');
+  assert.ok(tipos.includes('saque-pega'), 'a bola voltou para a mao');
+  assert.ok(!tipos.includes('saque') && !tipos.includes('ponto'), 'sem saque e sem ponto');
+  assert.equal(p.estado, 'saque');
+});
+
+test('saque da CPU: na levantada ela anda ate a posicao do plano antes de bater', () => {
+  const p = criarPartida({ modo: 'cpu', semente: 9, sacaPrimeiro: 1 });
+  p.interacao();
+  let antes = null;
+  for (let k = 0; k < 120 * 4; k++) {
+    p.passo();
+    for (const e of p.eventos) {
+      if (e.tipo === 'pulo' && e.i === 1 && p.estado === 'saque') antes = { x: p.slimes[1].x, alvo: posicaoParaRumo(p.saque.x0, 1, p.saque.plano.rumo) };
+      if (e.tipo === 'saque') k = 1e9;
+    }
+    p.eventos.length = 0;
+  }
+  assert.ok(antes, 'a CPU pulou para bater');
+  assert.ok(Math.abs(antes.x - antes.alvo) < 0.2, `x ${antes.x.toFixed(2)} longe da posicao ${antes.alvo.toFixed(2)}`);
 });
 
 test('saque da CPU: mais perfeitos no T4 que no T0', () => {

@@ -1,4 +1,5 @@
-// Reacoes (emoji) depois do ponto (decisao de 2026-10-21): o catalogo (6 da base + 4 da trilha),
+// Reacoes (emoji) (decisao de 2026-10-21; desde 2026-10-22 o jogador reage a qualquer hora, com
+// recarga): o catalogo (6 da base + 4 da trilha),
 // a expressao que o rosto do slime faz junto e a escolha da CPU (pura, com o rng que a partida
 // passar). Sem texto livre: so estas, desenhadas no estilo gosma (src/render/carinhas.js).
 
@@ -32,6 +33,8 @@ export const reacao = (id) => REACOES.find((r) => r.id === id) || null;
 export const REACAO = Object.freeze({
   /** o balao fica isto sobre o slime */
   dur: 1.6,
+  /** o humano reage a qualquer hora, com esta recarga entre uma reacao e outra */
+  recarga: 2.5,
   /** a CPU reage sozinha depois do ponto com esta chance, entre atraso[0] e atraso[1] s */
   chanceCpu: 0.35,
   atraso: Object.freeze([0.5, 0.9]),

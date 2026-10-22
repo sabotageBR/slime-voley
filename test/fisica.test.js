@@ -3,8 +3,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  criarSlime, criarBola, passoBola, passoSlime, eixos, pertoCupula, prever, limitesX,
-  RB, E_SLIME, PULO, G_SLIME, ACEL_CHAO, REDE_R, PLACA_X, PLACA_H, FUNDO_X, PASSO, VMAX,
+  criarSlime, criarBola, passoBola, passoSlime, eixos, pertoCupula, prever, limitesX, seguirAlvo,
+  RB, E_SLIME, PULO, G_SLIME, ACEL_CHAO, REDE_R, PLACA_X, PLACA_H, FUNDO_X, PASSO, VMAX, VEL,
 } from '../src/fisica/volei.js';
 
 const graus = (r) => (r * 180) / Math.PI;
@@ -99,7 +99,7 @@ test('numeros derivados: apice do pulo, tempo no ar, faixa livre e travessia', (
   const [x0, x1] = limitesX(s);
   const faixa = x1 - x0;
   assert.ok(faixa > 7.9 && faixa < 8.5, `faixa ${faixa}`);
-  // travessia da faixa com aceleracao de 85 (saindo do repouso)
+  // travessia da faixa com a aceleracao do chao (ACEL_CHAO, saindo do repouso): ~0,77 s
   s.x = x0;
   let t = 0;
   while (s.x < x1 - 1e-6 && t < 3) { passoSlime(s, { eixo: 1, pular: false }, PASSO); t += PASSO; }
@@ -130,4 +130,43 @@ test('prever bate com o passo da bola (mesmo integrador)', () => {
     if (ev.some((e) => e.tipo === 'chao')) break;
   }
   assert.ok(Math.abs(p.x - b.x) < 1e-9 && Math.abs(p.t - (k + 1) * PASSO) < 1e-9);
+});
+
+test('controle firme: chega a VEL no chao em menos de 80 ms e inverte no ar em menos de 0,25 s', () => {
+  const s = criarSlime(-1, -8);
+  let t = 0;
+  while (s.vx < VEL - 1e-9 && t < 1) { passoSlime(s, { eixo: 1, pular: false }, PASSO); t += PASSO; }
+  assert.ok(t <= 0.08, `0 ate VEL no chao: ${(t * 1000).toFixed(0)} ms`);
+  const a = criarSlime(-1, -8);
+  a.vx = VEL;
+  passoSlime(a, { eixo: 1, pular: true }, PASSO);
+  t = 0;
+  while (a.vx > -VEL + 1e-9 && t < 1) { passoSlime(a, { eixo: -1, pular: false }, PASSO); t += PASSO; }
+  assert.ok(!a.noChao, 'ainda no ar');
+  assert.ok(t <= 0.25, `inverter no ar: ${(t * 1000).toFixed(0)} ms`);
+});
+
+test('mouse: o slime segue o cursor de perto e para em cima dele sem passar do ponto', () => {
+  // cursor andando a 8 u/s: atraso em regime de no maximo 0,15 u
+  const s = criarSlime(-1, -9);
+  let cx = -9;
+  let pior = 0;
+  for (let k = 0; k < 120 * 0.8; k++) {
+    cx += 8 * PASSO;
+    passoSlime(s, { eixo: seguirAlvo(s, cx), pular: false }, PASSO);
+    if (k > 30) pior = Math.max(pior, Math.abs(cx - s.x));
+  }
+  assert.ok(pior <= 0.15, `atraso ${pior.toFixed(3)} u`);
+  // degrau de 5 u: chega em menos de 0,6 s e nunca passa mais de 0,05 u
+  const d = criarSlime(-1, -9);
+  let passou = 0;
+  let chegou = -1;
+  for (let k = 0; k < 120; k++) {
+    passoSlime(d, { eixo: seguirAlvo(d, -4), pular: false }, PASSO);
+    passou = Math.max(passou, d.x - -4);
+    if (chegou < 0 && Math.abs(d.x - -4) < 0.06) chegou = k * PASSO;
+  }
+  assert.ok(chegou >= 0 && chegou < 0.6, `chegou em ${chegou.toFixed(2)} s`);
+  assert.ok(passou <= 0.05, `passou ${passou.toFixed(3)} u`);
+  assert.ok(Math.abs(d.vx) < 1e-6, 'parado no alvo');
 });

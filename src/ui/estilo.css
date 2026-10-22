@@ -29,12 +29,12 @@ body { font-family: Fredoka, system-ui, sans-serif; color: var(--tinta); }
 .hud .lado { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 64px; position: relative; }
 .hud .reacoes { position: absolute; left: 50%; top: calc(var(--placarY, 0px) + var(--placarH, 52px) + 30px); transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: max-content; max-width: calc(100vw - 32px); }
 .hud .reacoes[hidden] { display: none; }
-.hud .reacoes button { pointer-events: auto; position: relative; width: 48px; height: 48px; padding: 3px; border-radius: 50%; background: rgba(255,255,255,.94); border: 3px solid var(--tinta); box-shadow: 0 3px 0 var(--tinta); cursor: pointer; animation: reacaoEntra .22s ease-out both; }
+.hud .reacoes button { pointer-events: auto; position: relative; width: 64px; height: 64px; padding: 4px; border-radius: 50%; background: rgba(255,255,255,.94); border: 3px solid var(--tinta); box-shadow: 0 3px 0 var(--tinta); cursor: pointer; animation: reacaoEntra .22s ease-out both; }
 .hud .reacoes button:active { transform: translateY(2px) scale(.94); box-shadow: 0 1px 0 var(--tinta); }
 #jogo .hud .reacoes canvas { width: 100%; height: 100%; }
-.hud .reacoes i { position: absolute; right: -5px; top: -7px; font-style: normal; font-size: 11px; line-height: 15px; min-width: 15px; color: #fff; background: var(--tinta); border-radius: 8px; }
+.hud .reacoes i { position: absolute; right: -5px; top: -7px; font-style: normal; font-size: 12px; line-height: 17px; min-width: 17px; color: #fff; background: var(--tinta); border-radius: 9px; }
 @keyframes reacaoEntra { from { transform: translateY(-10px) scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (max-width: 520px) { .hud .reacoes { max-width: 280px; gap: 5px; } .hud .reacoes button { width: 46px; height: 46px; } }
+@media (max-width: 520px) { .hud .reacoes { max-width: 320px; gap: 5px; } .hud .reacoes button { width: 56px; height: 56px; } }
 .hud .chips { position: absolute; top: 100%; display: flex; gap: 3px; margin-top: 4px; }
 .hud .chip { position: relative; width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 2px solid var(--tinta); box-shadow: 0 2px 0 var(--tinta); animation: chipEntra 0.25s ease-out; }
 #jogo .hud .chip canvas { width: 100%; height: 100%; }
@@ -51,6 +51,13 @@ body { font-family: Fredoka, system-ui, sans-serif; color: var(--tinta); }
 .hud .pausa { position: absolute; right: max(10px, env(safe-area-inset-right, 0px)); top: calc(var(--placarY, 0px) + 6px); width: 40px; height: 40px; border-radius: 12px;
   border: 3px solid var(--tinta); background: #fff; box-shadow: 0 3px 0 var(--tinta); pointer-events: auto; padding: 6px; }
 .hud .pausa svg { fill: var(--tinta); width: 100%; height: 100%; }
+/* botao fixo de reacao: embaixo da pausa (abre a barra a qualquer hora) */
+.hud .reagir { position: absolute; right: max(10px, env(safe-area-inset-right, 0px)); top: calc(var(--placarY, 0px) + 54px); width: 40px; height: 40px; border-radius: 50%;
+  border: 3px solid var(--tinta); background: #fff; box-shadow: 0 3px 0 var(--tinta); pointer-events: auto; padding: 2px; transition: opacity .2s; }
+.hud .reagir[hidden] { display: none; }
+.hud .reagir.recarga { opacity: .45; }
+.hud .reagir:active { transform: translateY(2px) scale(.94); box-shadow: 0 1px 0 var(--tinta); }
+#jogo .hud .reagir canvas { width: 100%; height: 100%; }
 .hud .faixa { position: absolute; left: 50%; top: calc(var(--placarY, 0px) + var(--placarH, 52px) + 6px); transform: translateX(-50%); background: var(--amarelo);
   border: 3px solid var(--tinta); border-radius: 12px; padding: 2px 14px; font-size: 16px; box-shadow: 0 3px 0 var(--tinta); white-space: nowrap; }
 .hud .faixa.entra { animation: faixa .4s ease-out; }

@@ -1,14 +1,15 @@
 // HUD do Volei de Gosma (DOM): placar no centro do alto (a pilula da Poki, no canto superior
 // esquerdo, fica livre), medidor de gosma (3 segmentos), chips dos power-ups ativos embaixo de
-// cada lado, botao de pausa a direita, mao fantasma
-// das dicas, a barra de reacoes (emoji) depois do ponto, o cartao unico entre partidas e o menu
-// de pausa. A barra tambem responde as teclas 1 a 9 e 0 no desktop. Teclado nos menus: setas e
+// cada lado, botao de pausa a direita (e o de reacao embaixo dele), mao fantasma das dicas, a
+// barra de reacoes (emoji: abre sozinha depois do ponto e a qualquer hora pelo botao), o cartao
+// unico entre partidas e o menu de pausa. As teclas 1 a 9 e 0 reagem a qualquer hora no
+// desktop (fora dos menus). Teclado nos menus: setas e
 // WASD movem o foco, Enter/Espaco acionam, Esc volta; o foco inicial e sempre o botao normal.
 
 /**
  * @param {HTMLElement} raiz
  * @param {(k: string) => string} T
- * @param {{ aoPausar: () => void, aoContinuar: () => void, aoProxima: () => void, aoRevanche: () => void, aoOpcao: (id: string, v?: any) => void, som: (id: string) => void, icone: (ctx: CanvasRenderingContext2D, id: string, lado: number) => void, carinha: (ctx: CanvasRenderingContext2D, id: string, lado: number) => void, aoReagir: (id: string) => void,
+ * @param {{ aoPausar: () => void, aoContinuar: () => void, aoProxima: () => void, aoRevanche: () => void, aoOpcao: (id: string, v?: any) => void, som: (id: string) => void, icone: (ctx: CanvasRenderingContext2D, id: string, lado: number) => void, carinha: (ctx: CanvasRenderingContext2D, id: string, lado: number) => void, aoReagir: (id: string) => void, aoReagirTecla: (k: number) => void, aoBotaoReacao: () => void,
  *   premio: (ctx: CanvasRenderingContext2D, pr: any, lado: number) => void, aoPremiado: () => void }} cb
  */
 export function criarHud(raiz, T, cb) {
@@ -20,6 +21,7 @@ export function criarHud(raiz, T, cb) {
         <div class="lado l1"><span class="nome"></span><div class="medidor"><i></i><i></i><i></i></div><div class="chips"></div></div>
       </div>
       <button class="pausa" aria-label="pause"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg></button>
+      <button class="reagir" aria-label="emoji" hidden><canvas width="72" height="72"></canvas></button>
       <div class="faixa" hidden></div>
       <div class="reacoes" hidden></div>
       <div class="mao" hidden><div class="dedo"></div><div class="texto"></div></div>
@@ -51,7 +53,7 @@ export function criarHud(raiz, T, cb) {
   const $ = (s) => /** @type {HTMLElement} */ (raiz.querySelector(s));
   const el = {
     hud: $('#hud'), nome0: $('.l0 .nome'), nome1: $('.l1 .nome'), p0: $('.p0'), p1: $('.p1'),
-    med0: $('.l0 .medidor'), med1: $('.l1 .medidor'), chips0: $('.l0 .chips'), chips1: $('.l1 .chips'), pausa: $('.pausa'), faixa: $('.faixa'),
+    med0: $('.l0 .medidor'), med1: $('.l1 .medidor'), chips0: $('.l0 .chips'), chips1: $('.l1 .chips'), pausa: $('.pausa'), reagir: $('.reagir'), faixa: $('.faixa'),
     reacoes: $('.reacoes'), mao: $('.mao'), maoTexto: $('.mao .texto'), cartao: $('#cartao'), cTitulo: $('#cartao .titulo'), cSub: $('#cartao .sub'),
     proxima: $('#cartao .proxima'), revanche: $('#cartao .revanche'), premiado: $('#cartao .premiado'),
     prog: $('#cartao .progresso'), gTotal: $('#cartao .gTotal'), gMais: $('#cartao .gMais'), xpMais: $('#cartao .xpMais'),
@@ -74,6 +76,9 @@ export function criarHud(raiz, T, cb) {
   let cartaoAberto = false;
 
   el.pausa.addEventListener('click', () => { cb.som('botao'); cb.aoPausar(); });
+  el.reagir.addEventListener('click', () => { cb.som('botao'); cb.aoBotaoReacao(); });
+  const ctxReagir = /** @type {HTMLCanvasElement} */ (el.reagir.querySelector('canvas')).getContext('2d');
+  if (ctxReagir) cb.carinha(ctxReagir, 'rindo', 72);
   el.reacoes.addEventListener('click', (e) => {
     const b = e.target instanceof Element ? e.target.closest('button[data-id]') : null;
     if (b) cb.aoReagir(/** @type {HTMLElement} */ (b).dataset.id || '');
@@ -98,10 +103,9 @@ export function criarHud(raiz, T, cb) {
     const box = menuAberto ? el.menu : cartaoAberto ? el.cartao : null;
     if (!box) {
       if (e.code === 'Escape' || e.code === 'KeyP') cb.aoPausar();
-      else if (barra && /^(Digit|Numpad)[0-9]$/.test(e.code)) {
+      else if (/^(Digit|Numpad)[0-9]$/.test(e.code)) {
         const n = Number(e.code.slice(-1));
-        const id = barra[n === 0 ? 9 : n - 1];
-        if (id) cb.aoReagir(id);
+        cb.aoReagirTecla(n === 0 ? 9 : n - 1);
       }
       return;
     }
@@ -253,7 +257,7 @@ export function criarHud(raiz, T, cb) {
         b.setAttribute('aria-label', T('reacao.' + id));
         b.style.animationDelay = `${k * 0.025}s`;
         const cv = document.createElement('canvas');
-        const lado = Math.round(40 * Math.min(2, window.devicePixelRatio || 1));
+        const lado = Math.round(56 * Math.min(2, window.devicePixelRatio || 1));
         cv.width = lado;
         cv.height = lado;
         const ctx = cv.getContext('2d');
@@ -262,6 +266,14 @@ export function criarHud(raiz, T, cb) {
         if (teclas && k < 10) { const i = document.createElement('i'); i.textContent = String((k + 1) % 10); b.append(i); }
         el.reacoes.append(b);
       });
+    },
+    /**
+     * Botao fixo de reacao: visivel na partida; apagado durante a recarga.
+     * @param {boolean} visivel @param {boolean} pronto
+     */
+    botaoReacao(visivel, pronto) {
+      if (el.reagir.hidden === visivel) el.reagir.hidden = !visivel;
+      el.reagir.classList.toggle('recarga', !pronto);
     },
     /** posiciona o placar (faixa do layout) */
     posicionar(L) {

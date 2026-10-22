@@ -5,8 +5,15 @@
 
 import { eixosVisuais, RB } from '../fisica/volei.js';
 
-/** Passo do reticulado (u) por qualidade: ~75 particulas no raio 2 (minima: ~55). */
+/** Passo do reticulado (u) por qualidade: 59 particulas no raio 2 (minima: 44). */
 export const PASSO_PELE = Object.freeze({ normal: 0.31, minima: 0.36 });
+
+/**
+ * Recuo do contorno de particulas para dentro da cupula (u, no raio 2). Com o nucleo do campo
+ * (src/render/cena.js, RAIO_CAMPO) o isocontorno da gosma cai em cima da cupula fisica (topo a
+ * menos de 0,05 u de b nas duas qualidades; test/pele.test.js): a bola encosta na gosma.
+ */
+export const RECUO_CONTORNO = 0.22;
 
 /**
  * Pontos de repouso da meia-lua de raio R (relativos ao centro da base): o contorno com passo
@@ -17,7 +24,7 @@ export const PASSO_PELE = Object.freeze({ normal: 0.31, minima: 0.36 });
  */
 export function meiaLua(R, passo) {
   const pts = [];
-  const r = R - 0.32;
+  const r = R - RECUO_CONTORNO * (R / 2);
   const y0 = 0.15;
   const a0 = Math.asin(y0 / r);
   const nArco = Math.floor(((Math.PI - 2 * a0) * r) / passo);
@@ -51,7 +58,7 @@ export function meiaLua(R, passo) {
   return pts;
 }
 
-/** Mola de forma (1/s2) e amortecimento (1/s): ~24 Hz, balanca 2 ou 3 vezes. */
+/** Mola de forma (1/s2) e amortecimento (1/s): ~7,6 Hz, balanca 2 ou 3 vezes. */
 const K = 2300;
 const C = 26;
 
@@ -65,6 +72,7 @@ const C = 26;
  * @property {Float64Array} vx
  * @property {Float64Array} vy
  * @property {number} R0  raio de referencia do reticulado
+ * @property {number} passo  passo do reticulado (o nucleo do campo escala com ele)
  * @property {{ x: number, y: number, nx: number, ny: number, f: number }} covinha
  */
 
@@ -77,7 +85,7 @@ export function criarPele(s, passo = PASSO_PELE.normal) {
   const pts = meiaLua(s.R, passo);
   const n = pts.length / 2;
   const p = {
-    n, R0: s.R,
+    n, R0: s.R, passo,
     ox: new Float64Array(n), oy: new Float64Array(n),
     x: new Float64Array(n), y: new Float64Array(n), vx: new Float64Array(n), vy: new Float64Array(n),
     covinha: { x: 0, y: 0, nx: 0, ny: 1, f: 0 },

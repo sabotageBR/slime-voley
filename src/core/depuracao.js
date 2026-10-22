@@ -2,7 +2,7 @@
 // (192.168.x, 10.x e 172.16-31.x: o celular pela Wi-Fi). Na Poki nada disso existe.
 // Unico modulo que le a URL (vigiado por test/estilo.test.js).
 //   ?semente=123          semente fixa (prints e GIFs reprodutiveis)
-//   ?roteiro=cortada      cena pronta: cortada | ponto | ponto-curto | reacao | saque | bolha | gelo | fogo | fim
+//   ?roteiro=cortada      cena pronta: cortada | ponto | ponto-curto | reacao | saque | bolha | gelo | fogo | gosmao | fim
 //                         (citados no desenho e ainda sem roteiro: jornada | raio | rali8 | onboarding)
 //   ?quadro=ms            congela o jogo-real nesse instante do roteiro (prints)
 //   ?filme=N&cada=K       grava N quadros (K passos entre eles) em <pre id="filme">

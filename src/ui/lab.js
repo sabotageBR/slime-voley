@@ -12,8 +12,6 @@ const CAMPOS = [
   ['hitstop', 'Hitstop (s)', 0, 0.15, 0.005],
   ['tMira', 'Mira máx. (s)', 0.5, 3, 0.1],
   ['pushIn', 'Push-in', 1, 1.12, 0.005],
-  ['gotaMin', 'Gota menor (u)', 0.05, 0.3, 0.01],
-  ['gotaMax', 'Gota maior (u)', 0.1, 0.45, 0.01],
   ['coroa.r1', 'Coroa raio (u)', 1, 4.5, 0.1],
   ['coroa.dur', 'Coroa (s)', 0.1, 0.6, 0.01],
   ['rastro.vida', 'Rastro (s)', 0.08, 0.6, 0.01],

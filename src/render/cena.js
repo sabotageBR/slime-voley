@@ -1,7 +1,7 @@
 // Cena do Volei de Gosma: quatro canvases empilhados
 //   cFundo (2D): fundo distante do ginasio, arquibancada e plateia, piso, placas e rede;
 //   cSlime (WebGL2): os dois slimes pela gosma (um campo P2G por slime, janela movel);
-//   cTopo  (2D): rostos, bola, rastro, mira em gotas, coroas, vfx;
+//   cTopo  (2D): rostos, bola, rastro, mira (feixe reto e reticula), coroas, vfx;
 //   cTela  (2D, por cima do HUD): palavra, placar gigante, VAI! (so quando ha efeito).
 // A camera vem do diretor (close, tremor, seguir a bola) sobre o layout (src/render/layout.js).
 
@@ -21,8 +21,12 @@ import { CORTADA } from '../jogo/cortada.js';
 import { BOLHA } from '../jogo/powerups.js';
 import { REACAO } from '../jogo/reacoes.js';
 
-/** Raio do nucleo do campo e limiar da superficie (os do motor da gosma). */
-export const RAIO_CAMPO = 0.48;
+/**
+ * Raio do nucleo do campo (no passo normal da pele e raio 2; cada slime escala pelo escNucleo) e
+ * limiar da superficie. 0,55 com o contorno da pele recuado 0,22 (src/jogo/pele.js) deixa o miolo
+ * cheio e o isocontorno em cima da cupula fisica (test/pele.test.js).
+ */
+export const RAIO_CAMPO = 0.55;
 export const LIMIAR = 0.85;
 
 /** Qualidades (so o render muda). */
@@ -113,7 +117,7 @@ export function criarCena(el, o = {}) {
     for (let k = a0; k < a1; k++) { xs[k] = m.x[k] - dx; ys[k] = m.y[k] - dy; }
     const s = m.slimes[i];
     const sombra = c.__s || (c.__s = { dados: null });
-    Object.assign(sombra, { ativo: true, idx: i, dados: s.dados, esq: s.esq - dx, dir: s.dir - dx, base: s.base - dy, topo: s.topo - dy, cx: s.cx - dx, cy: s.cy - dy, a11: s.a11, a12: s.a12, a21: s.a21, a22: s.a22, raio0: s.raio0 });
+    Object.assign(sombra, { ativo: true, idx: i, dados: s.dados, esq: s.esq - dx, dir: s.dir - dx, base: s.base - dy, topo: s.topo - dy, cx: s.cx - dx, cy: s.cy - dy, a11: s.a11, a12: s.a12, a21: s.a21, a22: s.a22, raio0: s.raio0, escNucleo: s.escNucleo });
     const prox = c.__p || (c.__p = { x: xs, y: ys, pig: m.pig, membros: m.membros, iniSl: m.iniSl, slimes: [] });
     prox.slimes = i === 0 ? [sombra, { ativo: false, idx: 1 }] : [{ ativo: false, idx: 0 }, sombra];
     c.acumular(prox);
@@ -127,7 +131,8 @@ export function criarCena(el, o = {}) {
    * @param {ReturnType<typeof import('./vista.js').criarVista>} vista
    * @param {number} alfa fracao do passo real
    * @param {number} dtR s de jogo-real desde o ultimo quadro
-   * @param {{ textos: (k: string) => string, cores: string[], festa?: any, inicio?: { t: number, txt: string }|null, pulsoSaque?: number, saque?: { k: number, q: string, alvo: number, depois: boolean }|null, alvoSaque?: number|null, mao?: any }} o2
+   * @param {{ textos: (k: string) => string, cores: string[], festa?: any, inicio?: { t: number, txt: string }|null, pulsoSaque?: number, saque?: { k: number, q: string, alvo: number, depois: boolean }|null, alvoSaque?: number|null, mao?: any, feixe?: boolean }} o2
+   *   feixe: false esconde o feixe da mira (a thumb desenha as setas dela; a reticula fica)
    */
   function desenhar(P, vista, alfa, dtR, o2) {
     medir();
@@ -189,7 +194,7 @@ export function criarCena(el, o = {}) {
     ctxTopo.setTransform(1, 0, 0, 1, 0, 0);
     ctxTopo.clearRect(0, 0, el.topo.width, el.topo.height);
     desenharRostos(ctxTopo, m, cam, dpr, t, { olhar: [b.x, b.y], estilo: 'classico' });
-    const mira = C && (C.fase === 'entrando' || C.fase === 'mirando') ? { c: C, cor: o2.cores[C.i], final: C.fase === 'mirando' && C.tMax - C.t < 0.3 } : null;
+    const mira = C && (C.fase === 'entrando' || C.fase === 'mirando') ? { c: C, cor: o2.cores[C.i], final: C.fase === 'mirando' && C.tMax - C.t < 0.3, feixe: o2.feixe } : null;
     const bolaAlfa = P.estado === 'ponto' && F ? (F.t < 0.5 ? 1 : F.t < 0.8 ? 1 - (F.t - 0.5) / 0.3 : 0) : 1;
     // power-ups: gelo e avisos sobre cada slime
     const gelos = [];
@@ -200,7 +205,9 @@ export function criarCena(el, o = {}) {
       const s = vista.slimes[i];
       if (Jx.gelo) gelos.push({ x: s.x, y: s.y, a: s.a, b: s.b, fase: Jx.gelo.fase, t: Jx.gelo.t });
       if (Jx.pendente) avisos.push({ x: s.x, y: s.y + s.b + 1.3, id: Jx.pendente.id });
-      if (Jx.reacao) baloes.push({ id: Jx.reacao.id, x: s.x, y: s.y + s.b, t: Jx.reacao.t, dur: REACAO.dur });
+      // balao legivel em qualquer tela (raio minimo: 32 px no retrato, 40 em paisagem); no rali
+      // um pouco menor, para nao tapar a bola
+      if (Jx.reacao) baloes.push({ id: Jx.reacao.id, x: s.x, y: s.y + s.b, t: Jx.reacao.t, dur: REACAO.dur, rMin: (L.orient === 'retrato' ? 32 : 40) / cam.s, escala: P.estado === 'jogo' ? 0.75 : 1 });
     }
     desenharTopo(ctxTopo, cam, dpr, t, est, {
       bola: b, rastro: ef.rastro, coroas: ef.coroas, mira, contagem: ef.contagem,
@@ -273,7 +280,8 @@ export function criarCena(el, o = {}) {
     get camera() { return camQuadro; },
     get cameraBase() { return camBase; },
     get usaGl() { return !!comp; },
-    paraMundo(px, py) { return camBase ? paraMundo(camBase, px, py) : null; },
+    /** tela -> mundo pela camera do ultimo quadro (o que o jogador ve: o cursor cai onde o slime esta) */
+    paraMundo(px, py) { const c = camQuadro || camBase; return c ? paraMundo(c, px, py) : null; },
     paraTela(x, y) { return camQuadro ? paraTela(camQuadro, x, y) : null; },
     medir,
   };

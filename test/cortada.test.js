@@ -35,6 +35,21 @@ test('escalas: entrada vai a 60/300 e a mira fica la', () => {
   assert.equal(escalas(c).defensor, CORTADA.escalaDefensor);
 });
 
+test('o tiro cai na reticula (a ate 0,3 u) em toda a faixa, sem raspar o poste, de varios pontos de batida', () => {
+  for (const lado of [-1, 1]) {
+    const [x0, x1] = faixaAlvo(lado);
+    for (const [bxa, by] of [[2.5, 6.5], [3.2, 7.6], [5, 7], [8, 7.5], [2.4, 5.2]]) {
+      const bx = lado * bxa;
+      for (let alvo = x0; alvo <= x1 + 1e-9; alvo += 0.25) {
+        const r = resolverTiro(bx, by, alvo, lado, {});
+        const p = prever({ x: bx, y: by, vx: r.vx, vy: r.vy, semLimite: true, fundo: [false, false] }, { tMax: 3, semVmax: true, pararNaRede: true });
+        assert.equal(p.motivo, 'chao', `lado ${lado} batida (${bx}, ${by}) alvo ${alvo.toFixed(2)}: ${p.motivo}`);
+        assert.ok(Math.abs(p.x - alvo) <= 0.3, `lado ${lado} batida (${bx}, ${by}) alvo ${alvo.toFixed(2)}: caiu em ${p.x.toFixed(2)}`);
+      }
+    }
+  }
+});
+
 test('o tiro cai sempre dentro da faixa do outro lado, com vento maximo', () => {
   for (const lado of [-1, 1]) {
     const [x0, x1] = faixaAlvo(lado);

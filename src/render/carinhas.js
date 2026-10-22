@@ -277,16 +277,17 @@ export function desenharCarinhaTela(ctx, id, lado) {
 }
 
 /**
- * Balao da reacao sobre o slime: entra estufando, balanca e some nos ultimos 0,3 s.
+ * Balao da reacao sobre o slime: entra estufando, balanca e some nos ultimos 0,3 s. O raio e
+ * 1,32 u ou rMin (u: o minimo em pixels que a cena pede para a tela), vezes `escala`.
  * @param {CanvasRenderingContext2D} ctx
- * @param {{ id: string, x: number, y: number, t: number, dur: number }} b  (x, y) = ponta do balao
+ * @param {{ id: string, x: number, y: number, t: number, dur: number, rMin?: number, escala?: number }} b  (x, y) = ponta do balao
  * @param {number} tr traco em u
  */
 export function desenharBalao(ctx, b, tr) {
   const k = b.t < 0.12 ? (b.t / 0.12) * 1.15 : b.t < 0.22 ? 1.15 - ((b.t - 0.12) / 0.1) * 0.15 : 1;
   const a = Math.min(1, (b.dur - b.t) / 0.3);
   if (k <= 0 || a <= 0) return;
-  const R = 1.05 * k;
+  const R = Math.max(1.32, b.rMin || 0) * (b.escala || 1) * k;
   const cy = b.y + 0.55 + R;
   ctx.save();
   ctx.globalAlpha = a;
