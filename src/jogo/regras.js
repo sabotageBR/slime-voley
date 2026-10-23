@@ -149,7 +149,7 @@ export function alvoDaPartida(o = {}) {
  * Quantas vezes por partida: `curta` na 2a da vida (as oitavas da Copa 1) e `copa1` nas outras da
  * Copa 1 depois de `deDerrotas` derrotas seguidas; no maximo `max`.
  */
-export const ANJO = Object.freeze({ atras: 2, curta: 0, copa1: 0, deDerrotas: 2, max: 2 });
+export const ANJO = Object.freeze({ atras: 2, curta: 1, copa1: 0, deDerrotas: 2, max: 2 });
 
 /**
  * Quantos anjos a partida tem.
@@ -160,6 +160,24 @@ export function anjoDaPartida(o = {}) {
   let n = o.curta ? ANJO.curta : 0;
   if ((o.copa || 1) === 1 && (o.derrotas || 0) >= ANJO.deDerrotas) n += ANJO.copa1;
   return Math.min(ANJO.max, n);
+}
+
+/**
+ * A ajuda ao jogador (M2d): a forca (0..1) da devolucao assistida e do ima mais fortes da partida
+ * (src/jogo/partida.js AJUDA). Na Copa 1 tem uma base por fase (quem esta aprendendo), e em toda
+ * Copa cresce `derrota` a cada derrota seguida na fase (ate `maxDerrotas`). O novato simulado
+ * mostrou que 70% dos pontos que ele perdia eram erros dele (a bola caindo do proprio lado ou na
+ * rede), nao ataques da CPU: o nivel da CPU sozinho nao tirava o Pingo dos 64% de derrota.
+ */
+export const AJUDA = Object.freeze({ copa1: Object.freeze([0.75, 0.75, 0.35, 0.3, 0.3]), derrota: 0.12, maxDerrotas: 4 });
+
+/**
+ * A forca da ajuda na partida.
+ * @param {{ copa?: number, fase?: number, derrotas?: number }} [o]
+ */
+export function ajudaDaPartida(o = {}) {
+  const base = (o.copa || 1) === 1 ? AJUDA.copa1[Math.max(0, Math.min(AJUDA.copa1.length - 1, o.fase | 0))] : 0;
+  return Math.min(1, base + AJUDA.derrota * Math.min(AJUDA.maxDerrotas, Math.max(0, o.derrotas | 0)));
 }
 
 /**

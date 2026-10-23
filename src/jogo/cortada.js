@@ -134,6 +134,19 @@ export function miraPadrao(lado, rivalX, rivalVx) {
 }
 
 /**
+ * Mira guiada (M2d): a ponta da faixa mais longe de onde o rival vai estar. E a mira inicial da
+ * cortada do humano (quem so toca corta com ela; quem segura mexe a partir dela) e a da cortada
+ * guiada da 1a partida. Com a mira padrao (o fundo), a CPU lia a reticula e ja estava embaixo: o
+ * novato simulado tentava duas cortadas por partida e quase nenhuma virava ponto.
+ * @param {number} lado de quem corta @param {number} rivalX @param {number} [rivalVx]
+ */
+export function miraGuiada(lado, rivalX, rivalVx = 0) {
+  const [x0, x1] = faixaAlvo(lado);
+  const prev = rivalX + rivalVx * 0.3;
+  return Math.abs(x0 - prev) > Math.abs(x1 - prev) ? x0 : x1;
+}
+
+/**
  * Resolve o tiro: o angulo mais ingreme (de -75 a +30 graus da horizontal, rumo ao outro lado)
  * cuja velocidade (bisseccao analitica, com vento) leva a bola ao alvo, sem passar de V_CORTADA,
  * cruzando a rede acima de REDE_H + RB + 0,25 e sem raspar o topo do poste em nenhum ponto do

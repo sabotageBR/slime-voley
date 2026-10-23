@@ -23,6 +23,7 @@ import { criarBolhas, powerUp, EFEITO } from './powerups.js';
 import { reacao as acharReacao, escolherReacaoCpu, chanceReacaoCpu, REACAO } from './reacoes.js';
 import { criarJuiz, passoJuiz, forcarBolada } from './juiz.js';
 import { criarFalas, passoFalas, disparar as dispararFala, FALA } from './falas.js';
+import { causaDoPonto } from './dicas.js';
 import { criarRng, hashTexto } from '../core/rng.js';
 
 /** Velocidade de saida que conta como BOMBA (com a bola descendo). */
@@ -31,6 +32,11 @@ const V_BOMBA = 24;
 const TS = temposSaque({ g: G_BOLA, gSlime: G_SLIME, pulo: PULO, rb: RB });
 /** Assistencias. */
 const IMA = Object.freeze({ toque: 0.25, teclado: 0.1 });
+/**
+ * A ajuda inteira (ajuda = 1): quanto o toque andando e o que nao cruzaria sao puxados para o arco
+ * do outro lado, quanto o parado ganha alem dos 0,45 e quanto o ima cresce (u).
+ */
+const AJUDA = Object.freeze({ andando: 0.45, semCruzar: 0.6, parado: 0.2, ima: 0.25 });
 /** Mola do raio do desenho (1/s2, 1/s): ~2,4 Hz com zeta 0,38; o Gosmao passa uns 28% do degrau. */
 const MOLA_RAIO = Object.freeze({ k: 227, c: 11.5 });
 
@@ -57,13 +63,14 @@ const intencaoVazia = () => ({ eixo: 0, botao: false, borda: false, superBorda: 
  * @property {boolean} [primeira]             primeira partida da vida (alvo 5, imperdivel, onboarding, saque de um toque)
  * @property {boolean} [curta]                a 2a partida da vida (alvo 5 sem vai-a-2)
  * @property {number} [copa]
- * @property {number} [partidaN]              quantas partidas o jogador ja comecou (protecao)
  * @property {number} [derrotas]              derrotas seguidas do jogador nesta fase da Copa (o alivio da CPU)
  * @property {number} [anjo]                  quantas vezes a CPU erra no match point dela (src/jogo/regras.js ANJO)
  * @property {{ vento?: number, teto?: number, eAlambrado?: number }} [ginasio]
  * @property {'novo'|'segura'} [gatilho]
  * @property {{ escalaMundo?: number, escalaDefensor?: number, entrada?: number }} [lenta]
  * @property {{ ima?: boolean, devolucao?: boolean }} [assist]
+ * @property {number} [ajuda]                 0..1: a devolucao assistida e o ima mais fortes para quem esta
+ *                                            aprendendo (a Copa 1; src/jogo/regras.js ajudaDaPartida)
  * @property {number} [nivelCortada]
  * @property {number[]} [pig]                 pigmentos [jogador, rival]
  * @property {boolean} [juiz]                 false: sem o juiz da rede (ele nunca muda a bola; o hash e o mesmo)
@@ -90,6 +97,8 @@ export function criarPartida(o = {}) {
   const ginasio = { vento: 0, teto: Infinity, eAlambrado: undefined, ...(o.ginasio || {}) };
   const gatilho = o.gatilho || 'novo';
   const assist = { ima: true, devolucao: true, ...(o.assist || {}) };
+  /** forca da ajuda ao humano (0 = a assistencia de sempre) */
+  const ajuda = modo === 'cpu' ? Math.max(0, Math.min(1, o.ajuda || 0)) : 0;
   const comFora = !!o.fora;
   const bolhas = criarBolhas({ semente: o.semente, liberados: o.primeira ? [] : o.powerups || [] });
   // o juiz da rede: rng proprio, nunca mexe na bola (so sofre a bolada)
@@ -110,7 +119,7 @@ export function criarPartida(o = {}) {
 
   let placar = [0, 0];
   const humano = [modo !== 'demo', modo === 'dois'];
-  const params = () => paramsIA(riv, { placarCpu: placar[1], placarHumano: placar[0], partida: o.partidaN || 1, alvo: regras.alvo, imperdivel: regras.imperdivel, derrotas: o.derrotas || 0 });
+  const params = () => paramsIA(riv, { placarCpu: placar[1], placarHumano: placar[0], alvo: regras.alvo, imperdivel: regras.imperdivel, derrotas: o.derrotas || 0 });
   const ias = [
     humano[0] ? null : criarIA(BOT, rng, {}),
     humano[1] ? null : criarIA(modo === 'demo' ? BOT : params(), rng, { perso: riv.perso }),
@@ -172,7 +181,7 @@ export function criarPartida(o = {}) {
   const festa = { t: 0, tipo: 'curta', lado: 0, motivo: '', palavra: '', x: 0, dur: 1, controle: 0.5, deslize: [0.3, 0.5], fim: false };
   let maxAtras = [0, 0];
   /** numeros da partida por jogador (perfil: XP e Gotas) */
-  const stats = { pontos: [0, 0], aces: [0, 0], bombas: [0, 0], viradas: [0, 0], ralis10: 0 };
+  const stats = { pontos: [0, 0], aces: [0, 0], bombas: [0, 0], viradas: [0, 0], ralis10: 0, perdas: [{}, {}] };
   let pontoN = 0;
   /** @type {Cort.Cortada|null} */
   let cortada = null;
@@ -438,6 +447,9 @@ export function criarPartida(o = {}) {
     const virada = antes[iv] < antes[ip] && placar[iv] > placar[ip] && maxAtras[iv] >= 2;
     let palavra = motivo === 'toques4' ? 'toques4' : motivo;
     if (virada) palavra = 'virada';
+    // como o ponto foi perdido (src/jogo/dicas.js: a dica do cartao de derrota)
+    const causa = causaDoPonto(motivo, { ultimoDoVencedor: rali.ultimoLado === ladoV, cortada: rali.ultimaCortada });
+    stats.perdas[ip][causa] = (stats.perdas[ip][causa] || 0) + 1;
     stats.pontos[iv]++;
     if (motivo === 'ace') stats.aces[iv]++;
     if (motivo === 'bomba') stats.bombas[iv]++;
@@ -485,7 +497,7 @@ export function criarPartida(o = {}) {
       caretar(ip, 'choro', 99);
       resultado = vence;
     }
-    ev({ tipo: 'ponto', lado: ladoV, i: iv, motivo, palavra: festa.palavra, festa: festa.tipo, x, placar: [...placar], humano: humano[iv], cpu: daCpu, matchPoint: vence === 0 ? mp : 0, fim: vence !== 0, travessias: rali.travessias });
+    ev({ tipo: 'ponto', lado: ladoV, i: iv, motivo, causa, palavra: festa.palavra, festa: festa.tipo, x, placar: [...placar], humano: humano[iv], cpu: daCpu, matchPoint: vence === 0 ? mp : 0, fim: vence !== 0, travessias: rali.travessias });
     if (vence === 0 && mp !== 0 && pontoDaPartida(antes, regras) !== mp) ev({ tipo: 'match-point', lado: mp });
     // falas: quem marcou comemora (o chefe provoca), senao quem perdeu reclama; no match point,
     // quem lidera avisa e o outro responde
@@ -619,7 +631,9 @@ export function criarPartida(o = {}) {
     Jm.cortadaGratis = false;
     const outro = slimes[outroI(i)];
     const tMax = tutorialCortada === 'oferecida' && humano[i] ? Cort.CORTADA.tMiraTutorial : modo === 'dois' ? Cort.CORTADA.tMira2P : Cort.CORTADA.tMira;
-    cortada = Cort.iniciar(i, s, { tMax, alvoX: Cort.miraPadrao(s.lado, outro.x, outro.vx), gratis, vento: ginasio.vento });
+    // o humano comeca na mira guiada (longe do rival); a CPU, na padrao (o fundo)
+    const alvoX = humano[i] && modo === 'cpu' ? Cort.miraGuiada(s.lado, outro.x, outro.vx) : Cort.miraPadrao(s.lado, outro.x, outro.vx);
+    cortada = Cort.iniciar(i, s, { tMax, alvoX, gratis, vento: ginasio.vento });
     cortada.cpuSegura = humanoOuCpu ? 0 : 0.4 + rng() * 0.2;
     cortada.bola0 = [bola.x, bola.y];
     s.congelado = true;
@@ -893,6 +907,13 @@ export function criarPartida(o = {}) {
     let mistura = 0;
     if (rali.toques <= 2 && parado) mistura = 0.45;
     if (rali.toques === 3 && !cruza) mistura = 0.6;
+    // ajuda (Copa 1, M2d): o toque andando tambem e puxado, e o que cairia do proprio lado vai para
+    // o outro (os erros do proprio jogador eram 70% dos pontos perdidos pelo novato simulado)
+    if (ajuda > 0) {
+      if (rali.toques <= 2 && !parado) mistura = Math.max(mistura, AJUDA.andando * ajuda);
+      if (!cruza) mistura = Math.max(mistura, AJUDA.semCruzar * ajuda);
+      if (parado) mistura = Math.max(mistura, 0.45 + AJUDA.parado * ajuda);
+    }
     if (!mistura) return;
     const [vx, vy] = arco(bola.x, bola.y, alvo, Math.max(bola.y + 2.5, 7.2));
     bola.vx = bola.vx * (1 - mistura) + vx * mistura;
@@ -906,7 +927,7 @@ export function criarPartida(o = {}) {
     if (!forte && (!assist.ima || !humano[i])) return;
     const s = slimes[i];
     if (forte && bola.x * s.lado < 0) return;
-    const r = (humano[i] && assist.ima ? (J[i].it.via === 'toque' ? IMA.toque : IMA.teclado) : 0) + (forte ? EFEITO.ima : 0);
+    const r = (humano[i] && assist.ima ? (J[i].it.via === 'toque' ? IMA.toque : IMA.teclado) + AJUDA.ima * ajuda : 0) + (forte ? EFEITO.ima : 0);
     const [a, b] = eixos(s);
     const p = pertoCupula(s.x, s.y, a, b, bola.x, bola.y);
     if (p.d > RB && p.d < RB + r && p.ny > 0.3) {
@@ -1326,7 +1347,7 @@ export function criarPartida(o = {}) {
      */
     resumo(i = 0) {
       const lado = i === 0 ? -1 : 1;
-      return { venceu: resultado === lado, copa, pontos: stats.pontos[i], aces: stats.aces[i], bombas: stats.bombas[i], viradas: stats.viradas[i], ralis10: stats.ralis10, perdidos: placar[1 - i], anjos: anjosUsados };
+      return { venceu: resultado === lado, copa, pontos: stats.pontos[i], aces: stats.aces[i], bombas: stats.bombas[i], viradas: stats.viradas[i], ralis10: stats.ralis10, perdidos: placar[1 - i], anjos: anjosUsados, perdas: { ...stats.perdas[i] } };
     },
     /** quantos pontos ja sairam nesta partida */
     get pontoN() { return pontoN; },

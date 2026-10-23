@@ -13,8 +13,9 @@ import { criarNovato, talentoDaVida, paramsNovato, jogarPartida } from './humano
  * Uma vida na Copa 1.
  * @param {number} semente a vida (o talento e as sementes das partidas saem dela)
  * @param {any} [params] parametros parciais do novato (h fixa o talento)
- * @param {{ max?: number, semAlivio?: boolean, semAjuda?: boolean, copa?: number }} [o]
- *   max: partidas no maximo; semAlivio: as derrotas nao aliviam a CPU; semAjuda: sem anjo
+ * @param {{ max?: number, semAlivio?: boolean, semAjuda?: boolean, copa?: number, ajuda?: number }} [o]
+ *   max: partidas no maximo; semAlivio: as derrotas nao aliviam a CPU; semAjuda: sem anjo nem a
+ *   ajuda ao jogador; ajuda: forca fixa da ajuda (para a calibragem)
  */
 export function jogarCopa(semente, params = {}, o = {}) {
   const P = paramsNovato(params);
@@ -37,8 +38,8 @@ export function jogarCopa(semente, params = {}, o = {}) {
     const novato = criarNovato(sem, { ...params, h });
     const r = jogarPartida(criarPartida, {
       semente: sem, rival: f.rival, primeira: f.primeira, curta: f.curta,
-      derrotas: o.semAlivio ? 0 : f.derrotas, anjo: o.semAjuda ? 0 : f.anjo,
-      partidaN: perfil.partidas + 1, powerups: [...perfil.liberados.powerups],
+      derrotas: o.semAlivio ? 0 : f.derrotas, anjo: o.semAjuda ? 0 : f.anjo, ajuda: o.semAjuda ? 0 : (o.ajuda ?? f.ajuda ?? 0),
+      powerups: [...perfil.liberados.powerups],
     }, novato);
     partidas.push({
       n: perfil.partidas + 1, rival: f.rival, fase: perfil.copa.fase, tentativa, derrotas: f.derrotas,

@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { novaCopa, chaveDaCopa, registrarVitoria, registrarDerrota, partidaDaFase, proximaCopa, normalizarCopa, caminhoDaCopa, trocarPais, FASES, NUM_COPAS, TAM_COPA, MAX_DERROTAS } from '../src/jogo/torneio.js';
-import { anjoDaPartida } from '../src/jogo/regras.js';
+import { anjoDaPartida, ajudaDaPartida } from '../src/jogo/regras.js';
 import { normalizarPerfil } from '../src/jogo/perfil.js';
 import { COPAS } from '../src/jogo/rivais.js';
 
@@ -135,7 +135,7 @@ test('save das derrotas: invalido vira 0, o teto vale, a chave de outro tamanho 
 
 test('partidaDaFase: a 1a da vida contra a Gota, as oitavas da Copa 1 curtas e com anjo, as derrotas passam', () => {
   const c0 = novaCopa(1, 9);
-  assert.deepEqual(partidaDaFase(c0, { partidas: 0 }), { rival: 'gota', primeira: true, curta: false, derrotas: 0, anjo: 0 });
+  assert.deepEqual(partidaDaFase(c0, { partidas: 0 }), { rival: 'gota', primeira: true, curta: false, derrotas: 0, anjo: 0, ajuda: ajudaDaPartida({ copa: 1, fase: 0 }) });
   assert.equal(partidaDaFase(c0, { partidas: 3 }).primeira, false, 'a Gota de novo (save mexido) nao e mais imperdivel');
   const c1 = registrarDerrota(registrarVitoria(c0, [5, 2]));
   const f1 = partidaDaFase(c1, { partidas: 2 });
@@ -143,6 +143,8 @@ test('partidaDaFase: a 1a da vida contra a Gota, as oitavas da Copa 1 curtas e c
   assert.equal(f1.curta, true);
   assert.equal(f1.derrotas, 1);
   assert.equal(f1.anjo, anjoDaPartida({ curta: true, copa: 1, derrotas: 1 }));
+  assert.ok(f1.anjo >= 1, 'as oitavas da Copa 1 tem anjo');
+  assert.equal(f1.ajuda, ajudaDaPartida({ copa: 1, fase: 1, derrotas: 1 }));
   const c2 = registrarVitoria(c1, [5, 4]);
   const f2 = partidaDaFase(c2, { partidas: 3 });
   assert.equal(f2.rival, 'geleia');

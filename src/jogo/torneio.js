@@ -13,7 +13,7 @@
 
 import { criarRng, hashTexto } from '../core/rng.js';
 import { RIVAIS, COPAS, FORCA_NIVEL, rival as acharRival } from './rivais.js';
-import { anjoDaPartida } from './regras.js';
+import { anjoDaPartida, ajudaDaPartida } from './regras.js';
 import { PAISES, embaralharPaises, ehPais } from './paises.js';
 
 /** Nomes das fases (chaves de texto copa.<fase>), da primeira rodada a final. */
@@ -166,7 +166,8 @@ export function registrarDerrota(c) {
 /**
  * A partida da fase atual (o main.js e o novato simulado do tools/calibrar.mjs usam a mesma): o
  * rival, a 1a da vida (contra a Gota, imperdivel), a curta (as oitavas da Copa 1, a 5), as
- * derrotas seguidas e quantas vezes o anjo pode salvar o jogador (src/jogo/regras.js).
+ * derrotas seguidas, quantas vezes o anjo pode salvar o jogador e a forca da ajuda a ele
+ * (src/jogo/regras.js).
  * @param {EstadoCopa} c @param {{ partidas: number }} perfil
  */
 export function partidaDaFase(c, perfil) {
@@ -174,7 +175,7 @@ export function partidaDaFase(c, perfil) {
   const primeira = perfil.partidas === 0 && rival === 'gota';
   const curta = !primeira && c.n === 1 && c.fase === 1;
   const derrotas = c.derrotas | 0;
-  return { rival, primeira, curta, derrotas, anjo: anjoDaPartida({ primeira, curta, copa: c.n, derrotas }) };
+  return { rival, primeira, curta, derrotas, anjo: anjoDaPartida({ primeira, curta, copa: c.n, derrotas }), ajuda: ajudaDaPartida({ copa: c.n, fase: c.fase, derrotas }) };
 }
 
 /** Depois do titulo: a proxima Copa (a ultima se repete com outra chave). @param {EstadoCopa} c @param {number} semente */

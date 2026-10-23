@@ -27,7 +27,7 @@ import { chaveDaCopa, registrarVitoria, registrarDerrota, partidaDaFase, proxima
 import { paisDoIdioma } from './jogo/paises.js';
 import { visualDaSkin, visualDoArquetipo, comprar as comprarItem, normalizarVisual } from './jogo/visual.js';
 import { normalizarPerfil, rendimento, aplicarGanho, proximosMarcos, darPresente, presenteDaVitoria } from './jogo/perfil.js';
-import { TEMPOS, anjoDaPartida } from './jogo/regras.js';
+import { TEMPOS, anjoDaPartida, ajudaDaPartida } from './jogo/regras.js';
 import { criarVista } from './render/vista.js';
 import { criarCena } from './render/cena.js';
 import { tonalidade } from './render/celebracao.js';
@@ -434,7 +434,7 @@ function novaPartida(revanche = false) {
     curta,
     derrotas,
     anjo: daCopa ? anjoDaPartida({ primeira, curta, copa: perfil.copa.n, derrotas }) : 0,
-    partidaN: partidaN + 1,
+    ajuda: daCopa ? ajudaDaPartida({ copa: perfil.copa.n, fase: perfil.copa.fase, derrotas }) : 0,
     gatilho: /** @type {any} */ (D.gatilho || 'novo'),
     assist: { ima: D.assist, devolucao: D.assist },
     fora: D.fora,

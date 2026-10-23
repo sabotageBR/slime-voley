@@ -1,7 +1,8 @@
 // Regras: alvo, vai-a-2, saque ativo e a partida (rali, 3 toques, parede de fundo; o fora antigo so com { fora: true }).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alvoDaPartida, vencedor, pontoDaPartida, profundidadeSaque, qualidadeSaque, temposSaque, posicaoParaRumo, anjoDaPartida, SAQUE, ANJO } from '../src/jogo/regras.js';
+import { alvoDaPartida, vencedor, pontoDaPartida, profundidadeSaque, qualidadeSaque, temposSaque, posicaoParaRumo, anjoDaPartida, ajudaDaPartida, SAQUE, ANJO, AJUDA } from '../src/jogo/regras.js';
+import { miraGuiada, faixaAlvo } from '../src/jogo/cortada.js';
 import { criarIA } from '../src/jogo/ia.js';
 import { NIVEIS } from '../src/jogo/rivais.js';
 import { criarRng } from '../src/core/rng.js';
@@ -331,4 +332,28 @@ test('anjo: nao age com o humano so 1 atras, sem anjo, no bot contra bot nem no 
   assert.equal(criarPartida({ modo: 'demo', semente: 6, anjo: 2 }).anjo.restam, 0);
   assert.equal(criarPartida({ modo: 'dois', semente: 6, anjo: 2 }).anjo.restam, 0);
   assert.equal(criarPartida({ modo: 'cpu', semente: 6, primeira: true, anjo: 2 }).anjo.restam, 0, 'a 1a da vida ja e imperdivel');
+});
+
+test('ajuda ao jogador: base por fase so na Copa 1, mais a cada derrota seguida, limitada a 1', () => {
+  assert.equal(ajudaDaPartida({ copa: 1, fase: 1 }), AJUDA.copa1[1]);
+  assert.ok(ajudaDaPartida({ copa: 1, fase: 1 }) >= ajudaDaPartida({ copa: 1, fase: 4 }), 'quem chega na final ja aprendeu');
+  assert.equal(ajudaDaPartida({ copa: 2, fase: 0 }), 0);
+  assert.ok(ajudaDaPartida({ copa: 2, fase: 0, derrotas: 2 }) > 0, 'as derrotas seguidas ajudam em toda Copa');
+  let antes = -1;
+  for (let d = 0; d <= 9; d++) {
+    const a = ajudaDaPartida({ copa: 1, fase: 3, derrotas: d });
+    assert.ok(a >= antes && a <= 1);
+    antes = a;
+  }
+  assert.equal(ajudaDaPartida({ copa: 1, fase: 3, derrotas: 9 }), ajudaDaPartida({ copa: 1, fase: 3, derrotas: AJUDA.maxDerrotas }));
+  assert.equal(criarPartida({ modo: 'demo', semente: 1, ajuda: 1 }).hash(), criarPartida({ modo: 'demo', semente: 1 }).hash(), 'nada muda no bot contra bot');
+});
+
+test('mira guiada: a ponta da faixa mais longe do rival (a cortada do humano comeca nela)', () => {
+  const [x0, x1] = faixaAlvo(-1);
+  assert.equal(miraGuiada(-1, 10, 0), x0, 'o rival no fundo: a cortada vai colada na rede');
+  assert.equal(miraGuiada(-1, 2, 0), x1, 'o rival na rede: vai no fundo');
+  const p = criarPartida({ modo: 'cpu', semente: 4 });
+  assert.ok(p.roteiro('cortada'));
+  assert.equal(p.cortada.alvoX, miraGuiada(-1, p.slimes[1].x, p.slimes[1].vx));
 });

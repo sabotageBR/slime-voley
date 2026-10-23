@@ -14,6 +14,7 @@ import { deltaE, linearDeHex } from '../cor/km.js';
  */
 export const NIVEIS = Object.freeze({
   T0: Object.freeze({ vel: 7.0, reacao: 0.45, erro: 1.8, pulo: 0, corta: 0, super: 0, perfeita: 0, saqueErro: 0.15 }),
+  'T0+': Object.freeze({ vel: 7.25, reacao: 0.425, erro: 1.7, pulo: 0.05, corta: 0, super: 0, perfeita: 0.025, saqueErro: 0.135 }),
   T1: Object.freeze({ vel: 7.5, reacao: 0.4, erro: 1.6, pulo: 0.1, corta: 0, super: 0, perfeita: 0.05, saqueErro: 0.12 }),
   'T1+': Object.freeze({ vel: 8.0, reacao: 0.32, erro: 1.4, pulo: 0.2, corta: 0.05, super: 0, perfeita: 0.1, saqueErro: 0.1 }),
   T2: Object.freeze({ vel: 9.0, reacao: 0.24, erro: 1.1, pulo: 0.35, corta: 0.15, super: 0.3, perfeita: 0.15, saqueErro: 0.08 }),
@@ -26,7 +27,7 @@ export const NIVEIS = Object.freeze({
  * Forca de cada nivel (a ordem e o meio-termo entre eles): os jogos simulados da chave
  * (src/jogo/torneio.js) e o tom do balbucio (main.js) leem daqui.
  */
-export const FORCA_NIVEL = Object.freeze({ T0: 0, T1: 1, 'T1+': 2, T2: 3, T3: 4, T4: 5, T5: 6 });
+export const FORCA_NIVEL = Object.freeze({ T0: 0, 'T0+': 0.5, T1: 1, 'T1+': 2, T2: 3, T3: 4, T4: 5, T5: 6 });
 
 /**
  * O jogador automatico do ?auto e dos prints, nos dois lados do bot contra bot (o npm run
@@ -59,9 +60,9 @@ const corBase = (id) => CORES_BASE.find((c) => c.id === id) || CORES_BASE[0];
 export const RIVAIS = Object.freeze([
   // Copa 1 (Praia)
   { id: 'gota', copa: 1, nivel: 'T0', perso: ['distraida'], cor: 'azul', alt: 'ciano', acessorio: 'chapeu' },
-  { id: 'pingo', copa: 1, nivel: 'T1', perso: ['lob'], cor: 'limao', alt: 'lilas', acessorio: 'bone' },
-  { id: 'geleia', copa: 1, nivel: 'T1+', perso: [], cor: 'pink', alt: 'verde', acessorio: 'faixa' },
-  { id: 'mingau', copa: 1, nivel: 'T2', perso: ['rede'], cor: 'creme', alt: 'grafite', acessorio: 'gorro' },
+  { id: 'pingo', copa: 1, nivel: 'T0+', perso: ['lob'], cor: 'limao', alt: 'lilas', acessorio: 'bone' },
+  { id: 'geleia', copa: 1, nivel: 'T1', perso: [], cor: 'pink', alt: 'verde', acessorio: 'faixa' },
+  { id: 'mingau', copa: 1, nivel: 'T1+', perso: ['rede'], cor: 'creme', alt: 'grafite', acessorio: 'gorro' },
   { id: 'rei', copa: 1, nivel: 'T2', perso: ['mira'], cor: 'roxo', alt: 'verde', acessorio: 'coroa', super: 'fogo', chefe: true },
   // Copa 2
   { id: 'quiabo', copa: 2, nivel: 'T2', perso: [], cor: 'verde', alt: 'rosa', acessorio: 'chapeu' },
@@ -133,7 +134,7 @@ export function corDoRival(r, hexJogador) {
  * `max` derrotas; nos chefes vale `chefe` disso. A vitoria zera (src/jogo/torneio.js). Nunca troca
  * de nivel: o jogador nao ve o degrau.
  */
-export const ALIVIO = Object.freeze({ max: 4, chefe: 0.75, erro: 0, reacao: 0, pulo: 0, corta: 0, saqueErro: 0 });
+export const ALIVIO = Object.freeze({ max: 4, chefe: 0.75, erro: 0.12, reacao: 0.03, pulo: 0.15, corta: 0.25, saqueErro: 0.15 });
 
 /**
  * Elastico (so contra a CPU): funcao continua do placar, limitada, que nunca troca de nivel no meio
@@ -144,7 +145,7 @@ export const ALIVIO = Object.freeze({ max: 4, chefe: 0.75, erro: 0, reacao: 0, p
 const ELASTICO_NORMAL = Object.freeze({ ini: 3, passo: 2, erro: 0.3, reacao: 0.06, corta: 0.5, pulo: 0, saqueErro: 0, atras: true });
 export const ELASTICO = Object.freeze({
   normal: ELASTICO_NORMAL,
-  curta: ELASTICO_NORMAL,
+  curta: Object.freeze({ ini: 1, passo: 2, erro: 0.45, reacao: 0.09, corta: 0.6, pulo: 0.4, saqueErro: 0.5, atras: false }),
   atras: Object.freeze({ ini: 4, passo: 2, erro: 0.15 }),
   chefe: 0.5,
 });
@@ -153,12 +154,10 @@ export const ELASTICO = Object.freeze({
  * Parametros efetivos da IA de um rival nesta partida: o nivel, com o alivio das derrotas seguidas
  * e o elastico do placar.
  * @param {Rival} r
- * @param {{ placarCpu: number, placarHumano: number, partida?: number, alvo?: number, imperdivel?: boolean, derrotas?: number }} ctx
+ * @param {{ placarCpu: number, placarHumano: number, alvo?: number, imperdivel?: boolean, derrotas?: number }} ctx
  */
 export function paramsIA(r, ctx) {
   const base = { ...NIVEIS[r.nivel] };
-  // Geleia na primeira vez (a 3a partida da Copa 1): erro x1,4 (T1+ fixo)
-  if (r.id === 'geleia' && (ctx.partida || 1) <= 3) base.erro *= 1.4;
   const d = Math.min(ALIVIO.max, Math.max(0, ctx.derrotas | 0)) * (r.chefe ? ALIVIO.chefe : 1);
   if (d > 0) {
     base.erro *= 1 + ALIVIO.erro * d;

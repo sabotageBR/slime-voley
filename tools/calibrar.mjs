@@ -4,9 +4,9 @@
 // marco (CLAUDE.md).
 //
 // Modos do novato simulado (M2d; test/apoio/humano-simulado.js, o jogador humano de mentira):
-//   --novato [N=300] --rival=pingo [--curta] [--primeira] [--derrotas=D] [--anjo=A]
+//   --novato [N=300] --rival=pingo [--curta] [--primeira] [--derrotas=D] [--anjo=A] [--ajuda=0..1]
 //       partidas avulsas contra um rival (iterar rapido no ajuste)
-//   --copa [N=200] [--max=40] [--cartao=4] [--sem-alivio] [--sem-ajuda] [--conferir]
+//   --copa [N=200] [--max=40] [--cartao=4] [--sem-alivio] [--sem-ajuda] [--ajuda=0..1] [--conferir]
 //       N vidas na Copa 1 com as revanches: vitoria por rival na 1a, 2a e 3a tentativa, tentativas
 //       por fase, o funil m1..m16, o tempo ate o titulo, como a CPU fez os pontos e os saques do
 //       novato pesados pelo funil real da 0.2.0 (o Player Fit Test de 2026-10-22)
@@ -131,14 +131,14 @@ async function repartir(sementes, modo) {
 function rodar(modo, s) {
   const params = paramsDaLinha();
   if (modo === 'copa') {
-    const v = jogarCopa(s, params, { max: Number(opt('max', 40)), semAlivio: flag('sem-alivio'), semAjuda: flag('sem-ajuda') });
+    const v = jogarCopa(s, params, { max: Number(opt('max', 40)), semAlivio: flag('sem-alivio'), semAjuda: flag('sem-ajuda'), ajuda: opt('ajuda', '') === '' ? undefined : Number(opt('ajuda')) });
     return { campeao: v.campeao, partidas: v.partidas };
   }
   const rival = modo === 'm1' ? 'gota' : opt('rival', 'pingo');
   const novato = criarNovato(s, params);
   const r = jogarPartida(criarPartida, {
     semente: s, rival, primeira: modo === 'm1' || flag('primeira'), curta: flag('curta'),
-    derrotas: Number(opt('derrotas', 0)), anjo: Number(opt('anjo', 0)), partidaN: Number(opt('partida', 2)),
+    derrotas: Number(opt('derrotas', 0)), anjo: Number(opt('anjo', 0)), ajuda: Number(opt('ajuda', 0)),
     powerups: ['cortadaGratis', 'segmento', 'congelar', 'fogo', 'gosmao', 'puloMola'],
   }, novato);
   return { venceu: r.venceu, acabou: r.acabou, placar: r.placar, t: r.t, anjos: r.anjos, pontosCpu: r.pontosCpu, saques: novato.stats.saques, cortadas: novato.stats.cortadas, bombas: r.resumo.bombas, h: novato.h };
