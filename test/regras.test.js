@@ -1,7 +1,7 @@
 // Regras: alvo, vai-a-2, saque ativo e a partida (rali, 3 toques, parede de fundo; o fora antigo so com { fora: true }).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alvoDaPartida, vencedor, pontoDaPartida, profundidadeSaque, qualidadeSaque, temposSaque, posicaoParaRumo, SAQUE } from '../src/jogo/regras.js';
+import { alvoDaPartida, vencedor, pontoDaPartida, profundidadeSaque, qualidadeSaque, temposSaque, posicaoParaRumo, anjoDaPartida, SAQUE, ANJO } from '../src/jogo/regras.js';
 import { criarIA } from '../src/jogo/ia.js';
 import { NIVEIS } from '../src/jogo/rivais.js';
 import { criarRng } from '../src/core/rng.js';
@@ -260,4 +260,75 @@ test('bot contra bot: nenhum ponto por fora com a parede; com { fora: true } a r
   assert.equal(motivos({}).filter((x) => x === 'fora').length, 0);
   const antigo = ateORali({ fora: true });
   assert.ok(atacarPorCima(antigo).includes('fora'), 'regra antiga: fora');
+});
+
+test('1a partida: o erro do proprio humano no match point da CPU nao fecha (o ponto nao vale e ele saca)', () => {
+  const p = criarPartida({ modo: 'cpu', semente: 3, primeira: true });
+  p.interacao();
+  for (let k = 0; k < 120 * 10 && p.estado !== 'jogo'; k++) { p.passo(); p.eventos.length = 0; }
+  assert.equal(p.estado, 'jogo');
+  p.placar[1] = 4;
+  // a bola cai do lado do humano depois do toque dele (rede/erro): seria o 5o ponto da Gota
+  Object.assign(p.bola, { solta: true, x: -2.2, y: 1.2, vx: 0, vy: -8, estado: 'normal' });
+  Object.assign(p.rali, { lado: -1, toques: 1, ultimo: 0, ultimoLado: -1, recepcaoSaque: false, bateuRede: true });
+  const tipos = [];
+  for (let k = 0; k < 120 * 3; k++) { p.passo(); for (const e of p.eventos) tipos.push(e.tipo); p.eventos.length = 0; }
+  assert.ok(tipos.includes('repete'), tipos.join(','));
+  assert.ok(!tipos.includes('fim') && !tipos.includes('ponto'));
+  assert.equal(p.placar[1], 4);
+  assert.equal(p.sacador, 0, 'o humano saca de novo');
+});
+
+/** Pingo nas oitavas (a 5), a CPU sacando no match point dela com o humano 2 atras; entrada nula. */
+function matchPointDoPingo(o = {}) {
+  const p = criarPartida({ modo: 'cpu', semente: 6, rival: 'pingo', curta: true, sacaPrimeiro: 1, ...o });
+  p.placar[0] = 2;
+  p.placar[1] = 4;
+  p.interacao();
+  return p;
+}
+
+/** Roda ate o proximo ponto (ou o fim); devolve o evento. */
+function proximoPonto(p, max = 120 * 30) {
+  for (let k = 0; k < max; k++) {
+    // o humano saca com os dois toques (o 2o no instante ideal)
+    if (p.estado === 'saque' && p.sacador === 0 && p.saque.valendo && p.saque.fase === 'pronto') { p.intencao(0, { borda: true, botao: true }); p.passo(); p.intencao(0, { botao: false }); }
+    if (p.estado === 'saque' && p.sacador === 0 && p.saque.fase === 'levantada' && p.saque.tL >= p.temposSaque.ideal) p.intencao(0, { borda: true, botao: true });
+    p.passo();
+    const e = p.eventos.find((x) => x.tipo === 'ponto');
+    p.eventos.length = 0;
+    if (e) return e;
+  }
+  return null;
+}
+
+test('anjo: no match point da CPU com o humano 2 atras ela erra (uma vez por anjo); sem anjo, fecha', () => {
+  assert.equal(anjoDaPartida({ primeira: true, curta: true }), 0);
+  assert.equal(anjoDaPartida({ curta: true }), Math.min(ANJO.max, ANJO.curta));
+  const p = matchPointDoPingo({ anjo: 1 });
+  const e = proximoPonto(p);
+  assert.equal(e.i, 0, 'o ponto e do humano');
+  assert.deepEqual(p.anjo, { restam: 0, usados: 1 });
+  assert.equal(p.resumo(0).anjos, 1);
+  // de novo em 2-4, sem anjo: a CPU pode fechar (o humano parado nao segura)
+  p.placar[0] = 2;
+  p.placar[1] = 4;
+  let fim = false;
+  for (let k = 0; k < 10 && !fim; k++) { const x = proximoPonto(p); fim = !!(x && x.fim); }
+  assert.ok(fim && p.placar[1] === 5, `${p.placar}`);
+});
+
+test('anjo: nao age com o humano so 1 atras, sem anjo, no bot contra bot nem no 2P', () => {
+  const um = criarPartida({ modo: 'cpu', semente: 6, rival: 'pingo', curta: true, sacaPrimeiro: 1, anjo: 2 });
+  um.placar[0] = 3;
+  um.placar[1] = 4;
+  um.interacao();
+  proximoPonto(um);
+  assert.equal(um.anjo.usados, 0);
+  const zero = matchPointDoPingo({ anjo: 0 });
+  proximoPonto(zero);
+  assert.equal(zero.anjo.usados, 0);
+  assert.equal(criarPartida({ modo: 'demo', semente: 6, anjo: 2 }).anjo.restam, 0);
+  assert.equal(criarPartida({ modo: 'dois', semente: 6, anjo: 2 }).anjo.restam, 0);
+  assert.equal(criarPartida({ modo: 'cpu', semente: 6, primeira: true, anjo: 2 }).anjo.restam, 0, 'a 1a da vida ja e imperdivel');
 });

@@ -18,16 +18,16 @@ import { criarLaco, PASSO } from './core/laco.js';
 import { lerDepuracao } from './core/depuracao.js';
 import { linearDeHex } from './cor/km.js';
 import { criarPartida } from './jogo/partida.js';
-import { rival as acharRival, corDoRival } from './jogo/rivais.js';
+import { rival as acharRival, corDoRival, FORCA_NIVEL } from './jogo/rivais.js';
 import { skin as acharSkin } from './jogo/skins.js';
 import { CUSTO } from './jogo/medidor.js';
 import { REACOES } from './jogo/reacoes.js';
 import { vozDaFala, FALA } from './jogo/falas.js';
-import { chaveDaCopa, registrarVitoria, proximaCopa, trocarPais, normalizarCopa, GOTAS_TITULO, NUM_COPAS, TAM_COPA } from './jogo/torneio.js';
+import { chaveDaCopa, registrarVitoria, registrarDerrota, partidaDaFase, proximaCopa, trocarPais, normalizarCopa, GOTAS_TITULO, NUM_COPAS, TAM_COPA } from './jogo/torneio.js';
 import { paisDoIdioma } from './jogo/paises.js';
 import { visualDaSkin, visualDoArquetipo, comprar as comprarItem, normalizarVisual } from './jogo/visual.js';
 import { normalizarPerfil, rendimento, aplicarGanho, proximosMarcos, darPresente, presenteDaVitoria } from './jogo/perfil.js';
-import { TEMPOS } from './jogo/regras.js';
+import { TEMPOS, anjoDaPartida } from './jogo/regras.js';
 import { criarVista } from './render/vista.js';
 import { criarCena } from './render/cena.js';
 import { tonalidade } from './render/celebracao.js';
@@ -416,14 +416,15 @@ function vestirRival() {
 }
 
 function novaPartida(revanche = false) {
-  // a 1a partida da vida e os 16-avos da Copa 1, contra a Gota (imperdivel); as oitavas da Copa 1
-  // (a 2a partida da vida, contra o Pingo) vao a 5 sem vai-a-2
-  const ch0 = chaveDaCopa(perfil.copa);
-  const adversario = ch0.adversario || 'gota';
-  const primeira = D.primeira ?? (perfil.partidas === 0 && adversario === 'gota');
-  const curta = !primeira && !D.rival && ch0.n === 1 && ch0.fase === 1;
-  const idRival = D.rival || adversario;
-  const riv = acharRival(idRival);
+  // a partida da fase (src/jogo/torneio.js partidaDaFase): a 1a da vida e os 16-avos da Copa 1,
+  // contra a Gota (imperdivel); as oitavas da Copa 1 (a 2a da vida, contra o Pingo) vao a 5 sem
+  // vai-a-2; as derrotas seguidas na fase aliviam a CPU e o anjo salva o match point
+  const f = partidaDaFase(perfil.copa, perfil);
+  const daCopa = !D.rival && !D.auto;
+  const primeira = D.primeira ?? f.primeira;
+  const curta = !primeira && !D.rival && f.curta;
+  const derrotas = daCopa ? (D.derrotas ?? f.derrotas) : 0;
+  const riv = acharRival(D.rival || f.rival);
   reacoesLiberadas = REACOES.map((r) => r.id).filter((id) => perfil.liberados.reacoes.includes(id));
   P = criarPartida({
     semente: D.semente || ((Date.now() / 1000) | 0) + partidaN * 7919,
@@ -431,6 +432,8 @@ function novaPartida(revanche = false) {
     rival: riv.id,
     primeira,
     curta,
+    derrotas,
+    anjo: daCopa ? anjoDaPartida({ primeira, curta, copa: perfil.copa.n, derrotas }) : 0,
     partidaN: partidaN + 1,
     gatilho: /** @type {any} */ (D.gatilho || 'novo'),
     assist: { ima: D.assist, devolucao: D.assist },
@@ -448,7 +451,7 @@ function novaPartida(revanche = false) {
   vista.m.slimes[1].dados.acessorios = acessoriosDoRival(riv.acessorio);
   nomes = [T('ui.voce'), T('rival.' + riv.id)];
   // tom do balbucio: o jogador agudo; o rival pelo nivel (os chefes falam grosso)
-  tons = [3, riv.chefe ? 11 : 2 + Math.max(0, ['T0', 'T1', 'T1+', 'T2', 'T3', 'T4', 'T5'].indexOf(riv.nivel))];
+  tons = [3, riv.chefe ? 11 : 2 + Math.floor(FORCA_NIVEL[riv.nivel] ?? 0)];
   inicio = null;
   tMao = 0;
   inicioMedido = false;
@@ -661,6 +664,8 @@ const TRATADORES = {
     if (!e.fim && !D.auto && P.humano[0]) barra = { de: tReal + 0.15, ate: tReal + 2.2 };
   },
   'match-point': () => {},
+  // o ponto nao valeu (protecao da 1a partida): o apito e o jogador saca de novo
+  'repete': () => mesa.tocar('apito', {}, { max: 1 }),
   'fim': (e) => {
     const venceu = e.humanoVenceu;
     perfil.partidas++;
@@ -670,6 +675,7 @@ const TRATADORES = {
     const daCopa = !D.rival && !D.auto;
     let titulo = false;
     let bonus = 0;
+    if (daCopa && !venceu) perfil.copa = registrarDerrota(perfil.copa);
     if (venceu && daCopa) {
       perfil.copa = registrarVitoria(perfil.copa, e.placar);
       const ch = chaveDaCopa(perfil.copa);
@@ -843,7 +849,7 @@ function desenhar(dtReal, alfa) {
   // comemoracao
   let festa = null;
   const campeao = finalDaCopa && P.festa.fim && P.resultado === -1;
-  if (P.estado === 'ponto' || (P.estado === 'fim' && P.festa.t < (campeao ? 9 : 3))) {
+  if ((P.estado === 'ponto' && P.festa.motivo !== 'repete') || (P.estado === 'fim' && P.festa.t < (campeao ? 9 : 3))) {
     const f = P.festa;
     const iv = f.lado < 0 ? 0 : 1;
     const venceu = P.resultado === -1;

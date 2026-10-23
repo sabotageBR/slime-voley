@@ -144,6 +144,25 @@ export function alvoDaPartida(o = {}) {
 }
 
 /**
+ * O anjo (desenho §2.8): no match point da CPU, com o humano `atras` pontos ou mais atras, a CPU
+ * erra de forma visivel (a bola morre na rede do proprio lado), como na protecao da 1a partida.
+ * Quantas vezes por partida: `curta` na 2a da vida (as oitavas da Copa 1) e `copa1` nas outras da
+ * Copa 1 depois de `deDerrotas` derrotas seguidas; no maximo `max`.
+ */
+export const ANJO = Object.freeze({ atras: 2, curta: 0, copa1: 0, deDerrotas: 2, max: 2 });
+
+/**
+ * Quantos anjos a partida tem.
+ * @param {{ primeira?: boolean, curta?: boolean, copa?: number, derrotas?: number }} [o]
+ */
+export function anjoDaPartida(o = {}) {
+  if (o.primeira) return 0;
+  let n = o.curta ? ANJO.curta : 0;
+  if ((o.copa || 1) === 1 && (o.derrotas || 0) >= ANJO.deDerrotas) n += ANJO.copa1;
+  return Math.min(ANJO.max, n);
+}
+
+/**
  * Alguem venceu? (vai-a-2 ate o teto)
  * @param {number[]} p placar [esquerda, direita]
  * @param {{ alvo: number, vaiA2: boolean, teto: number }} r

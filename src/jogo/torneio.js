@@ -3,15 +3,17 @@
 // figurantes, cada um com a bandeira de um pais, e o jogador com a dele. O nome e nosso: nunca o do torneio de selecoes de futebol (marca de terceiros; a
 // lista do estilo.test barra o nome ate em comentario).
 //
-// Puro e deterministico: o save guarda so { n, tam, semente, fase, placares, pais } e a chave inteira
+// Puro e deterministico: o save guarda so { n, tam, semente, fase, placares, pais, derrotas } e a chave inteira
 // sai daqui (vagas, jogos simulados, campeao). O caminho do jogador e fixo pela ordem dos rivais
 // da Copa (src/jogo/rivais.js COPAS: o ultimo e o chefe, na final), como no arco do desenho §3.9;
 // os rivais do caminho sempre vencem os seus jogos simulados (sao os mais fortes da chave). Os
 // outros jogos saem por sorteio pelo nivel T, e cada rodada so aparece quando o jogador vence a
-// dele. Perder nao elimina: a revanche e a mesma fase (o jogador nunca fica sem jogo).
+// dele. Perder nao elimina: a revanche e a mesma fase (o jogador nunca fica sem jogo), e as derrotas
+// seguidas na fase aliviam a CPU (src/jogo/rivais.js paramsIA; a vitoria zera).
 
 import { criarRng, hashTexto } from '../core/rng.js';
-import { RIVAIS, COPAS, rival as acharRival } from './rivais.js';
+import { RIVAIS, COPAS, FORCA_NIVEL, rival as acharRival } from './rivais.js';
+import { anjoDaPartida } from './regras.js';
 import { PAISES, embaralharPaises, ehPais } from './paises.js';
 
 /** Nomes das fases (chaves de texto copa.<fase>), da primeira rodada a final. */
@@ -22,10 +24,12 @@ export const NUM_COPAS = COPAS.length;
 /** Gotas pelo titulo de cada Copa (desenho §3.7: 1o titulo de cada Copa). */
 export const GOTAS_TITULO = 50;
 
-const ORDEM_NIVEL = ['T0', 'T1', 'T1+', 'T2', 'T3', 'T4', 'T5'];
+/** Teto das derrotas seguidas guardadas (o alivio da CPU para antes: rivais.js ALIVIO.max). */
+export const MAX_DERROTAS = 9;
 
 /**
- * @typedef {{ n: number, tam: number, semente: number, fase: number, placares: number[][], pais: string }} EstadoCopa
+ * @typedef {{ n: number, tam: number, semente: number, fase: number, placares: number[][], pais: string, derrotas: number }} EstadoCopa
+ *   derrotas: as derrotas seguidas do jogador na fase atual (a vitoria zera)
  * @typedef {{ id: string, pais: string, jogador: boolean }} Vaga
  * @typedef {{ a: number, b: number, venc: number, placar: number[]|null, doJogador: boolean }} Jogo
  *   a, b: indices das vagas; venc: o indice de quem venceu (-1 = ainda nao jogado)
@@ -33,7 +37,7 @@ const ORDEM_NIVEL = ['T0', 'T1', 'T1+', 'T2', 'T3', 'T4', 'T5'];
 
 /** Uma copa nova. @param {number} n @param {number} semente @param {string} [pais] @returns {EstadoCopa} */
 export function novaCopa(n, semente, pais = '') {
-  return { n: Math.max(1, Math.min(NUM_COPAS, n | 0 || 1)), tam: TAM_COPA, semente: semente >>> 0, fase: 0, placares: [], pais: ehPais(pais) ? pais.toUpperCase() : '' };
+  return { n: Math.max(1, Math.min(NUM_COPAS, n | 0 || 1)), tam: TAM_COPA, semente: semente >>> 0, fase: 0, placares: [], pais: ehPais(pais) ? pais.toUpperCase() : '', derrotas: 0 };
 }
 
 /**
@@ -50,6 +54,7 @@ export function normalizarCopa(s, semente = 1) {
   const pl = Array.isArray(s.placares) ? s.placares : [];
   c.placares = pl.slice(0, c.fase).map((p) => (Array.isArray(p) && p.length === 2 ? [Math.max(0, p[0] | 0), Math.max(0, p[1] | 0)] : [7, 0]));
   while (c.placares.length < c.fase) c.placares.push([7, 0]);
+  c.derrotas = c.fase >= rodadas ? 0 : Math.max(0, Math.min(MAX_DERROTAS, Number(s.derrotas) | 0));
   return c;
 }
 
@@ -119,8 +124,8 @@ export function chaveDaCopa(c) {
           if (caminho.includes(ia)) venceA = true;
           else if (caminho.includes(ib)) venceA = false;
           else {
-            const la = ORDEM_NIVEL.indexOf(acharRival(ia).nivel);
-            const lb = ORDEM_NIVEL.indexOf(acharRival(ib).nivel);
+            const la = FORCA_NIVEL[acharRival(ia).nivel];
+            const lb = FORCA_NIVEL[acharRival(ib).nivel];
             venceA = rj() < 1 / (1 + Math.exp(-(la - lb) * 0.8));
           }
           const pl = placarSimulado(rj, r === fases.length - 1, c.n);
@@ -146,7 +151,30 @@ export function chaveDaCopa(c) {
 export function registrarVitoria(c, placar) {
   const rodadas = FASES[TAM_COPA].length;
   if (c.fase >= rodadas) return c;
-  return { ...c, fase: c.fase + 1, placares: [...c.placares, [placar[0] | 0, placar[1] | 0]] };
+  return { ...c, fase: c.fase + 1, placares: [...c.placares, [placar[0] | 0, placar[1] | 0]], derrotas: 0 };
+}
+
+/**
+ * O jogador perdeu a partida da fase atual: e revanche da mesma fase, com mais uma derrota seguida.
+ * @param {EstadoCopa} c @returns {EstadoCopa}
+ */
+export function registrarDerrota(c) {
+  if (c.fase >= FASES[TAM_COPA].length) return c;
+  return { ...c, derrotas: Math.min(MAX_DERROTAS, (c.derrotas | 0) + 1) };
+}
+
+/**
+ * A partida da fase atual (o main.js e o novato simulado do tools/calibrar.mjs usam a mesma): o
+ * rival, a 1a da vida (contra a Gota, imperdivel), a curta (as oitavas da Copa 1, a 5), as
+ * derrotas seguidas e quantas vezes o anjo pode salvar o jogador (src/jogo/regras.js).
+ * @param {EstadoCopa} c @param {{ partidas: number }} perfil
+ */
+export function partidaDaFase(c, perfil) {
+  const rival = chaveDaCopa(c).adversario || 'gota';
+  const primeira = perfil.partidas === 0 && rival === 'gota';
+  const curta = !primeira && c.n === 1 && c.fase === 1;
+  const derrotas = c.derrotas | 0;
+  return { rival, primeira, curta, derrotas, anjo: anjoDaPartida({ primeira, curta, copa: c.n, derrotas }) };
 }
 
 /** Depois do titulo: a proxima Copa (a ultima se repete com outra chave). @param {EstadoCopa} c @param {number} semente */

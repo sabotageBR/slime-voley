@@ -4,7 +4,8 @@
 // a fase do mesmo rival na Copa 1.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { novaCopa, chaveDaCopa, registrarVitoria, proximaCopa, normalizarCopa, caminhoDaCopa, trocarPais, FASES, NUM_COPAS, TAM_COPA } from '../src/jogo/torneio.js';
+import { novaCopa, chaveDaCopa, registrarVitoria, registrarDerrota, partidaDaFase, proximaCopa, normalizarCopa, caminhoDaCopa, trocarPais, FASES, NUM_COPAS, TAM_COPA, MAX_DERROTAS } from '../src/jogo/torneio.js';
+import { anjoDaPartida } from '../src/jogo/regras.js';
 import { normalizarPerfil } from '../src/jogo/perfil.js';
 import { COPAS } from '../src/jogo/rivais.js';
 
@@ -98,4 +99,54 @@ test('save: copa invalida vira a Copa 1; a de outra chave recomeca; o perfil ant
   }
   const p = normalizarPerfil({ partidas: 4, fase: 2 });
   assert.deepEqual(p.titulos, [0, 0, 0, 0]);
+});
+
+test('derrotas seguidas: a derrota conta, a vitoria zera, a Copa nova zera e a chave nao muda', () => {
+  let c = novaCopa(1, 11, 'BR');
+  assert.equal(c.derrotas, 0);
+  c = registrarVitoria(c, [5, 1]);
+  const chave = chaveDaCopa(c);
+  c = registrarDerrota(registrarDerrota(c));
+  assert.equal(c.derrotas, 2);
+  assert.equal(c.fase, 1, 'a derrota e revanche da mesma fase');
+  assert.deepEqual(chaveDaCopa(c), chave, 'a chave e a mesma com qualquer numero de derrotas');
+  for (let k = 0; k < 20; k++) c = registrarDerrota(c);
+  assert.equal(c.derrotas, MAX_DERROTAS);
+  c = registrarVitoria(c, [5, 4]);
+  assert.equal(c.derrotas, 0);
+  assert.equal(proximaCopa({ ...correr(novaCopa(1, 3)).c, derrotas: 4 }, 5).derrotas, 0);
+  const campeao = correr(novaCopa(1, 3)).c;
+  assert.equal(registrarDerrota(campeao).derrotas, 0, 'depois do titulo nao ha fase para perder');
+});
+
+test('save das derrotas: invalido vira 0, o teto vale, a chave de outro tamanho zera e o perfil carrega', () => {
+  const base = { n: 1, tam: TAM_COPA, semente: 4, fase: 2, placares: [[5, 0], [5, 3]] };
+  assert.equal(normalizarCopa(base).derrotas, 0, 'save da 0.2.0 sem o campo');
+  assert.equal(normalizarCopa({ ...base, derrotas: 3 }).derrotas, 3);
+  assert.equal(normalizarCopa({ ...base, derrotas: '2' }).derrotas, 2);
+  assert.equal(normalizarCopa({ ...base, derrotas: -4 }).derrotas, 0);
+  assert.equal(normalizarCopa({ ...base, derrotas: 'x' }).derrotas, 0);
+  assert.equal(normalizarCopa({ ...base, derrotas: 99 }).derrotas, MAX_DERROTAS);
+  assert.equal(normalizarCopa({ ...base, tam: 8, derrotas: 3 }).derrotas, 0, 'a chave de outro tamanho recomeca');
+  assert.equal(normalizarCopa({ ...base, fase: 5, placares: [], derrotas: 3 }).derrotas, 0, 'campeao');
+  const p = normalizarPerfil(JSON.parse(JSON.stringify(normalizarPerfil({ copa: { ...base, derrotas: 2 } }))));
+  assert.equal(p.copa.derrotas, 2, 'ida e volta pelo save');
+});
+
+test('partidaDaFase: a 1a da vida contra a Gota, as oitavas da Copa 1 curtas e com anjo, as derrotas passam', () => {
+  const c0 = novaCopa(1, 9);
+  assert.deepEqual(partidaDaFase(c0, { partidas: 0 }), { rival: 'gota', primeira: true, curta: false, derrotas: 0, anjo: 0 });
+  assert.equal(partidaDaFase(c0, { partidas: 3 }).primeira, false, 'a Gota de novo (save mexido) nao e mais imperdivel');
+  const c1 = registrarDerrota(registrarVitoria(c0, [5, 2]));
+  const f1 = partidaDaFase(c1, { partidas: 2 });
+  assert.equal(f1.rival, 'pingo');
+  assert.equal(f1.curta, true);
+  assert.equal(f1.derrotas, 1);
+  assert.equal(f1.anjo, anjoDaPartida({ curta: true, copa: 1, derrotas: 1 }));
+  const c2 = registrarVitoria(c1, [5, 4]);
+  const f2 = partidaDaFase(c2, { partidas: 3 });
+  assert.equal(f2.rival, 'geleia');
+  assert.equal(f2.curta, false);
+  assert.equal(f2.derrotas, 0);
+  assert.equal(partidaDaFase(novaCopa(2, 9), { partidas: 20 }).curta, false, 'so a Copa 1 tem a partida curta');
 });

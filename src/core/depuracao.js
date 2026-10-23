@@ -18,6 +18,8 @@
 //   ?lab                  laboratorio da cortada lenta (sliders ao vivo)
 //   ?menu ?chave          abre o menu principal (e a tela da chave) no comeco; ?vestiario=cores abre o vestiario na aba
 //   ?copa=2&fase=3        poe a Copa Gosma N na fase F (0 = primeira rodada; grava no save do navegador)
+//   ?derrotas=2           a partida da Copa como depois de N derrotas seguidas na fase (o alivio da CPU e o anjo)
+//   ?direta=0             o cartao depois da 1a vitoria da vida (sem a transicao direta para a 2a partida)
 //   ?look=pirata          veste o jogador com um arquetipo (src/jogo/visual.js); ?bandeira=BR a estampa da bandeira
 //   ?avanco=8             segundos ate o cartao de fim avancar sozinho (0 desliga; padrao 8, tambem fora do loopback)
 //
@@ -33,6 +35,7 @@ export function lerDepuracao() {
     ginasio: '', skin: '', rival: '', nivel: '', controle: '', visual: '', gatilho: '', defensor: 0, lenta: 0, fora: false, assist: true,
     qualidade: -1, render: '', lang: '', semHud: false, semAnuncio: false, semBlur: false, auto: false, primeira: null, lab: false,
     menu: false, chave: false, vestiario: '', copa: 0, fase: 0, look: '', bandeira: '', avanco: AVANCO,
+    derrotas: null, direta: true,
   };
   let local = false;
   try {
@@ -88,5 +91,7 @@ export function lerDepuracao() {
     look: q.get('look') || '',
     bandeira: /^[a-z]{2}$/i.test(q.get('bandeira') || '') ? String(q.get('bandeira')) : '',
     avanco: q.has('avanco') ? Math.max(0, num('avanco')) : AVANCO,
+    derrotas: q.has('derrotas') ? Math.max(0, Number(q.get('derrotas')) | 0) : null,
+    direta: q.get('direta') !== '0',
   });
 }

@@ -22,8 +22,18 @@ export const NIVEIS = Object.freeze({
   T5: Object.freeze({ vel: 11, reacao: 0.08, erro: 0.45, pulo: 0.6, corta: 0.55, super: 0.9, perfeita: 0.5, saqueErro: 0.035 }),
 });
 
-/** O jogador automatico do ?auto, dos prints e do humano simulado de base. */
-export const BOT = Object.freeze({ ...NIVEIS.T2, corta: 0.2 });
+/**
+ * Forca de cada nivel (a ordem e o meio-termo entre eles): os jogos simulados da chave
+ * (src/jogo/torneio.js) e o tom do balbucio (main.js) leem daqui.
+ */
+export const FORCA_NIVEL = Object.freeze({ T0: 0, T1: 1, 'T1+': 2, T2: 3, T3: 4, T4: 5, T5: 6 });
+
+/**
+ * O jogador automatico do ?auto e dos prints, nos dois lados do bot contra bot (o npm run
+ * calibrar e os hashes do modo demo): o T2 de 2026-10-22 em literal, para a Copa poder mexer nos
+ * niveis sem mudar o bot.
+ */
+export const BOT = Object.freeze({ vel: 9.0, reacao: 0.24, erro: 1.1, pulo: 0.35, corta: 0.2, super: 0.3, perfeita: 0.15, saqueErro: 0.08 });
 
 /**
  * @typedef {Object} Rival
@@ -118,25 +128,58 @@ export function corDoRival(r, hexJogador) {
 }
 
 /**
- * Parametros efetivos da IA de um rival nesta partida: o nivel, com o elastico (funcao continua
- * do placar, nunca troca de nivel no meio) e a protecao da primeira partida.
+ * Alivio por derrota seguida (M2d, 2026-10-22): cada derrota seguida do jogador na fase da Copa
+ * deixa a CPU um pouco pior (erro e saqueErro multiplicam, reacao soma, pulo e corta dividem), ate
+ * `max` derrotas; nos chefes vale `chefe` disso. A vitoria zera (src/jogo/torneio.js). Nunca troca
+ * de nivel: o jogador nao ve o degrau.
+ */
+export const ALIVIO = Object.freeze({ max: 4, chefe: 0.75, erro: 0, reacao: 0, pulo: 0, corta: 0, saqueErro: 0 });
+
+/**
+ * Elastico (so contra a CPU): funcao continua do placar, limitada, que nunca troca de nivel no meio
+ * da partida. `normal` (as partidas a 7 e a 1a da vida) e a de antes do M2d; `curta` (as partidas
+ * a 5) comeca antes, porque a 5 a vantagem de 3 ja decidiu. ini: a diferenca em que comeca; passo:
+ * quantos pontos ate o teto. `atras`: a CPU muito atras erra menos. Os chefes usam `chefe` disso.
+ */
+const ELASTICO_NORMAL = Object.freeze({ ini: 3, passo: 2, erro: 0.3, reacao: 0.06, corta: 0.5, pulo: 0, saqueErro: 0, atras: true });
+export const ELASTICO = Object.freeze({
+  normal: ELASTICO_NORMAL,
+  curta: ELASTICO_NORMAL,
+  atras: Object.freeze({ ini: 4, passo: 2, erro: 0.15 }),
+  chefe: 0.5,
+});
+
+/**
+ * Parametros efetivos da IA de um rival nesta partida: o nivel, com o alivio das derrotas seguidas
+ * e o elastico do placar.
  * @param {Rival} r
- * @param {{ placarCpu: number, placarHumano: number, partida: number }} ctx
+ * @param {{ placarCpu: number, placarHumano: number, partida?: number, alvo?: number, imperdivel?: boolean, derrotas?: number }} ctx
  */
 export function paramsIA(r, ctx) {
   const base = { ...NIVEIS[r.nivel] };
   // Geleia na primeira vez (a 3a partida da Copa 1): erro x1,4 (T1+ fixo)
-  if (r.id === 'geleia' && ctx.partida <= 3) base.erro *= 1.4;
+  if (r.id === 'geleia' && (ctx.partida || 1) <= 3) base.erro *= 1.4;
+  const d = Math.min(ALIVIO.max, Math.max(0, ctx.derrotas | 0)) * (r.chefe ? ALIVIO.chefe : 1);
+  if (d > 0) {
+    base.erro *= 1 + ALIVIO.erro * d;
+    base.reacao += ALIVIO.reacao * d;
+    base.pulo *= Math.max(0, 1 - ALIVIO.pulo * d);
+    base.corta *= Math.max(0, 1 - ALIVIO.corta * d);
+    base.saqueErro *= 1 + ALIVIO.saqueErro * d;
+  }
+  const E = !ctx.imperdivel && (ctx.alvo || 7) <= 5 ? ELASTICO.curta : ELASTICO.normal;
+  const f = r.chefe ? ELASTICO.chefe : 1;
   const dif = ctx.placarCpu - ctx.placarHumano;
-  const f = r.chefe ? 0.5 : 1;
-  if (dif >= 3) {
-    const k = Math.min(1, (dif - 2) / 2) * f;
-    base.erro *= 1 + 0.3 * k;
-    base.reacao += 0.06 * k;
-    base.corta *= 1 - 0.5 * k;
-  } else if (dif <= -4) {
-    const k = Math.min(1, (-dif - 3) / 2) * f;
-    base.erro *= 1 - 0.15 * k;
+  if (dif >= E.ini) {
+    const k = Math.min(1, (dif - E.ini + 1) / E.passo) * f;
+    base.erro *= 1 + E.erro * k;
+    base.reacao += E.reacao * k;
+    base.corta *= 1 - E.corta * k;
+    if (E.pulo) base.pulo *= 1 - E.pulo * k;
+    if (E.saqueErro) base.saqueErro *= 1 + E.saqueErro * k;
+  } else if (E.atras && dif <= -ELASTICO.atras.ini) {
+    const k = Math.min(1, (-dif - ELASTICO.atras.ini + 1) / ELASTICO.atras.passo) * f;
+    base.erro *= 1 - ELASTICO.atras.erro * k;
   }
   return base;
 }

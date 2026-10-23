@@ -14,7 +14,7 @@
 import { criarSlime, criarBola, passoSlime, passoBola, eixos, prever, pertoCupula, amassar, limitesX, limitar, seguirAlvo, RB, PASSO, PULO, G_BOLA, G_SLIME, LARG, REDE_R, REDE_H, RAIO, VEL } from '../fisica/volei.js';
 import { criarTempo, passoReal, escalarTudo } from './tempo.js';
 import { criarPele, passoPele, assentar, marcarCovinha, PASSO_PELE } from './pele.js';
-import { TEMPOS, SAQUE, temposSaque, qualidadeSaque, profundidadePorPosicao, posicaoParaRumo, alvoDaPartida, vencedor, pontoDaPartida, TOQUES } from './regras.js';
+import { TEMPOS, SAQUE, ANJO, temposSaque, qualidadeSaque, profundidadePorPosicao, posicaoParaRumo, alvoDaPartida, vencedor, pontoDaPartida, TOQUES } from './regras.js';
 import { criarMedidor, ganhar, gastar, tem, CUSTO } from './medidor.js';
 import { criarIA, irPara } from './ia.js';
 import { BOT, paramsIA, rival as acharRival } from './rivais.js';
@@ -58,6 +58,8 @@ const intencaoVazia = () => ({ eixo: 0, botao: false, borda: false, superBorda: 
  * @property {boolean} [curta]                a 2a partida da vida (alvo 5 sem vai-a-2)
  * @property {number} [copa]
  * @property {number} [partidaN]              quantas partidas o jogador ja comecou (protecao)
+ * @property {number} [derrotas]              derrotas seguidas do jogador nesta fase da Copa (o alivio da CPU)
+ * @property {number} [anjo]                  quantas vezes a CPU erra no match point dela (src/jogo/regras.js ANJO)
  * @property {{ vento?: number, teto?: number, eAlambrado?: number }} [ginasio]
  * @property {'novo'|'segura'} [gatilho]
  * @property {{ escalaMundo?: number, escalaDefensor?: number, entrada?: number }} [lenta]
@@ -108,7 +110,7 @@ export function criarPartida(o = {}) {
 
   let placar = [0, 0];
   const humano = [modo !== 'demo', modo === 'dois'];
-  const params = () => paramsIA(riv, { placarCpu: placar[1], placarHumano: placar[0], partida: o.partidaN || 1 });
+  const params = () => paramsIA(riv, { placarCpu: placar[1], placarHumano: placar[0], partida: o.partidaN || 1, alvo: regras.alvo, imperdivel: regras.imperdivel, derrotas: o.derrotas || 0 });
   const ias = [
     humano[0] ? null : criarIA(BOT, rng, {}),
     humano[1] ? null : criarIA(modo === 'demo' ? BOT : params(), rng, { perso: riv.perso }),
@@ -184,6 +186,11 @@ export function criarPartida(o = {}) {
   const lenta = o.lenta || {};
   // onboarding: a Gota saca 0,6 s depois do primeiro toque
   let onboardingSaque = !!o.primeira;
+  /** o anjo: quantas vezes ainda salva o humano no match point da CPU, e quantas ja salvou */
+  let anjo = modo === 'cpu' && !regras.imperdivel ? Math.max(0, o.anjo | 0) : 0;
+  let anjosUsados = 0;
+  /** a CPU ja decidiu errar neste rali (o 2o toque dela nao salva a bola) */
+  let erraNoRali = false;
   let primeiroToque = false;
 
   // ------------------------------------------------------------------ utilidades
@@ -224,6 +231,33 @@ export function criarPartida(o = {}) {
     for (const a of ias) if (a) a.jogada();
   }
 
+  /**
+   * A CPU `i` tem que errar agora (de forma visivel)? A protecao da 1a partida (ela nunca fecha a
+   * partida: a bola morre na rede do proprio lado) e o anjo (no match point dela, com o humano
+   * ANJO.atras ou mais atras, enquanto houver anjo; vale o rali inteiro).
+   */
+  function cpuDeveErrar(i) {
+    if (humano[i] || !humano[outroI(i)]) return false;
+    if (regras.imperdivel) return placar[i] === regras.alvo - 1;
+    return erraNoRali || anjoQuer(i);
+  }
+
+  /** O anjo quer que a CPU `i` erre este rali? */
+  function anjoQuer(i) {
+    return !regras.imperdivel && anjo > 0 && !humano[i] && humano[outroI(i)] && pontoDaPartida(placar, regras) === slimes[i].lado && placar[i] - placar[outroI(i)] >= ANJO.atras;
+  }
+
+  /**
+   * A CPU errou de proposito (anjo): gasta um anjo, uma vez por rali. Pelo resto do rali ela le
+   * errado a queda (vai para o lado errado) e nao encosta na bola: o furo de um rival novato.
+   */
+  function cpuErra() {
+    if (regras.imperdivel || erraNoRali) return;
+    anjo--;
+    anjosUsados++;
+    erraNoRali = true;
+  }
+
   /** Comeca o saque de `i` (ponto acabou ou partida nova). */
   function prepararSaque(i) {
     sacador = i;
@@ -247,6 +281,7 @@ export function criarPartida(o = {}) {
     rali.bateuRede = false;
     rali.ultimaCortada = false;
     rali.recepcaoSaque = false;
+    erraNoRali = false;
     atualizarFundo();
     bolaNoSacador();
     novaJogadaIAs();
@@ -342,8 +377,9 @@ export function criarPartida(o = {}) {
       H = 9.0;
       tipo = 'roteiro';
       onboardingSaque = false;
-    } else if (regras.imperdivel && !humano[i] && humano[outroI(i)] && placar[i] === regras.alvo - 1) {
-      // protecao da primeira partida: a CPU nao fecha nem no saque (morre na rede)
+    } else if (cpuDeveErrar(i)) {
+      // protecao da primeira partida e anjo: a CPU nao fecha nem no saque (morre na rede)
+      cpuErra();
       alvo = s.lado * (REDE_R + 0.9);
       H = bola.y + 0.8;
     } else {
@@ -388,6 +424,12 @@ export function criarPartida(o = {}) {
     if (cortada) terminarCortada(true);
     const iv = iDoLado(ladoV);
     const ip = outroI(iv);
+    // protecao da 1a partida: o erro do proprio humano (rede, 4 toques) no match point da CPU nao
+    // fecha a partida imperdivel; o ponto nao vale e ele saca de novo (antes do M2d, 1,7% perdiam)
+    if (regras.imperdivel && !humano[iv] && humano[ip] && placar[iv] >= regras.alvo - 1) {
+      repetir(ip, x);
+      return;
+    }
     const antes = [...placar];
     placar[iv]++;
     pontoN++;
@@ -462,6 +504,24 @@ export function criarPartida(o = {}) {
       const [a0, a1] = REACAO.atraso;
       reacaoCpu = { t: a0 + (a1 - a0) * rngR(), id: escolherReacaoCpu(rngR, { ganhou: iv === 1 }) };
     }
+  }
+
+  /** O ponto nao valeu (protecao da 1a partida): pausa curta sem festa e `i` saca de novo. */
+  function repetir(i, x) {
+    festa.t = 0;
+    festa.tipo = 'curta';
+    festa.lado = 0;
+    festa.motivo = 'repete';
+    festa.palavra = '';
+    festa.x = x;
+    festa.dur = TEMPOS.festaCurta;
+    festa.controle = TEMPOS.controleCurta;
+    festa.deslize = TEMPOS.deslizeCurta;
+    festa.fim = false;
+    T.hitstop = TEMPOS.hitstopCurta;
+    estado = 'ponto';
+    sacador = i;
+    ev({ tipo: 'repete', i, x });
   }
 
   /**
@@ -723,9 +783,10 @@ export function criarPartida(o = {}) {
     atualizarFundo();
     ganhar(Jm.med, 'toque');
     if (humano[i] && !humano[outroI(i)]) assistir(i);
-    // protecao da primeira partida: a CPU nunca fecha a partida (erra de forma visivel: a bola
-    // morre na rede, do proprio lado; para fora nao da mais, a parede de fundo devolve)
-    if (!humano[i] && humano[outroI(i)] && regras.imperdivel && placar[i] === regras.alvo - 1) {
+    // protecao da primeira partida e anjo: a CPU nao fecha a partida (erra de forma visivel: a
+    // bola morre na rede, do proprio lado; para fora nao da mais, a parede de fundo devolve)
+    if (cpuDeveErrar(i)) {
+      cpuErra();
       const [vx, vy] = arco(bola.x, bola.y, s.lado * (REDE_R + 0.9), bola.y + 0.8);
       bola.vx = vx;
       bola.vy = vy;
@@ -882,6 +943,13 @@ export function criarPartida(o = {}) {
         if (i === sacador) return { eixo: irPara(s.x, s.lado * 8, 6), pular: false };
         return { eixo: irPara(s.x, s.lado * 6.5, 8), pular: false };
       }
+      // anjo: a CPU que furou le errado a queda e vai para o lado errado (longe da bola)
+      if (erraNoRali && estado === 'jogo' && bola.solta) {
+        const pr = prever(bola, { tMax: 3, vento: ginasio.vento, teto: ginasio.teto });
+        const [x0, x1] = limitesX(s);
+        const longe = Math.abs(pr.x) > 7 ? pr.x - s.lado * 4.2 : pr.x + s.lado * 4.2;
+        return { eixo: irPara(s.x, limitar(pr.x * s.lado > 0 ? longe : s.x, x0, x1), 11, s.vx), pular: false };
+      }
       const ctx = {
         bola, eu: s, outro: slimes[outroI(i)], meus: rali.lado === s.lado ? rali.toques : 0, estado,
         souSacador: i === sacador, mira: cortada && cortada.i !== i ? { x: cortada.alvoX } : null,
@@ -998,6 +1066,8 @@ export function criarPartida(o = {}) {
     if (T.tMundo - tSaqueSolto < 0.2 && rali.recepcaoSaque) { bola.colide[rali.saqueDeQuem] = false; bola.colide[outroI(rali.saqueDeQuem)] = true; }
     else if (T.tMundo - tCortadaSolta < 0.15 && rali.ultimaCortada) bola.colide[rali.ultimo] = false;
     else if (!cortada || cortada.fase === 'soltando') { bola.colide[0] = true; bola.colide[1] = true; }
+    // anjo: a CPU que furou nao encosta mais na bola neste rali
+    if (erraNoRali) for (const i of [0, 1]) if (!humano[i]) bola.colide[i] = false;
     const evs = passoBola(bola, slimes, dtM, ginasio, [], andaram);
     for (const e of evs) {
       if (e.tipo === 'toque') aoToque(e);
@@ -1010,6 +1080,8 @@ export function criarPartida(o = {}) {
           rali.lado = e.lado;
           rali.toques = 0;
           rali.bateuRede = false;
+          // anjo: a bola chegou no lado da CPU no match point dela, e ela vai furar
+          if (anjoQuer(iDoLado(e.lado))) cpuErra();
           ev({ tipo: 'cruzou', lado: e.lado, n: rali.travessias });
           if (rali.travessias === 8) falar(quemMandou, 'rali');
         }
@@ -1132,7 +1204,7 @@ export function criarPartida(o = {}) {
       for (const i of [0, 1]) {
         if (!ias[i] || cortada || estado !== 'jogo') continue;
         const s = slimes[i];
-        if (!s.noChao && ias[i].querCortar() && !rali.recepcaoSaque) tentarCortada(i, false);
+        if (!s.noChao && ias[i].querCortar() && !rali.recepcaoSaque && !cpuDeveErrar(i)) tentarCortada(i, false);
       }
     }
     if (cortada && cortada.fase !== 'soltando') { anterior.bola.x = bola.x; anterior.bola.y = bola.y; }
@@ -1218,6 +1290,10 @@ export function criarPartida(o = {}) {
     get humano() { return humano; },
     get rali() { return rali; },
     get rival() { return riv; },
+    /** vento e teto do ginasio (o novato simulado le para prever a bola como a IA) */
+    get ginasio() { return ginasio; },
+    /** o anjo: quantos restam e quantos ja salvaram o humano nesta partida */
+    get anjo() { return { restam: anjo, usados: anjosUsados }; },
     get esperaToque() { return esperaToque; },
     get tPartida() { return tPartida; },
     get tutorialCortada() { return tutorialCortada; },
@@ -1250,7 +1326,7 @@ export function criarPartida(o = {}) {
      */
     resumo(i = 0) {
       const lado = i === 0 ? -1 : 1;
-      return { venceu: resultado === lado, copa, pontos: stats.pontos[i], aces: stats.aces[i], bombas: stats.bombas[i], viradas: stats.viradas[i], ralis10: stats.ralis10, perdidos: placar[1 - i] };
+      return { venceu: resultado === lado, copa, pontos: stats.pontos[i], aces: stats.aces[i], bombas: stats.bombas[i], viradas: stats.viradas[i], ralis10: stats.ralis10, perdidos: placar[1 - i], anjos: anjosUsados };
     },
     /** quantos pontos ja sairam nesta partida */
     get pontoN() { return pontoN; },
