@@ -361,6 +361,7 @@ O slime subindo soma vy (×1,0) e verticaliza a saída. O teste mede a normal e 
 - Medido no bot contra bot: a mediana do rali foi de 6,1 s para 6,6 s (antes, 16% dos pontos eram fora).
 - A regra antiga (fora por cima da placa do lado oposto ao do último toque) ficou atrás de `criarPartida({ fora: true })` e de `?fora=1`, só para comparar.
 - Na 1ª partida, o erro visível da CPU, que antes mandava a bola para fora, agora morre na rede do próprio lado.
+- **Na 1ª partida, o erro do próprio jogador no match point da Gota não fecha a partida** (M2d): quando a bola dele cai na rede ou ele dá 4 toques, o ponto não vale e ele saca de novo (evento `repete`, só o apito, sem festa). Antes, 1,7% perdiam a partida "imperdível".
 
 **Modos:** Circuito Gosma (4 Copas), Amistoso, 2P local e Vestiário.
 
@@ -372,7 +373,13 @@ O slime subindo soma vy (×1,0) e verticaliza a saída. O teste mede a normal e 
 
 Evolução, Gotas contando e replay podem ser pulados com um toque. **Meta medida pelo bot:** no máximo 2 toques e 4 s, sem anúncio, entre o fim de uma partida e o saque da próxima.
 
-**Avanço automático** (2026-10-22): sem toque, o cartão avança sozinho em 8 s (`?avanco=N`), sem anúncio. Depois da 1ª partida da vida, em 3 s (`TEMPOS.avancoPrimeira`, mais 1,5 s de espera antes da barra encher). No Player Fit Test de 2026-10-21 (build 0.1.1, sem avanço), 47% de quem venceu a 1ª partida não terminou a 2ª.
+**Avanço automático** (2026-10-22): sem toque, o cartão avança sozinho em 8 s (`?avanco=N`), sem anúncio. Nas 3 primeiras derrotas da vida, em 4 s (M2d: `TEMPOS.avancoDerrota`; na 0.2.0, cerca de 21% saíam no cartão de derrota). A conta toda está em `avancoDoCartao` (`src/jogo/regras.js`). No Player Fit Test de 2026-10-21 (build 0.1.1, sem avanço), 47% de quem venceu a 1ª partida não terminou a 2ª.
+
+**Transição direta da 1ª para a 2ª partida, sem cartão** (M2d, decisão do usuário; na 0.2.0, 19% saíam no cartão de 3 s depois da 1ª vitória). A sequência anda no jogo-real (`main.js` `transicao`; a pausa congela):
+- **Presente** (`TEMPOS.transPresente`, 2,2 s, contando os 0,4 s finais da festa): a câmera fecha no jogador com um holofote leve, o presente desce na cabeça dele e aparecem "NOVO!", o nome do item e, se subiu, "NÍVEL 2!" (`celebracao.js` `desenharPresente`; `acessorios.js` `dados.novo`).
+- **Entrada** (`TEMPOS.letreiro`, 1,6 s): a 2ª partida já criada (`entrada: true`); o Pingo cai do céu (`rival-entra`: splat, tremor, plateia), o letreiro da fase ("Oitavas!") e a faixa do próximo presente ("Vença Pingo · Óculos redondos", que some no 1º ponto).
+- O saque espera o toque, que dá o `gameplayStart`. Um toque no presente pula para a entrada. Tudo em canvas (aparece nas gravações do playtest).
+- Sai do 1º cartão: o Prêmio ×2, o presente que abria o vestiário e o XP visível. A chave e o caminho aparecem a partir do 2º cartão. `?direta=0` volta ao cartão; medida `transicao/m2/direta`.
 
 **Presentes das primeiras vitórias** (2026-10-22, `PRESENTES` em `src/jogo/perfil.js`): nas 3 primeiras vitórias da vida, um acessório do vestiário por vitória (Orelhas de gato, Óculos redondos e Coroa).
 - O cartão mostra o presente novo ("NOVO!", o slime do jogador vestindo o item) e o da próxima vitória ("Vença Pingo").
@@ -389,6 +396,8 @@ Evolução, Gotas contando e replay podem ser pulados com um toque. **Meta medid
 | 1º jogo | `gameplayStart` no 1º `pointerdown`/`keydown` real |
 | Entre pontos | nenhum evento |
 | Ponto final | `gameplayStop` quando a bola toca o chão → festa e replay → cartão único → toque em "Próxima" ou "Revanche" → `commercialBreak` (a partir da 3ª partida e **só se não houve premiado nessa pausa**) → o rival entra (1 s) → espera o toque de saque → `gameplayStart` |
+| Fim da 1ª partida da vida | sem cartão (a transição direta) e sem `commercialBreak` → o rival cai do céu → espera o toque de saque → `gameplayStart` |
+| Cortada guiada congelada | sem limite; depois de 30 s sem interação, `gameplayStop`; o próximo toque real retoma (`gameplayStart`) |
 | Pausa | `gameplayStop` → "Continuar" → `commercialBreak` → toque → `gameplayStart` |
 | Durante anúncio | entrada desligada, blur ignorado. O toque de saque só vale depois que a promessa resolver |
 | Editor e vestiário | só entre partidas, sem `commercialBreak` ao sair |
@@ -430,7 +439,8 @@ Evolução, Gotas contando e replay podem ser pulados com um toque. **Meta medid
 
 **Mira** (`render/mira.js`)
 - O alvo fica no piso adversário, de rede + 1,0 até LARG − 0,6. A cortada lenta nunca sai.
-- **Mira padrão:** um ponto no fundo da quadra a pelo menos 3 u da posição prevista do rival (posição + 0,3 s de velocidade). Se não houver, o ponto válido mais longe dele.
+- **Mira padrão (a CPU):** um ponto no fundo da quadra a pelo menos 3 u da posição prevista do rival (posição + 0,3 s de velocidade). Se não houver, o ponto válido mais longe dele.
+- **Mira guiada (o humano, M2d; `miraGuiada`):** a cortada do humano começa no ponto da faixa mais longe da posição prevista do rival. Com a mira padrão, a IA lia a retícula desde a entrada e já estava embaixo: o novato simulado tentava duas cortadas por partida e só 0,02 viravam BOMBA. Com a guiada, cerca de 0,3. A ponta colada na rede, vinda do fundo, sai como deixada lenta (o resolvedor não acha o tiro direto), e mesmo assim pontua mais que o tiro direto, que a CPU lê. Quem segura mexe a mira a partir dela.
 - **Resolvedor (por tiro):**
   - para cada ângulo de −75° a +30°, em passos de 2°, faz bissecção na velocidade com `fisica/volei.prever`, o mesmo integrador, **com vento e sem `VMAX`**, até o ponto de queda bater no alvo;
   - descarta o que passa de `V_CORTADA` = 29, cruza a rede abaixo de `REDE_H + RB + 0,25` ou **raspa o topo do poste em qualquer ponto do voo** (2026-10-22: o tiro curto que descia logo depois da rede batia nela);
@@ -464,7 +474,23 @@ Evolução, Gotas contando e replay podem ser pulados com um toque. **Meta medid
 - eventos na ordem certa;
 - `hash` com escala 1000.
 
-**Telemetria** (só o humano; até 2026-10-22 a CPU entrava na conta):
+**Cortada guiada da 1ª partida, à prova de falha** (M2d; `partida.js` `guia`, `CORTADA.guia`). Na 0.2.0, só 55% recebiam a guiada (ela esperava o medidor cheio e 1 ponto do jogador) e 55% deles cortavam.
+
+| Fase | Entra quando | O que acontece |
+|---|---|---|
+| `esperando` | a 1ª partida da vida | — |
+| `oferecida` | do 2º rali em diante (`pontoN ≥ 1`), no toque ou no saque da Gota | O medidor enche. A bola sai em arco (ápice 10,5) e, descendo, passa pelo **ponto de batida do jogador no ápice do pulo** (`batidaNoApice`). Com a guia pendente, o saque de um toque do jogador vai no corpo da Gota (sem ace) |
+| `congelada` | a bola descendo do lado do jogador, até 0,6 u acima desse ponto | O mundo vai a 3% (rampa de 120 ms) e a bola fica presa por mola sobre o jogador, **sem limite de tempo**. A mão diz "toque para cortar!". Push-in de 1,04 e plateia lenta |
+| `salto` | **qualquer** toque (`interacao()`) | O pulo sai sozinho, com o mundo a 50% |
+| `cortando` | perto do ápice (vy ≤ 3) | A cortada forçada, na mira guiada **direta** (só alvos que o resolvedor acerta sem lob), com pelo menos 0,7 s de mira |
+| `feito` | a soltura | A Gota não encosta na bola até o ponto: BOMBA, 2,5 s depois do toque |
+
+- Da oferta até o ponto, a Gota assiste do fundo e não corta. Se o rali acabar antes da soltura, a guia volta a `esperando` e é oferecida de novo.
+- No ar quando congela, o toque corta direto. A cortada natural depois da oferta também encerra a guia, com o mesmo bloqueio.
+- 30 s congelado sem interação param o gameplay (§2.4).
+- `roteiro=guiada`: a fase congelada pronta para os prints.
+
+**Telemetria** (só o humano; até 2026-10-22 a CPU entrava na conta; a guiada conta a parte como `cortada/gesto/guiada`):
 - `cortada/gesto/toque|segurou`: soltou antes do `tMinToque` (o toque simples) ou segurou;
 - `cortada/mira/auto|manual`: a mira padrão ou mexida (o mouse sempre mexe: a mira segue o cursor);
 - `cortada/lenta/sem-querer`: só na variante "segura" (soltura rápida com a mira parada, que devolve o medidor).
@@ -551,6 +577,7 @@ Catálogo aprovado pelo usuário em 2026-10-21. O código está em `src/jogo/pow
 | Nível | vel | reação (s) | erro (u) | pulo | corta | super | perfeita |
 |---|---|---|---|---|---|---|---|
 | T0 | 7,0 | 0,45 | 1,8 | 0 | 0 | 0 | 0 |
+| **T0+** (M2d) | 7,25 | 0,425 | 1,7 | 0,05 | 0 | 0 | 0,025 |
 | T1 | 7,5 | 0,40 | 1,6 | 0,10 | 0 | 0 | 0,05 |
 | **T1+** | 8,0 | 0,32 | 1,4 | 0,20 | 0,05 | 0 | 0,10 |
 | T2 | 9,0 | 0,24 | 1,1 | 0,35 | 0,15 | 0,3 | 0,15 |
@@ -564,45 +591,47 @@ Catálogo aprovado pelo usuário em 2026-10-21. O código está em `src/jogo/pow
 
 | Copa | Rivais | Chefe |
 |---|---|---|
-| 1 Praia | Gota (T0→T1, distraída; partida 1 imperdível), **Pingo** (T1, lob), Geleia (**T1+ fixo** na 1ª vez, erro ×1,4, no máximo 1 cortada lenta telegrafada depois do 4º ponto e nunca no match point), **Mingau** (T2, rede) | **Rei Gosma (T2**, mira, **1 Fogo roteirizado**, anunciado e defensável, sem cortada lenta no 1º encontro) |
+| 1 Praia | Gota (T0, distraída; partida 1 imperdível), **Pingo** (**T0+**, lob), Geleia (**T1**), **Mingau** (**T1+**, rede) | **Rei Gosma (T2**, mira, **1 Fogo roteirizado**, anunciado e defensável, sem cortada lenta no 1º encontro) |
 | 2 Escola | **Quiabo** (T2), Bolinha (T2, lob), Muralha (T2, rede), Professora Pudim (T3) | Faísca (T3, Raio) |
 | 3 Rua | **Onda** (T3, lob), Dona Calma (T3), Chiclete (T3, Fogo), Bolota (T3, caça-powerup) | Vovó Nuvem (T4, Jornada) |
 | 4 Arena | **Vulcão** (T4, Fogo), Trovão (T4, Raio), Cometa (T4), Geleião (T4) | Pimenta (T5, Fogo + Meteoro) |
 
-Os rivais em negrito entraram com a chave de 32 (2026-10-22). Mais 11 **figurantes** (`copa: 0`) só completam a chave e nunca cruzam com o jogador: Xarope, Mel, Lama, Musgo, Piche, Amora, Kiwi, Tapioca, Grude, Brejo e Melado.
+Os rivais em negrito entraram com a chave de 32 (2026-10-22). Os níveis da Copa 1 são os do M2d (eram Pingo T1, Geleia T1+ com erro ×1,4 e Mingau T2). O ×1,4 da Geleia estava invertido: só valia na 3ª partida da vida, ou seja, para quem venceu o Pingo de primeira. `FORCA_NIVEL` dá a ordem dos níveis (os jogos simulados da chave e o tom da voz), e o `BOT` é o T2 em literal. Mais 11 **figurantes** (`copa: 0`) só completam a chave e nunca cruzam com o jogador: Xarope, Mel, Lama, Musgo, Piche, Amora, Kiwi, Tapioca, Grude, Brejo e Melado.
 
 **Cores (2026-10-22, "os rivais vêm sempre da mesma cor"):** cada rival veste uma cor da paleta calibrada do vestiário (`CORES_BASE`), distinta dentro do caminho da Copa (ΔE OKLab×100 ≥ 15) e longe da laranjinha; antes, os três da Copa 1 eram azuis. Quando o jogador veste uma cor a menos de 12 da do rival, o rival troca para a cor reserva (`alt`, `corDoRival`); a chave usa a mesma cor da quadra. O `test/rivais.test.js` vigia.
 
-**Elástico** (só contra a CPU): é uma função contínua do placar, limitada, e **nunca troca de nível no meio da partida**.
-- CPU 3 ou mais pontos à frente: erro ×1,3, reação +0,06 s, corta ×0,5.
-- CPU 4 ou mais pontos atrás: erro ×0,85.
-- Chefes: fatores reduzidos a ×1,15.
+**Elástico** (só contra a CPU; `ELASTICO` em `rivais.js`): é uma função contínua do placar, limitada, e **nunca troca de nível no meio da partida**.
+- **Partidas a 7 e a 1ª da vida** (o de antes, número a número; o `rivais.test` compara): CPU 3 ou mais pontos à frente: erro ×1,3, reação +0,06 s, corta ×0,5. CPU 4 ou mais atrás: erro ×0,85.
+- **Partidas a 5** (M2d; as oitavas da Copa 1): começa com 1 ponto de vantagem da CPU e chega ao teto com 2: erro ×1,45, reação +0,09 s, corta ×0,4, pulo ×0,6 e saqueErro ×1,5. A 5, a vantagem de 3 já tinha decidido.
+- Chefes: metade dos fatores.
 
 **Proteção por partida (não por relógio):**
-- **Partida 1 imperdível:** a CPU nunca marca o ponto que fecharia a partida. Quando iria marcar, erra de forma visível, com um ataque estourado.
-- **Partida 2:** nível fixo do começo ao fim, com o "anjo" no match point quando o humano está 2 ou mais pontos atrás.
-- **Partida 3:** como na tabela.
+- **Partida 1 imperdível:** a CPU nunca marca o ponto que fecharia a partida. Quando iria marcar, erra de forma visível (a bola morre na rede do próprio lado). O erro do próprio humano nesse match point também não fecha (§2.4: o ponto não vale).
+- **Partida 2, o anjo** (M2d; `ANJO` e `anjoDaPartida` em `regras.js`): 1 vez por partida, no match point da CPU com o humano 2 ou mais atrás, a CPU "fura": desde o saque ou desde a bola cruzar para o lado dela, lê errado a queda, vai para o lado errado e não encosta na bola pelo resto do rali. O novato simulado usa 0,13 anjo por partida contra o Pingo. A alavanca `copa1` (o anjo nas outras da Copa 1 depois de derrotas) existe e está em 0.
+- **Alívio por derrota seguida** (M2d; `ALIVIO`): cada derrota seguida na fase da Copa (`copa.derrotas` no save; a vitória zera) deixa a CPU pior: erro +12%, reação +0,03 s, pulo −15%, cortada −25% e saqueErro +15%, até 4 derrotas. Nos chefes vale ×0,75.
+- **Ajuda ao jogador** (M2d; `AJUDA` e `ajudaDaPartida` em `regras.js`, `partida.js` `assistir` e `ima`): a devolução assistida também puxa o toque andando (até 0,45) e o toque que cairia do próprio lado (até 0,6) para o arco do outro lado, o parado ganha até +0,2 e o ímã cresce até 0,25 u. A força é uma base por fase na Copa 1 (0,75, 0,75, 0,35, 0,3 e 0,3) mais 0,12 por derrota seguida em qualquer Copa (até 4). Foi a alavanca que faltava: no novato, 70% dos pontos perdidos eram erros dele (a bola caindo do próprio lado ou na rede), e nem o Pingo no T0 passava de 36%.
+- `partidaDaFase` (`torneio.js`) junta tudo (rival, 1ª da vida, curta, derrotas, anjo e ajuda) para o `main.js` e o `calibrar`.
 
-**Humano simulado** (`test/apoio/humano-simulado.js`):
-- reação de 0,28 s, erro de 1,2 u, latência de 1 quadro;
-- 30% de pulos fora de hora;
-- usa a cortada em 50% das chances; nunca segura sem querer;
-- variante de **entrada nula**.
+**Novato simulado** (M2d; `test/apoio/humano-simulado.js` e `copa-simulada.js`; o "humano simulado" do desenho original):
+- Dirige o slime 0 numa partida `cpu` pela mesma entrada do `main.js` (`p.intencao`, `p.interacao`), então valem as proteções, a ajuda e a guiada. Rng próprio.
+- Por baixo, uma IA com a velocidade do humano (11 u/s × a fração `vel`) e um talento h entre o `fraco` (reação 0,7 s, erro 3,6, 65% da velocidade, 20% de jogadas distraídas) e o `bom` (o humano do desenho: 0,28 s, erro 1,2).
+- Erros de gente: pulo fora de hora (0,08 a 0,3 s), pulo à toa, saque de dois toques (60% cedo, senão com viés de +0,22 s e desvio de 0,12 s: 87% fracos), cortada por toque em 85% das vezes, leitura incerta da mira do rival.
+- **Ajustado à 0.2.0** (h0 0,33 ± 0,3, aprendendo 0,085 por partida): 30% contra o Pingo, cerca de 33% de m3 a m10 no funil com desistência (quem continua: 85% depois de vitória, 52% depois de derrota), a m1 em cerca de 1 min, e os saques por gameplay do painel. Congelado: a calibragem mexe na CPU e na ajuda, nunca no novato.
+- Variante de **entrada nula**.
 
 **Testes em dois níveis:**
 - **`npm test`** (sementes fixas, rápido):
   - `hash` e placares exatos;
   - a entrada nula ganha o 1º ponto em até 15 s em 8 sementes;
   - nunca 4 toques.
-- **`npm run calibrar`** (estatístico, rodado ao mexer na IA ou na física):
-  - o humano simulado nunca perde a partida 1 em 1.000 sementes;
-  - vence a Copa 1 na 1ª tentativa em 65% ou mais das sementes;
-  - o arco fecha entre 6:00 e 7:30;
-  - ralis de 5 a 9 s;
-  - ACE abaixo de 8%;
-  - fora contra si mesmo abaixo de 5%;
-  - cortada de 55% a 70%;
-  - perfeita de 25% a 40%.
+- **`npm run calibrar`** (estatístico, rodado ao mexer na IA ou na física): o bot contra bot (ralis de 5 a 9 s, ACE abaixo de 8%).
+- **`node tools/calibrar.mjs --copa 400 --conferir`** (o novato, M2d), as metas:
+  - a Gota sempre (e `--m1 1000`: o novato nunca perde a 1ª da vida);
+  - o Pingo em 70% ou mais na 1ª tentativa, a Geleia em cerca de 60%, o Mingau em cerca de 55% e o Rei em cerca de 45% (±8);
+  - 90% ou mais vencem cada fase em até 3 tentativas;
+  - no máximo 0,5 anjo por partida contra o Pingo.
+
+  Resultado do M2d: 81 / 60 / 59 / 45%, de 93% a 100% em até 3 tentativas; o título em 7 partidas (mediana). As metas antigas do arco (6:00 a 7:30, a Copa 1 de primeira em 65%) ficam como informação (`--perfil=desenho`).
 
 ### 2.9 Comemoração de ponto (ritmo do Blumgi, identidade nossa)
 
@@ -715,11 +744,12 @@ Os rivais em negrito entraram com a chave de 32 (2026-10-22). Mais 11 **figurant
 ### 2.13 Copa Gosma e menu (pedido de 2026-10-22)
 
 - **Nome:** Copa Gosma (EN Goo Cup, ES Copa Slime). Nunca o nome do torneio de seleções de futebol (marca de terceiros; o `estilo.test` barra até em comentário). As bandeiras são de países reais (`src/jogo/paises.js`, 195 = ONU + Vaticano e Palestina; desenhadas em código em `src/render/bandeiras.js`), sem número nem escudo de seleção; a taça é desenho nosso (de gosma).
-- **Formato (decisão do usuário, revista no mesmo dia):** mata-mata de **32 em todas as Copas**, dos 16-avos à final (5 partidas). Antes era de 8 na Copa 1 e de 16 nas Copas 2 a 4. A chave usa os 20 rivais das Copas e 11 figurantes. O caminho do jogador é fixo pela ordem dos rivais da Copa (`COPAS` em `rivais.js`; o chefe na final), como no arco do §3.9; os rivais do caminho vencem os seus jogos simulados e os outros jogos saem por sorteio pelo nível T. **Perder não elimina:** é revanche da mesma fase.
+- **Formato (decisão do usuário, revista no mesmo dia):** mata-mata de **32 em todas as Copas**, dos 16-avos à final (5 partidas). Antes era de 8 na Copa 1 e de 16 nas Copas 2 a 4. A chave usa os 20 rivais das Copas e 11 figurantes. O caminho do jogador é fixo pela ordem dos rivais da Copa (`COPAS` em `rivais.js`; o chefe na final), como no arco do §3.9; os rivais do caminho vencem os seus jogos simulados e os outros jogos saem por sorteio pelo nível T. **Perder não elimina:** é revanche da mesma fase, e as derrotas seguidas nela aliviam a CPU e aumentam a ajuda ao jogador (§2.8; `copa.derrotas` no save).
 - **Estado:** `src/jogo/torneio.js` é puro; o save guarda só `{ n, tam, semente, fase, placares, pais }` e a chave inteira sai de `chaveDaCopa()`. Cada vitória revela a rodada inteira (placares plausíveis, vai-a-2). O save antigo (`perfil.fase`) vira a fase do mesmo rival na Copa 1 (Gota, Geleia ou Rei); a Copa salva sem `tam: 32` (da chave de 8 ou 16) recomeça na primeira rodada, mantendo a Copa, a seleção e os títulos.
 - **Título:** +50 Gotas no 1º título de cada Copa (+20 nos seguintes), `vozParabens`, "Copa Gosma N+1 liberada!"; a Copa 4 se repete com outra chave. Todas na Praia até existirem os outros ginásios.
 - **Seleção do jogador:** a região do idioma do navegador (`pt-BR` → Brasil) até ele escolher no vestiário; os rivais nunca repetem a bandeira dele.
-- **Cartão de fim:** a chave em canvas (`src/render/chave.js`, espelhada na horizontal ou na vertical no retrato), com a rodada nova animando em 1,2 s (um toque pula), e "Próxima: Semifinal contra Geleia (Kuwait)". Botões Próxima/Revanche, Menu e o premiado.
+- **Cartão de fim:** a chave em canvas (`src/render/chave.js`, espelhada na horizontal ou na vertical no retrato), com a rodada nova animando em 1,2 s (um toque pula), e "Próxima: Semifinal contra Geleia (Kuwait)". Botões Próxima/Revanche, Menu e o premiado. Depois da 1ª partida da vida não há cartão (a transição direta, §2.4): a chave aparece a partir do 2º.
+  - **Dica na derrota (M2d; `src/jogo/dicas.js`):** abaixo do placar, uma pílula amarela com a dica da causa principal dos pontos perdidos na partida (`causaDoPonto`: ace, colocada, rede, erro, 4 toques, cortada, bola forte, bloqueio, fora; o empate vai pela ordem de `CAUSAS`). Por exemplo, "No saque do rival, corra para a marca na areia". Cabe sem rolar de 360×740 a 1920×1080. `roteiro=derrota-<causa>`.
   - **Seu caminho (2026-10-22):** acima da chave, uma faixa com o slime do jogador, as 5 rodadas (bandeira do adversário, visto e placar nas jogadas; a atual pulsando com VS e o nome; as seguintes em aberto) e a taça (`desenharCaminho`). No celular deitado (altura até 460 px) só a faixa aparece; a chave inteira fica no menu.
   - **Destaque do jogador na chave:** a caixa dele cheia na cor dele, brilhando e por cima das vizinhas; o caminho dele em linha grossa com contorno; o adversário da vez com borda vermelha pulsando e o selo VS. As caixas crescem a cada rodada (os 16-avos só com bandeira e placar).
   - **Avanço automático:** sem toque, depois das animações, uma barra enche dentro do botão principal e em **8 s** a próxima partida (ou a revanche) vem sozinha, **sem anúncio** (o `commercialBreak` continua só no toque em Próxima/Revanche). Um toque no cartão recomeça a conta; o Prêmio ×2 cancela. A partida nova espera o toque para sacar, então o `gameplayStart` segue vindo de entrada real. `?avanco=N` (0 desliga).
@@ -954,12 +984,19 @@ O editor deste §3.6 continua no plano; o vestiário que existe hoje é este:
 |---|---|
 | `level/m<N>/start` | no 1º `gameplayStart` da partida N da vida (o painel mostra quem saiu em cada partida) |
 | `level/m<N>/complete\|fail` | no fim da partida |
-| `tutorial/<receber\|saque\|cortada>/start\|complete` | só na 1ª partida: o saque da Gota e o 1º toque do jogador; o 1º saque dele; a cortada guiada |
-| `cartao/<proxima\|revanche\|menu\|vestiario>/visible` | o cartão de fim abriu (o `vestiario` só com presente novo) |
+| `rival/<id>/start\|complete\|fail` (M2d) | junto do `level/m<N>/...`: o painel por adversário (a revanche conta outro start) |
+| `placar/<id>/<h>-<c>`, `derrota/<id>/<causa>` (M2d) | o fim de toda partida; na derrota, a causa principal (a mesma da dica do cartão) |
+| `perda/<id>/<causa>` (M2d) | nas 3 primeiras partidas da vida, cada ponto que o humano perde (as gravações do playtest só pegam o canvas) |
+| `m<N>/ponto/<n>` (M2d) | nas partidas 1 e 2 da vida, a cada ponto jogado: o funil dentro da partida |
+| `tela/<retrato\|paisagem\|desktop>/<toque\|mouse>` (M2d) | uma vez por carregamento, no `gameLoadingFinished` |
+| `alivio/d<k>/<venceu\|perdeu>`, `anjo/<id>/usou` (M2d) | no fim da partida com derrotas seguidas na fase; quando o anjo agiu |
+| `transicao/m2/direta` (M2d) | a 1ª partida virou a 2ª sem cartão |
+| `tutorial/<receber\|saque\|cortada>/start\|complete` | só na 1ª partida: o saque da Gota e o 1º toque do jogador; o 1º saque dele; a cortada guiada (desde o M2d: start na oferta, complete na soltura) |
+| `cartao/<proxima\|revanche\|menu\|vestiario>/visible` | o cartão de fim abriu (o `vestiario` só com presente novo; desde o M2d, a partir do 2º cartão) |
 | `cartao/<...>/interact`, `cartao/<proxima\|revanche>/auto` | o toque no botão; o avanço automático |
 | `rewarded/dobrar/visible\|interact` | a oferta do Prêmio ×2 (o SDK mede o vídeo) |
 | `presente/<id>/ganhou`, `vestiario/abrir/<menu\|cartao>` | os presentes e de onde o vestiário abriu |
-| `saque/<perfeito\|bom\|fraco\|simples>/humano`, `cortada/...` (§2.5), `powerup/<id>/<humano\|cpu>`, `reacao/<id>/humano`, `juiz/<reacao>/bolada`, `nivel/n<N>/subiu`, `copa/c<N>/titulo`, `fora/<lado>/ponto` | o resto, como antes |
+| `saque/<perfeito\|bom\|fraco\|simples>/humano`, `cortada/...` (§2.5; `cortada/gesto/guiada` desde o M2d), `powerup/<id>/<humano\|cpu>`, `reacao/<id>/humano`, `juiz/<reacao>/bolada`, `nivel/n<N>/subiu`, `copa/c<N>/titulo`, `fora/<lado>/ponto` | o resto, como antes |
 
 - Saiu o `powerup/cortada-lenta/interact`, que contava a CPU e nunca apareceu no painel de interações.
 - Ainda não existem: `powerup/<super>/visible` (os supers), `entrada/mouse/sem-clique` e `cortada/lenta/segurou-do-chao`.
@@ -979,7 +1016,16 @@ O editor deste §3.6 continua no plano; o vestiário que existe hoje é este:
 > - o mínimo de 0,5 s de câmera lenta no toque (§2.5);
 > - o funil por partida no `measure` (§3.8).
 
-> **2026-10-22:** com a chave de 32, a Copa 1 passou a ter 5 partidas (Gota, Pingo, Geleia, Mingau e Rei Gosma). A tabela abaixo é o arco original de 3 partidas e precisa ser refeita com o humano simulado.
+> **2026-10-22, 2º Player Fit Test** (build 0.2.0, M2b + M2c, 500 gameplays). Média de 3m57s e 30% de engajados, mas o ganho veio da cauda (5+ min: de 14% para 20%). O muro passou a ser a 2ª partida: 64% perdiam para o Pingo, e daí em diante cerca de 70% de todas as partidas. Só 19% chegavam à 2ª vitória da vida. Na 1ª partida, só 55% recebiam a cortada guiada, e 55% desses cortavam.
+>
+> O que mudou (M2d, `docs/marcos/M2d.md`):
+> - a Copa 1 calibrada com o novato simulado (§2.8: ajuda ao jogador, níveis, anjo, elástico curto e alívio por derrota);
+> - a cortada guiada à prova de falha no 2º rali (§2.5);
+> - a transição direta da 1ª para a 2ª partida, sem cartão (§2.4);
+> - a dica no cartão de derrota (§2.13);
+> - a medição por rival (§3.8).
+
+> **2026-10-22:** com a chave de 32, a Copa 1 passou a ter 5 partidas (Gota, Pingo, Geleia, Mingau e Rei Gosma). A tabela abaixo é o arco original de 3 partidas. O arco medido pelo novato simulado (M2d): a 1ª partida em cerca de 1 min (a cortada guiada no 2º rali), a transição direta em cerca de 5,6 s, e o título da Copa 1 em 7 partidas (mediana; cerca de 11 min de jogo e cartões, sem anúncios).
 
 | Tempo | O que acontece |
 |---|---|

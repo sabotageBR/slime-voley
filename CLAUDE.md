@@ -16,14 +16,14 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
 - as referências medidas do Blumgi, em `docs/referencias/`;
 - o que cada marco entregou e o que ficou para depois, em `docs/marcos/`.
 
-**O desenho vai além do código.** Ele descreve o jogo inteiro, até o M5. Muitos módulos, testes e ferramentas citados nele ainda não existem (`poderes.js`, `layout.test`, `fluxo.test`, o humano simulado, `sdkcheck`, `npm run poki`...). Antes de supor que algo existe, confira em `docs/marcos/`. Os comentários dos arquivos portados de projetos irmãos também citam coisas que não estão aqui, como `tools/pigmentos.mjs` e `test/cor.test.js`.
+**O desenho vai além do código.** Ele descreve o jogo inteiro, até o M5. Muitos módulos, testes e ferramentas citados nele ainda não existem (`poderes.js`, `layout.test`, `fluxo.test`, `sdkcheck`, `npm run poki`...). Antes de supor que algo existe, confira em `docs/marcos/`. Os comentários dos arquivos portados de projetos irmãos também citam coisas que não estão aqui, como `tools/pigmentos.mjs` e `test/cor.test.js`.
 
 ## Rodar e testar
 - `npm run servir` abre o jogo em http://127.0.0.1:5380/. Os módulos ES não carregam por `file://`.
 - `npm run lan` faz o mesmo, aberto na rede local, para testar no celular pela Wi-Fi. Os parâmetros de teste também valem na LAN.
 - `npm test` roda todos os testes (`node --test test/*.test.js`, cerca de 4 s).
 - Um arquivo: `node --test test/fisica.test.js`. Um teste: `node --test --test-name-pattern="<regex>" test/*.test.js`.
-- `npm run calibrar` roda o bot contra bot (`tools/calibrar.mjs`, cerca de 4 s para 30 partidas). O humano simulado do desenho ainda não existe.
+- `npm run calibrar` roda o bot contra bot (`tools/calibrar.mjs`, cerca de 4 s para 30 partidas). O novato simulado (o humano do desenho) roda com `--novato`, `--copa` e `--m1` (ver Calibragem).
 
 ## Como um quadro anda
 1. O `core/laco.js` roda passos fixos de 1/120 s (a bola faz 2 subpassos de 1/240 s), no máximo 6 por quadro. Depois chama `desenhar(dtReal, alfa)` uma vez.
@@ -45,15 +45,16 @@ As ferramentas usam o Node 22 (WebSocket global para o CDP), `google-chrome`, `f
   - `pele.js`: as partículas só de desenho;
   - `ia.js`: plano exato do contato, simulando a trajetória;
   - `cortada.js`: a máquina de estados, a mira e o resolvedor do tiro;
-  - `regras.js`: a tabela única de tempos e o saque (`SAQUE`, `temposSaque`, `qualidadeSaque`);
+  - `regras.js`: a tabela única de tempos, o saque (`SAQUE`, `temposSaque`, `qualidadeSaque`), o anjo e a ajuda ao jogador (`ANJO`, `AJUDA`), o avanço do cartão e a transição direta;
   - `powerups.js`: catálogo, sorteio e relógio das bolhas (rng próprio, separado do das IAs);
   - `reacoes.js`: os emoji (a qualquer hora, com recarga) e a escolha da CPU;
   - `juiz.js`: o juiz da rede (olhar, apontar e a bolada sorteada; nunca muda a bola);
   - `falas.js`: as falas em balão (catálogo fixo por gatilho, recarga e rng próprio);
-  - `torneio.js` (a Copa Gosma: chave de 32 em todas as Copas, derivada do save) e `paises.js` (os 195 códigos);
+  - `torneio.js` (a Copa Gosma: chave de 32 em todas as Copas, derivada do save, com as derrotas seguidas na fase; `partidaDaFase` monta a partida para o `main.js` e o `calibrar`) e `paises.js` (os 195 códigos);
+  - `dicas.js`: a causa de cada ponto perdido e a principal da partida (a dica do cartão de derrota);
   - `perfil.js`: XP, nível, trilha, Gotas, os presentes das 3 primeiras vitórias e o save normalizado;
   - `visual.js`: o visual do vestiário (paleta de pigmentos, padrões, acessórios, arquétipos, compra e o save);
-  - `rivais.js`: os níveis T, os 31 rivais (20 nos caminhos das Copas e 11 figurantes só da chave), as cores da paleta com a reserva (`corDoRival`) e as Copas;
+  - `rivais.js`: os níveis T (`FORCA_NIVEL`), os 31 rivais (20 nos caminhos das Copas e 11 figurantes só da chave), as cores da paleta com a reserva (`corDoRival`), as Copas, o elástico e o alívio por derrota (`paramsIA`);
   - `humor.js` (porte sem uso), `medidor.js` e `skins.js`.
 - `src/core/`: laço, `rng.js`, save, áudio, vibração, o SDK (`poki.js`) e `depuracao.js`.
 - `src/cor/km.js`: a mistura de pigmentos Kubelka-Munk, que roda igual no shader da `composicao.js`. O `pigmentos.js` é gerado e não se edita à mão.
@@ -94,8 +95,10 @@ Sem teste, por convenção: no jogo, o `preventDefault` fica no `controles.js` e
 - Não existe saque automático.
 - Portão de 30 s sem interação: até o saque da CPU espera um toque.
 - `commercialBreak` só no toque em Próxima/Revanche (a partir da 3ª partida) e ao despausar; nunca no rali.
-- O cartão de fim avança sozinho em 8 s sem toque (3 s depois da 1ª partida da vida; `?avanco=N`, 0 desliga), **sem anúncio**; a partida nova espera o toque para sacar.
-- `measure`: `level/m<N>/start` no 1º `gameplayStart` de cada partida, e `complete`/`fail` no fim. Os botões do cartão mandam `visible`/`interact`. Tabela completa no desenho §3.8.
+- O cartão de fim avança sozinho em 8 s sem toque (4 s nas 3 primeiras derrotas da vida; `?avanco=N`, 0 desliga), **sem anúncio**; a partida nova espera o toque para sacar.
+- Depois da 1ª partida da vida não há cartão: a transição direta (o presente na quadra, o rival caindo do céu e o letreiro da fase) não pede anúncio e o saque espera o toque (`?direta=0` volta ao cartão).
+- A cortada guiada da 1ª partida espera o toque sem limite; com 30 s sem interação, `gameplayStop`.
+- `measure`: `level/m<N>/start` (e `rival/<id>/start`) no 1º `gameplayStart` de cada partida, e `complete`/`fail` no fim. Os botões do cartão mandam `visible`/`interact`. Tabela completa no desenho §3.8.
 
 ## Ferramentas
 Portas: 5380 (servir), 4380–4385, CDP 9380–9382. É um Chrome por vez: o `shot` usa 4380/9380, a `thumb` usa 4384/9381, e o `gif` e o `medir` usam 4385/9382. Evite as portas 9222, 9503 e 9666.
@@ -105,6 +108,7 @@ Portas: 5380 (servir), 4380–4385, CDP 9380–9382. É um Chrome por vez: o `sh
 | `node tools/shot.mjs "<query>" 390x844 saida.png [ms] --toque` | print pelo CDP, com os erros do console |
 | `node tools/gif.mjs saida.gif 844x390 480 "<query>@ms" ...` | GIF da partida |
 | `node tools/medir.mjs 4` | custo por quadro com a CPU limitada (relativo: GPU por software) |
+| `node tools/fluxo.mjs [390x844] [--mouse]` | o fluxo de ponta a ponta com entrada real e um PokiSDK falso (perfil novo: a guiada, a transição direta, a derrota com a dica e a revanche automática), conferindo o `measure` e o console; prints em `.tmp/fluxo` (portas do `shot`) |
 | `node tools/midia-m1.mjs` | quadros e GIFs das 3 direções |
 | `npm run empacotar` | build da Poki: `dist/` e `dist-poki/slime-voley-<versão>.zip` + `.sha256` (`-- --thumb` confere a thumb e a copia ao lado do zip) |
 | `node tools/thumb.mjs [--final]` | thumb da Poki pelo motor (`tools/thumb.html`): as opções em `marketing/thumb/opcoes/` e `comparar*.png`; o `--final` mede a `ESCOLHIDA` e grava `slime-voley-{1256,628}.{png,jpg}` e o `conferir.png` |
@@ -115,7 +119,7 @@ Portas: 5380 (servir), 4380–4385, CDP 9380–9382. É um Chrome por vez: o `sh
 **Parâmetros de teste:**
 - Só valem em loopback e na LAN, ou pelo `window.__voleiModelo` da build de modelos.
 - O `core/depuracao.js` é o único módulo que lê a URL, e o cabeçalho dele tem a lista completa.
-- Os mais usados: `?semente ?roteiro=cortada|ponto|ponto-curto|reacao|saque|bolha|gelo|fogo|gosmao|juiz|juiz-<reação>|fim ?visual=a|b|c ?controle=a|b ?gatilho=novo|segura ?lab ?auto ?primeira ?menu ?chave ?vestiario=aba ?look=id ?bandeira=XX ?copa=N&fase=F ?avanco=N ?semblur ?semanuncio ?debug`.
+- Os mais usados: `?semente ?roteiro=cortada|ponto|ponto-curto|reacao|saque|bolha|gelo|fogo|gosmao|juiz|juiz-<reação>|fim|guiada|derrota-<causa>|transicao ?derrotas=N ?direta=0 ?visual=a|b|c ?controle=a|b ?gatilho=novo|segura ?lab ?auto ?primeira ?menu ?chave ?vestiario=aba ?look=id ?bandeira=XX ?copa=N&fase=F ?avanco=N ?semblur ?semanuncio ?debug`.
 - Prints do cartão de fim pedem `?avanco=0`; o `?roteiro=fim` se repete a cada partida nova (a final da Copa é `?copa=N&fase=4&roteiro=fim`).
 - Para um print parado num instante, use `?filme=1&cada=N`: N passos e um desenho, sem rAF.
 - `?fora=1` liga a regra antiga do fora; por padrão, a bola nunca sai.
@@ -138,3 +142,9 @@ Faça um commit no fim de cada marco, com as notas em `docs/marcos/M<n>.md`. Pus
 - **Resultado (30 partidas):** ralis com mediana de cerca de 5,8 s (p90 de 15,6 s), 0% de fora e cerca de 33% de pontos na rede.
 - **Saque:** o `saqueErro` de cada nível está em `src/jogo/rivais.js`; o bot T2 acerta cerca de 65% de perfeitos (100 partidas; com 30 a amostra oscila de 61% a 70%).
 - A câmera lenta usa mundo a 0,06 (medido no Blumgi) e defensor a 0,30: `escalaMundo: 60` e `escalaDefensor: 300` (em milésimos), no `src/jogo/cortada.js`.
+
+## Calibragem da Copa 1 (novato simulado, M2d, 2026-10-22)
+- **O novato** (`test/apoio/humano-simulado.js` e `copa-simulada.js`): dirige o slime 0 pela entrada do `main.js` e foi ajustado ao Player Fit Test da 0.2.0 (30% contra o Pingo, cerca de 33% de m3 a m10 com desistência, 87% dos saques fracos). **Congelado:** a calibragem mexe na CPU e na ajuda, nunca nele.
+- **Rodar:** `node tools/calibrar.mjs --copa 400 --par=8 --conferir` (vidas inteiras na Copa 1 com as revanches, cerca de 15 s), `--m1 1000` (a 1ª partida nunca se perde), `--novato 400 --rival=<id> [--curta] [--derrotas=D] [--anjo=A] [--ajuda=0..1]` (partidas avulsas). `--h=`, `--param=chave:valor,saque.vies:0.1` e `--perfil=desenho` trocam o novato.
+- **Metas:** Pingo ≥ 70% na 1ª tentativa, Geleia ~60%, Mingau ~55% e Rei ~45% (±8); cada fase em até 3 tentativas em 90% ou mais; no máximo 0,5 anjo por partida contra o Pingo.
+- **Resultado:** 81 / 60 / 59 / 45%, de 93% a 100% em até 3 tentativas, o título em 7 partidas (mediana). As alavancas ficam em `src/jogo/regras.js` (`AJUDA`, `ANJO`) e `src/jogo/rivais.js` (`NIVEIS`, `ELASTICO`, `ALIVIO`).
