@@ -1,7 +1,7 @@
 // Regras: alvo, vai-a-2, saque ativo e a partida (rali, 3 toques, parede de fundo; o fora antigo so com { fora: true }).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alvoDaPartida, vencedor, pontoDaPartida, profundidadeSaque, qualidadeSaque, temposSaque, posicaoParaRumo, anjoDaPartida, ajudaDaPartida, SAQUE, ANJO, AJUDA } from '../src/jogo/regras.js';
+import { alvoDaPartida, vencedor, pontoDaPartida, profundidadeSaque, qualidadeSaque, temposSaque, posicaoParaRumo, anjoDaPartida, ajudaDaPartida, avancoDoCartao, SAQUE, ANJO, AJUDA, TEMPOS } from '../src/jogo/regras.js';
 import { miraGuiada, faixaAlvo } from '../src/jogo/cortada.js';
 import { criarIA } from '../src/jogo/ia.js';
 import { NIVEIS } from '../src/jogo/rivais.js';
@@ -356,4 +356,13 @@ test('mira guiada: a ponta da faixa mais longe do rival (a cortada do humano com
   const p = criarPartida({ modo: 'cpu', semente: 4 });
   assert.ok(p.roteiro('cortada'));
   assert.equal(p.cortada.alvoX, miraGuiada(-1, p.slimes[1].x, p.slimes[1].vx));
+});
+
+test('avanco do cartao: 3 s depois da 1a partida, 4 s nas primeiras derrotas, senao o padrao; 0 desliga', () => {
+  assert.equal(avancoDoCartao({ partidas: 1, vitorias: 1, venceu: true, avanco: 8 }), TEMPOS.avancoPrimeira);
+  assert.equal(avancoDoCartao({ partidas: 2, vitorias: 1, venceu: false, avanco: 8 }), TEMPOS.avancoDerrota);
+  assert.equal(avancoDoCartao({ partidas: 9, vitorias: 1, venceu: false, avanco: 8 }), 8, 'depois das primeiras derrotas, o padrao');
+  assert.equal(avancoDoCartao({ partidas: 3, vitorias: 2, venceu: true, avanco: 8 }), 8);
+  assert.equal(avancoDoCartao({ partidas: 2, vitorias: 1, venceu: false, avanco: 0 }), 0);
+  assert.equal(avancoDoCartao({ partidas: 2, vitorias: 1, venceu: false, avanco: 2 }), 2, 'nunca mais lento que o ?avanco');
 });

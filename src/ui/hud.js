@@ -36,6 +36,7 @@ export function criarHud(raiz, T, cb) {
       <div class="caixa">
         <div class="titulo"></div>
         <div class="sub"></div>
+        <div class="dica" hidden><b></b><span></span></div>
         <canvas class="cvCaminho" hidden></canvas>
         <canvas class="cvChave" hidden></canvas>
         <div class="proxCopa" hidden></div>
@@ -66,6 +67,7 @@ export function criarHud(raiz, T, cb) {
     hud: $('#hud'), nome0: $('.l0 .nome'), nome1: $('.l1 .nome'), p0: $('.p0'), p1: $('.p1'),
     med0: $('.l0 .medidor'), med1: $('.l1 .medidor'), chips0: $('.l0 .chips'), chips1: $('.l1 .chips'), pausa: $('.pausa'), reagir: $('.reagir'), faixa: $('.faixa'),
     reacoes: $('.reacoes'), mao: $('.mao'), maoTexto: $('.mao .texto'), cartao: $('#cartao'), cTitulo: $('#cartao .titulo'), cSub: $('#cartao .sub'),
+    dica: $('#cartao .dica'), dicaTit: $('#cartao .dica b'), dicaTxt: $('#cartao .dica span'),
     proxima: $('#cartao .proxima'), revanche: $('#cartao .revanche'), premiado: $('#cartao .premiado'), menuBt: $('#cartao .menuBt'),
     cvChave: /** @type {HTMLCanvasElement} */ ($('#cartao .cvChave')), cvCaminho: /** @type {HTMLCanvasElement} */ ($('#cartao .cvCaminho')), cCaixa: $('#cartao .caixa'), proxCopa: $('#cartao .proxCopa'), presentes: $('#cartao .presentes'), opMenu: $('[data-op="menu"]'),
     prog: $('#cartao .progresso'), gTotal: $('#cartao .gTotal'), gMais: $('#cartao .gMais'), xpMais: $('#cartao .xpMais'),
@@ -433,6 +435,10 @@ export function criarHud(raiz, T, cb) {
       el.cCaixa.classList.toggle('campeao', !!c.campeao);
       el.cTitulo.textContent = c.titulo;
       el.cSub.textContent = c.sub || '';
+      // a dica da derrota (src/jogo/dicas.js: como o jogador perdeu mais pontos)
+      el.dica.hidden = !c.dica;
+      el.dicaTit.textContent = c.dica ? T('dica.titulo') : '';
+      el.dicaTxt.textContent = c.dica || '';
       el.proxima.hidden = !c.proxima;
       el.revanche.hidden = !c.revanche;
       el.premiado.hidden = !c.premiado;

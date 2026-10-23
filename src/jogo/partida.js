@@ -1557,6 +1557,21 @@ export function criarPartida(o = {}) {
         stats.pontos[1] = placar[1];
         return true;
       }
+      if (nome.startsWith('derrota-')) {
+        // o ponto final da CPU acabou de sair, com as perdas do jogador na causa pedida (o cartao de
+        // derrota mostra a dica dela): derrota-ace, derrota-rede, derrota-erro...
+        const causa = nome.slice(8);
+        estado = 'jogo';
+        placar = [2, regras.alvo - 1];
+        pontoN = placar[0] + placar[1];
+        stats.pontos[0] = placar[0];
+        stats.pontos[1] = placar[1];
+        stats.perdas[0] = { [causa]: placar[1] };
+        bola.solta = true; bola.x = -6.2; bola.y = RB + 0.05; bola.vx = -2; bola.vy = -14;
+        rali.ultimoLado = 1; rali.recepcaoSaque = false; rali.ultimaCortada = false;
+        ponto(1, 'ponto', -6.2);
+        return true;
+      }
       if (nome === 'bolha' || nome === 'gelo' || nome === 'fogo') {
         // rali no ar: a bolha no caminho da bola; o rival preso no gelo; a Bola de Fogo indo
         estado = 'jogo';

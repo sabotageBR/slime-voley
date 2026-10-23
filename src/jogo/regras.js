@@ -34,7 +34,26 @@ export const TEMPOS = Object.freeze({
    * Fit Test de 2026-10-21 perdeu 47% de quem venceu a 1a partida antes de terminar a 2a.
    */
   avancoPrimeira: 3,
+  /**
+   * o cartao de derrota avanca sozinho nisto nas primeiras `derrotasCurtas` derrotas da vida (M2d:
+   * cerca de 21% saiam no cartao de derrota da 0.2.0, e o avanco de 8 s quase nunca disparava)
+   */
+  avancoDerrota: 4,
+  derrotasCurtas: 3,
 });
+
+/**
+ * Em quantos s o cartao de fim avanca sozinho (0: nunca): 3 s depois da 1a partida da vida, 4 s
+ * nas primeiras derrotas, senao o padrao (?avanco, 8 s).
+ * @param {{ partidas: number, vitorias: number, venceu: boolean, avanco: number }} o partidas e
+ *   vitorias da vida ja contando esta
+ */
+export function avancoDoCartao(o) {
+  if (!(o.avanco > 0)) return 0;
+  if (o.partidas === 1) return Math.min(o.avanco, TEMPOS.avancoPrimeira);
+  if (!o.venceu && o.partidas - o.vitorias <= TEMPOS.derrotasCurtas) return Math.min(o.avanco, TEMPOS.avancoDerrota);
+  return o.avanco;
+}
 
 /**
  * Saque "levantar e bater" (decisao de 2026-10-21): o 1o toque levanta a bola, um anel fecha ate o

@@ -3,6 +3,8 @@
 // Unico modulo que le a URL (vigiado por test/estilo.test.js).
 //   ?semente=123          semente fixa (prints e GIFs reprodutiveis)
 //   ?roteiro=cortada      cena pronta: cortada | ponto | ponto-curto | reacao | saque | bolha | gelo | fogo | gosmao | juiz | juiz-<reacao> | fim
+//                         | guiada (a cortada guiada da 1a partida congelada) | derrota-<causa> (o cartao de derrota com a dica: ace, colocada, rede, erro...)
+//                         | transicao (a 1a vitoria da vida virando a 2a partida, sem cartao)
 //                         (citados no desenho e ainda sem roteiro: jornada | raio | rali8 | onboarding)
 //   ?quadro=ms            congela o jogo-real nesse instante do roteiro (prints)
 //   ?filme=N&cada=K       grava N quadros (K passos entre eles) em <pre id="filme">

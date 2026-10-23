@@ -27,7 +27,8 @@ import { chaveDaCopa, registrarVitoria, registrarDerrota, partidaDaFase, proxima
 import { paisDoIdioma } from './jogo/paises.js';
 import { visualDaSkin, visualDoArquetipo, comprar as comprarItem, normalizarVisual } from './jogo/visual.js';
 import { normalizarPerfil, rendimento, aplicarGanho, proximosMarcos, darPresente, presenteDaVitoria } from './jogo/perfil.js';
-import { TEMPOS, anjoDaPartida, ajudaDaPartida } from './jogo/regras.js';
+import { TEMPOS, anjoDaPartida, ajudaDaPartida, avancoDoCartao } from './jogo/regras.js';
+import { causaPrincipal } from './jogo/dicas.js';
 import { criarVista } from './render/vista.js';
 import { criarCena } from './render/cena.js';
 import { tonalidade } from './render/celebracao.js';
@@ -346,6 +347,8 @@ let inicio = null;
 let tMao = 0;
 let partidaN = perfil.partidas;
 let premiadoNaPausa = false;
+/** derrotas seguidas na fase quando a partida comecou (o alivio da CPU; measure alivio/d<k>) */
+let derrotasPartida = 0;
 /** a partida ja mandou o level/mN/start (no primeiro gameplayStart dela) */
 let inicioMedido = false;
 /** passos do tutorial da 1a partida (0 nao comecou, 1 comecou, 2 feito): receber, sacar, cortar */
@@ -424,6 +427,7 @@ function novaPartida(revanche = false) {
   const primeira = D.primeira ?? f.primeira;
   const curta = !primeira && !D.rival && f.curta;
   const derrotas = daCopa ? (D.derrotas ?? f.derrotas) : 0;
+  derrotasPartida = derrotas;
   const riv = acharRival(D.rival || f.rival);
   reacoesLiberadas = REACOES.map((r) => r.id).filter((id) => perfil.liberados.reacoes.includes(id));
   P = criarPartida({
@@ -486,7 +490,11 @@ function interagir(e) {
     // o funil da Poki: a partida N comecou (com o complete/fail do fim, o painel mostra quem saiu nela)
     if (!inicioMedido) {
       inicioMedido = true;
-      if (!D.auto) poki.measure('level', 'm' + (perfil.partidas + 1), 'start');
+      if (!D.auto) {
+        poki.measure('level', 'm' + (perfil.partidas + 1), 'start');
+        // o painel da Poki por adversario (a revanche conta outro start)
+        poki.measure('rival', P.rival.id, 'start');
+      }
     }
     if (!inicio) inicio = { t: 0, txt: T('grito.vai') };
     audio.pronto().then((ok) => { if (ok) { mesa.falar('vozProntoSlime', { forcar: true }); mesa.falar('vozVaiSlime', { forcar: true, atraso: 0.55 }); } });
@@ -665,6 +673,13 @@ const TRATADORES = {
     if (e.matchPoint) hud.faixa(T('grito.matchPoint'));
     else hud.faixa('');
     if (e.motivo === 'fora') poki.measure('fora', e.lado < 0 ? 'esquerda' : 'direita', 'ponto');
+    // o funil dentro das 2 primeiras partidas da vida (pontos jogados) e como o jogador perde os
+    // pontos nas 3 primeiras (as gravacoes do playtest so pegam o canvas: o placar nao aparece)
+    if (!D.auto && P.humano[0]) {
+      const N = perfil.partidas + 1;
+      if (N <= 2) poki.measure('m' + N, 'ponto', String(P.pontoN));
+      if (e.cpu && N <= 3) poki.measure('perda', P.rival.id, e.causa);
+    }
     if (!e.fim && !D.auto && P.humano[0]) barra = { de: tReal + 0.15, ate: tReal + 2.2 };
   },
   'match-point': () => {},
@@ -711,6 +726,17 @@ const TRATADORES = {
     gravarPerfil();
     mesa.falar(titulo ? 'vozParabensSlime' : venceu ? 'vozVenceuSlime' : 'vozPerdeuSlime', { forcar: true });
     poki.measure('level', 'm' + perfil.partidas, venceu ? 'complete' : 'fail');
+    // por adversario: o resultado, o placar, a causa principal da derrota (a mesma da dica do cartao),
+    // e se havia alivio (derrotas seguidas) ou o anjo salvou
+    const causa = venceu ? '' : causaPrincipal(P.resumo(0).perdas);
+    if (!D.auto) {
+      const riv = P.rival.id;
+      poki.measure('rival', riv, venceu ? 'complete' : 'fail');
+      poki.measure('placar', riv, `${e.placar[0]}-${e.placar[1]}`);
+      if (!venceu) poki.measure('derrota', riv, causa || 'nenhuma');
+      if (derrotasPartida > 0) poki.measure('alivio', 'd' + derrotasPartida, venceu ? 'venceu' : 'perdeu');
+      if (P.anjo.usados > 0) poki.measure('anjo', riv, 'usou');
+    }
     hud.faixa('');
     const ch = daCopa ? chaveDaCopa(perfil.copa) : null;
     let proxCopa = '';
@@ -726,12 +752,14 @@ const TRATADORES = {
       : null;
     const premiadoVisivel = !!progresso && poki.temAnuncios && !D.semAnuncio;
     // depois da 1a partida da vida o cartao avanca rapido (o maior vazamento do Player Fit Test)
-    const auto = perfil.partidas === 1 && D.avanco > 0 ? Math.min(D.avanco, TEMPOS.avancoPrimeira) : D.avanco;
+    // o avanco automatico: rapido depois da 1a partida da vida e nas primeiras derrotas
+    const auto = avancoDoCartao({ partidas: perfil.partidas, vitorias: perfil.vitorias, venceu, avanco: D.avanco });
     const abrir = () => {
       if (cartaoPendente !== abrir) return;
       cartaoPendente = null;
       hud.cartao({
         titulo: titulo ? T('copa.campeao') : venceu ? T('ui.venceu') : T('ui.perdeu'), sub: `${e.placar[0]} · ${e.placar[1]}`, proxima: venceu, revanche: !venceu,
+        dica: causa ? T('dica.derrota.' + causa) : '',
         progresso, premiado: premiadoVisivel, campeao: titulo, auto,
         chave: ch ? { ...dadosChave(ch), animar: venceu } : null, proxCopa, presente: presenteCartao,
       });
@@ -901,12 +929,17 @@ function desenhar(dtReal, alfa) {
   controles.mostrarSuper(false);
   desenharMao(dt);
   // carregou: primeiro quadro com a fonte
-  if (!carregouEnviado) {
-    carregouEnviado = true;
-    $('carregando')?.remove();
-    poki.gameLoadingFinished();
-  }
+  if (!carregouEnviado) carregou();
   void tFesta;
+}
+
+/** Fim do carregamento: o SDK e o formato da tela (o painel cruza o funil por retrato, paisagem e desktop). */
+function carregou() {
+  carregouEnviado = true;
+  $('carregando')?.remove();
+  poki.gameLoadingFinished();
+  const orient = cena.layout ? cena.layout.orient : window.innerHeight > window.innerWidth ? 'retrato' : toque ? 'paisagem' : 'desktop';
+  poki.measure('tela', orient, toque ? 'toque' : 'mouse');
 }
 
 /** Mao fantasma: comeco da partida, espera do saque e cortada guiada. */
@@ -961,7 +994,7 @@ if (D.filme > 0) {
   if (D.auto) { primeiraInteracao = true; P.interacao(); }
   laco.iniciar();
   // reserva do loading: 1,5 s
-  setTimeout(() => { if (!carregouEnviado) { carregouEnviado = true; $('carregando')?.remove(); poki.gameLoadingFinished(); } }, 1500);
+  setTimeout(() => { if (!carregouEnviado) carregou(); }, 1500);
 }
 
 // laboratorio da cortada (?lab)

@@ -90,6 +90,10 @@ body { font-family: Fredoka, system-ui, sans-serif; color: var(--tinta); }
   display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .cartao .titulo, .menuPausa .titulo { font-size: 30px; }
 .cartao .sub { font-size: 22px; }
+.cartao .dica { display: flex; align-items: center; gap: 8px; max-width: min(380px, calc(100vw - 72px)); background: var(--amarelo); border: 3px solid var(--tinta); border-radius: 14px;
+  box-shadow: 0 3px 0 var(--tinta); padding: 4px 12px; font-size: 16px; line-height: 1.2; text-align: left; animation: subiu .4s .2s ease-out both; }
+.cartao .dica[hidden] { display: none; }
+.cartao .dica b { flex: none; color: var(--laranja); -webkit-text-stroke: 2px var(--tinta); paint-order: stroke fill; }
 .cartao .caixa { max-height: calc(100vh - 16px); overflow-y: auto; }
 .cartao .progresso { display: grid; gap: 8px; width: min(340px, calc(100vw - 80px)); }
 .cartao .progresso[hidden] { display: none; }
@@ -123,6 +127,7 @@ body { font-family: Fredoka, system-ui, sans-serif; color: var(--tinta); }
   .cartao .caixa { padding: 10px 18px; gap: 6px; }
   .cartao .titulo { font-size: 24px; }
   .cartao .sub { font-size: 18px; }
+  .cartao .dica { font-size: 14px; padding: 2px 10px; }
   .cartao .progresso { gap: 5px; }
   .cartao .subiu { flex-direction: row; gap: 10px; }
   #jogo .cartao .premio canvas { width: 34px; height: 34px; }
