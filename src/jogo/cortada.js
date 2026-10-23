@@ -146,16 +146,23 @@ export function miraPadrao(lado, rivalX, rivalVx) {
 }
 
 /**
- * Mira guiada (M2d): a ponta da faixa mais longe de onde o rival vai estar. E a mira inicial da
- * cortada do humano (quem so toca corta com ela; quem segura mexe a partir dela) e a da cortada
- * guiada da 1a partida. Com a mira padrao (o fundo), a CPU lia a reticula e ja estava embaixo: o
- * novato simulado tentava duas cortadas por partida e quase nenhuma virava ponto.
+ * Mira guiada (M2d): o ponto da faixa mais longe de onde o rival vai estar. E a mira inicial da
+ * cortada do humano (quem so toca corta com ela; quem segura mexe a partir dela): com a mira padrao
+ * (o fundo), a CPU lia a reticula e ja estava embaixo, e o novato simulado quase nunca pontuava.
+ * Sem `de` e a ponta mais longe, mesmo que vire a deixada lenta atras da rede (contra a Geleia: 0,32
+ * BOMBA por partida, contra 0,01 da cortada direta, que a CPU le). Com o ponto de batida `de`, so
+ * os alvos com cortada direta (rapida): a cortada guiada da 1a partida, que a Gota nao pega.
  * @param {number} lado de quem corta @param {number} rivalX @param {number} [rivalVx]
+ * @param {number[]|null} [de] o ponto de batida [x, y] (sem ele, so a ponta mais longe) @param {number} [vento]
  */
-export function miraGuiada(lado, rivalX, rivalVx = 0) {
+export function miraGuiada(lado, rivalX, rivalVx = 0, de = null, vento = 0) {
   const [x0, x1] = faixaAlvo(lado);
   const prev = rivalX + rivalVx * 0.3;
-  return Math.abs(x0 - prev) > Math.abs(x1 - prev) ? x0 : x1;
+  const alvos = [];
+  for (let k = 0; k <= 8; k++) alvos.push(x0 + ((x1 - x0) * k) / 8);
+  alvos.sort((a, b) => Math.abs(b - prev) - Math.abs(a - prev));
+  if (de) for (const x of alvos) if (resolverTiro(de[0], de[1], x, lado, { vento }).ok) return x;
+  return alvos[0];
 }
 
 /**

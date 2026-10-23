@@ -27,7 +27,7 @@ import { chaveDaCopa, registrarVitoria, registrarDerrota, partidaDaFase, proxima
 import { paisDoIdioma } from './jogo/paises.js';
 import { visualDaSkin, visualDoArquetipo, comprar as comprarItem, normalizarVisual } from './jogo/visual.js';
 import { normalizarPerfil, rendimento, aplicarGanho, proximosMarcos, darPresente, presenteDaVitoria } from './jogo/perfil.js';
-import { TEMPOS, anjoDaPartida, ajudaDaPartida, avancoDoCartao } from './jogo/regras.js';
+import { TEMPOS, anjoDaPartida, ajudaDaPartida, avancoDoCartao, transicaoDireta } from './jogo/regras.js';
 import { causaPrincipal } from './jogo/dicas.js';
 import { criarVista } from './render/vista.js';
 import { criarCena } from './render/cena.js';
@@ -347,6 +347,13 @@ let inicio = null;
 let tMao = 0;
 let partidaN = perfil.partidas;
 let premiadoNaPausa = false;
+/**
+ * A transicao direta da 1a para a 2a partida (M2d, sem cartao): 'presente' (o presente desce no
+ * slime na quadra, "NOVO!") -> 'entrada' (a 2a partida ja criada: o rival cai do ceu e o letreiro
+ * da fase), no jogo-real (a pausa congela).
+ * @type {null | { fase: 'presente'|'entrada', t: number, encaixe: string, novo: string, nivel: string, letreiro: string, faixa: string }}
+ */
+let transicao = null;
 /** derrotas seguidas na fase quando a partida comecou (o alivio da CPU; measure alivio/d<k>) */
 let derrotasPartida = 0;
 /** a partida ja mandou o level/mN/start (no primeiro gameplayStart dela) */
@@ -418,7 +425,8 @@ function vestirRival() {
   vista.vestir(1, c.pig, c.hex);
 }
 
-function novaPartida(revanche = false) {
+/** @param {boolean} [revanche] @param {{ entrada?: boolean }} [o2] entrada: o rival cai do ceu (a transicao direta) */
+function novaPartida(revanche = false, o2 = {}) {
   // a partida da fase (src/jogo/torneio.js partidaDaFase): a 1a da vida e os 16-avos da Copa 1,
   // contra a Gota (imperdivel); as oitavas da Copa 1 (a 2a da vida, contra o Pingo) vao a 5 sem
   // vai-a-2; as derrotas seguidas na fase aliviam a CPU e o anjo salva o match point
@@ -445,6 +453,7 @@ function novaPartida(revanche = false) {
     powerups: [...perfil.liberados.powerups],
     lenta: { ...(D.lenta ? { escalaMundo: Math.round(D.lenta * 1000) } : {}), ...(D.defensor ? { escalaDefensor: Math.round(D.defensor * 1000) } : {}) },
     qualidadeMinima: cena.nivelQualidade >= 3,
+    entrada: !!o2.entrada,
   });
   vista = criarVista(P);
   const ch = chaveDaCopa(perfil.copa);
@@ -460,10 +469,12 @@ function novaPartida(revanche = false) {
   tMao = 0;
   inicioMedido = false;
   tutorial = { receber: 0, saque: 0, cortada: 0 };
-  if (D.roteiro) {
+  // roteiros (prints): o ?roteiro=transicao e o fim da 1a partida da vida (a 2a comeca normal)
+  const roteiro = D.roteiro === 'transicao' ? (perfil.partidas === 0 ? 'fim' : '') : D.roteiro;
+  if (roteiro) {
     primeiraInteracao = true;
     jogando = true;
-    P.roteiro(D.roteiro);
+    P.roteiro(roteiro);
   }
   void revanche;
 }
@@ -478,6 +489,9 @@ function interagir(e) {
   tUltimaInteracao = performance.now();
   audio.iniciar();
   if (cartaoPendente) { cartaoPendente(); return; }
+  // a transicao direta: o toque pula o presente; no letreiro, o toque comeca a partida (sai o letreiro)
+  if (transicao && transicao.fase === 'presente') { entrarNaProxima(); return; }
+  if (transicao) transicao = null;
   if (!P || menu.aberto || vestiario.aberto) return;
   P.interacao();
   if (!primeiraInteracao) {
@@ -683,6 +697,8 @@ const TRATADORES = {
     if (!e.fim && !D.auto && P.humano[0]) barra = { de: tReal + 0.15, ate: tReal + 2.2 };
   },
   'match-point': () => {},
+  // a transicao direta: o rival pousa caindo do ceu
+  'rival-entra': (e) => { mesa.tocar('chao', { forca: 1.2 }, { max: 1 }); cena.vfx.respingo(e.x, 0.3, cores[1], 12, 7); cena.diretor.tremer(0.3); cena.plateia.animar(0.3); },
   // o ponto nao valeu (protecao da 1a partida): o apito e o jogador saca de novo
   'repete': () => mesa.tocar('apito', {}, { max: 1 }),
   'fim': (e) => {
@@ -738,6 +754,25 @@ const TRATADORES = {
       if (P.anjo.usados > 0) poki.measure('anjo', riv, 'usou');
     }
     hud.faixa('');
+    // a 1a vitoria da vida vira a 2a partida sem cartao (M2d: 19% saiam no cartao de 3 s da 0.2.0):
+    // o presente desce no slime na quadra, o rival cai do ceu com o letreiro da fase e o saque espera
+    // o toque; a chave e o caminho aparecem a partir do 2o cartao
+    if (transicaoDireta({ partidas: perfil.partidas, imperdivel: P.regras.imperdivel, venceu, daCopa, direta: D.direta })) {
+      const ch1 = chaveDaCopa(perfil.copa);
+      const [, enc, id] = presente ? presente.split(':') : ['', '', ''];
+      const prox1 = presenteDaVitoria(perfil.vitorias + 1);
+      const proxId = prox1 && !perfil.liberados.itens.includes(prox1) ? prox1.split(':')[2] : '';
+      transicao = {
+        fase: 'presente', t: 0, encaixe: enc,
+        novo: id ? T('ac.' + id) : '',
+        nivel: progresso && progresso.subiu.length ? T('ui.nivelN').replace('{n}', String(progresso.depois.nivel)) : '',
+        letreiro: T('copa.letreiro').replace('{fase}', T('copa.' + ch1.nomeFase)),
+        faixa: T('ui.presenteProximo').replace('{rival}', T('rival.' + ch1.adversario)) + (proxId ? ' · ' + T('ac.' + proxId) : ''),
+      };
+      if (enc) vista.m.slimes[0].dados.novo = { encaixe: enc, k: 0 };
+      poki.measure('transicao', 'm2', 'direta');
+      return;
+    }
     const ch = daCopa ? chaveDaCopa(perfil.copa) : null;
     let proxCopa = '';
     if (ch) proxCopa = titulo ? (ch.n < NUM_COPAS ? T('copa.liberada').replace('{n}', String(ch.n + 1)) : T('copa.campeao')) + ` · ${T('copa.titulo').replace('{g}', String(bonus))}` : textoProxima(ch);
@@ -841,6 +876,7 @@ function passo(dt) {
   if (pausado || emAnuncio) return;
   tReal += dt;
   if (inicio) inicio.t += dt;
+  if (transicao) passoTransicao(dt);
   // intencoes do jogador (uma vez por passo: as bordas acumulam no controle)
   const its = controles.ler(P.slimes);
   // roteiro da mira: a acao fica segurada (prints e laboratorio)
@@ -863,6 +899,25 @@ function passo(dt) {
   // a cortada guiada espera o toque sem limite: depois do portao sem interacao, o gameplay para (o
   // proximo toque real o retoma em interagir)
   if (jogando && P.guia.fase === 'congelada' && P.guia.t > TEMPOS.portao) pararJogo();
+}
+
+/** A transicao direta anda no jogo-real: o presente desce e, no fim, a 2a partida entra. */
+function passoTransicao(dt) {
+  transicao.t += dt;
+  if (transicao.fase === 'presente') {
+    const novo = vista.m.slimes[0].dados.novo;
+    if (novo) novo.k = Math.max(0, Math.min(1, (transicao.t - 0.55) / 0.6));
+    if (transicao.t >= TEMPOS.transPresente) entrarNaProxima();
+  } else if (transicao.t >= TEMPOS.letreiro) transicao = null;
+}
+
+/** A 2a partida da vida entra (o rival caindo do ceu, o letreiro e a faixa do proximo presente). */
+function entrarNaProxima() {
+  if (!transicao) return;
+  partidaN++;
+  novaPartida(false, { entrada: true });
+  hud.faixa(transicao.faixa);
+  transicao = { ...transicao, fase: 'entrada', t: 0 };
 }
 
 /** Power-ups ativos de um jogador para o HUD: "id:pontos" (sem pontos: espera o uso). */
@@ -914,7 +969,10 @@ function desenhar(dtReal, alfa) {
     if (f && !D.semHud) falas.push({ i, texto: T('fala.' + f.id), t: f.t, dur: FALA.dur });
   }
   const nomeBolha = P.bolha && !D.semHud ? T('pwn.' + P.bolha.id) : '';
-  cena.desenhar(P, vista, alfa, dt, { cores, festa, inicio, saque: sq, pulsoSaque: pulso, alvoSaque, falas, nomeBolha, vitrine: vestiario.aberto ? vestiario.vitrine() : null });
+  // a transicao direta: o presente na quadra e o letreiro da fase
+  const presente = transicao && transicao.fase === 'presente' ? { t: transicao.t, novo: transicao.novo, nivel: transicao.nivel, titulo: T('ui.presenteNovo') } : null;
+  const letreiro = transicao && transicao.fase === 'entrada' ? { t: transicao.t, txt: transicao.letreiro } : null;
+  cena.desenhar(P, vista, alfa, dt, { cores, festa, inicio, saque: sq, pulsoSaque: pulso, alvoSaque, falas, nomeBolha, vitrine: vestiario.aberto ? vestiario.vitrine() : null, presente, letreiro });
   // HUD
   const L = cena.layout;
   if (L) hud.posicionar(L);

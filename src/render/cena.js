@@ -15,7 +15,7 @@ import { criarPlateia } from './plateia.js';
 import { calcularLayout } from './layout.js';
 import { ESTILOS, desenharPiso, desenharTopo } from './quadra.js';
 import { desenharFundo, desenharArquibancada, desenharBiruta } from './ginasios/praia.js';
-import { cameraFesta, desenharFesta, desenharInicio, focoCampeao, QUADRO_CAMPEAO } from './celebracao.js';
+import { cameraFesta, desenharFesta, desenharInicio, desenharPresente, desenharLetreiro, focoCampeao, focoPresente, QUADRO_CAMPEAO } from './celebracao.js';
 import { paraMundo, paraTela, aplicar, enquadrar } from './camera.js';
 import { CORTADA } from '../jogo/cortada.js';
 import { alfaCanal } from '../jogo/tempo.js';
@@ -173,7 +173,8 @@ export function criarCena(el, o = {}) {
     }
     let { base, cam } = diretor.quadro(L, b, dtR, { zoom, foco, reduzir: o.reduzir });
     // campeao da Copa: a camera fecha no slime do jogador (o letreiro e a taca na celebracao.js)
-    const kc = F && F.campeao ? focoCampeao(F.t) : 0;
+    // e na transicao direta (o presente da 1a vitoria), mais leve
+    const kc = F && F.campeao ? focoCampeao(F.t) : o2.presente ? focoPresente(o2.presente.t) : 0;
     if (kc > 0) {
       const sx = vista.slimes[0].x;
       const Q = QUADRO_CAMPEAO;
@@ -272,7 +273,7 @@ export function criarCena(el, o = {}) {
     if (o2.nomeBolha && P.bolha) desenharNomeBolha(ctxTopo, P.bolha, t, BOLHA.vida, o2.nomeBolha, cam, dpr, W);
     // ---------------- tela (por cima do HUD)
     const dT = Math.min(1.5, dpr);
-    const ativo = !!F || !!(o2.inicio && o2.inicio.t < 1.4);
+    const ativo = !!F || !!(o2.inicio && o2.inicio.t < 1.4) || !!o2.presente || !!o2.letreiro;
     if (ativo || telaSuja) {
       ctxTela.setTransform(1, 0, 0, 1, 0, 0);
       ctxTela.clearRect(0, 0, el.tela.width, el.tela.height);
@@ -285,6 +286,11 @@ export function criarCena(el, o = {}) {
       desenharFesta(ctxTela, cam, dT, W, H, F, { quadra: L.quadra, qualidade: q.nome, retrato: L.orient === 'retrato', ...campeao });
     }
     if (o2.inicio && o2.inicio.t < 1.4) desenharInicio(ctxTela, dT, o2.inicio.t, { quadra: L.quadra }, o2.inicio.txt, P.placar, o2.cores[0]);
+    if (o2.presente) {
+      const s0 = vista.slimes[0];
+      desenharPresente(ctxTela, cam, dT, W, H, { ...o2.presente, foco: paraTela(cam, s0.x, s0.y + s0.b * 0.5) });
+    }
+    if (o2.letreiro) desenharLetreiro(ctxTela, dT, o2.letreiro.t, { quadra: L.quadra }, o2.letreiro.txt, o2.cores[0]);
   }
 
   /** Limpa o canvas de cima do HUD (a vitrine nao tem festa). */

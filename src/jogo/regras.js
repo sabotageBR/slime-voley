@@ -40,7 +40,23 @@ export const TEMPOS = Object.freeze({
    */
   avancoDerrota: 4,
   derrotasCurtas: 3,
+  /**
+   * a transicao direta da 1a para a 2a partida (M2d, sem cartao): o presente na quadra (inclui os
+   * 0,4 s finais da festa da vitoria) e o letreiro da fase com o rival entrando
+   */
+  transPresente: 2.2,
+  letreiro: 1.6,
 });
+
+/**
+ * A 1a vitoria da vida (a partida imperdivel da Copa) vira a 2a partida sem cartao? (M2d: 19% saiam
+ * no cartao de 3 s da 0.2.0; direta = false e o ?direta=0 das ferramentas)
+ * @param {{ partidas: number, imperdivel: boolean, venceu: boolean, daCopa: boolean, direta?: boolean }} o
+ *   partidas da vida ja contando esta
+ */
+export function transicaoDireta(o) {
+  return o.direta !== false && o.daCopa && o.venceu && o.imperdivel && o.partidas === 1;
+}
 
 /**
  * Em quantos s o cartao de fim avanca sozinho (0: nunca): 3 s depois da 1a partida da vida, 4 s

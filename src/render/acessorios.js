@@ -319,11 +319,24 @@ export function desenharAcessoriosDe(ctx, s, traco, t) {
   const a = s.dados && s.dados.acessorios;
   if (!a) return;
   const k = kit(ctx, s, traco);
+  // o presente que acabou de ganhar (a transicao direta): desce do alto e assenta, como a taca
+  const novo = s.dados.novo;
   ctx.save();
   ctx.lineJoin = 'round';
   for (const enc of /** @type {const} */ (['boca', 'rosto', 'cabeca'])) {
     const fn = a[enc] && REG[enc][a[enc]];
-    if (fn) fn(k, t);
+    if (!fn) continue;
+    if (novo && novo.encaixe === enc) {
+      if (novo.k <= 0) continue;
+      const u = Math.min(1, novo.k);
+      const c = 1.9;
+      const x = u - 1;
+      const pouso = 1 + (c + 1) * x * x * x + c * x * x;
+      ctx.save();
+      ctx.translate(0, (1 - pouso) * 3.2);
+      fn(k, t);
+      ctx.restore();
+    } else fn(k, t);
   }
   ctx.restore();
 }

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { alvoDaPartida, vencedor, pontoDaPartida, profundidadeSaque, qualidadeSaque, temposSaque, posicaoParaRumo, anjoDaPartida, ajudaDaPartida, avancoDoCartao, SAQUE, ANJO, AJUDA, TEMPOS } from '../src/jogo/regras.js';
-import { miraGuiada, faixaAlvo } from '../src/jogo/cortada.js';
+import { miraGuiada, faixaAlvo, resolverTiro } from '../src/jogo/cortada.js';
 import { criarIA } from '../src/jogo/ia.js';
 import { NIVEIS } from '../src/jogo/rivais.js';
 import { criarRng } from '../src/core/rng.js';
@@ -355,7 +355,12 @@ test('mira guiada: a ponta da faixa mais longe do rival (a cortada do humano com
   assert.equal(miraGuiada(-1, 2, 0), x1, 'o rival na rede: vai no fundo');
   const p = criarPartida({ modo: 'cpu', semente: 4 });
   assert.ok(p.roteiro('cortada'));
-  assert.equal(p.cortada.alvoX, miraGuiada(-1, p.slimes[1].x, p.slimes[1].vx));
+  assert.equal(p.cortada.alvoX, miraGuiada(-1, p.slimes[1].x, p.slimes[1].vx), 'a cortada livre: a ponta mais longe');
+  // com o ponto de batida (a cortada guiada da 1a partida): do fundo da quadra, colado na rede nao
+  // da cortada direta, e ela escolhe um alvo que da
+  const de = [-10, 6.5];
+  const x = miraGuiada(-1, 10, 0, de);
+  assert.ok(resolverTiro(de[0], de[1], x, -1).ok, `alvo ${x}`);
 });
 
 test('avanco do cartao: 3 s depois da 1a partida, 4 s nas primeiras derrotas, senao o padrao; 0 desliga', () => {

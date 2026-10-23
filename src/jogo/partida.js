@@ -79,6 +79,7 @@ const intencaoVazia = () => ({ eixo: 0, botao: false, borda: false, superBorda: 
  * @property {0|1} [sacaPrimeiro]
  * @property {boolean} [fora]                 regra antiga do fora (padrao: a bola nunca sai)
  * @property {string[]} [powerups]           ids liberados das bolhas (vazio: sem bolhas; nunca na 1a partida)
+ * @property {boolean} [entrada]              o rival entra caindo do ceu (a transicao direta da 1a para a 2a partida)
  */
 
 /**
@@ -114,6 +115,9 @@ export function criarPartida(o = {}) {
   const eventos = [];
 
   const slimes = [criarSlime(-1, -7), criarSlime(1, 7)];
+  // a transicao direta: o rival cai do ceu e pousa (evento rival-entra no 1o pouso)
+  let entrando = !!o.entrada;
+  if (entrando) { slimes[1].y = 12; slimes[1].noChao = false; }
   const peles = slimes.map((s) => criarPele(s, passoPeleQ));
   const bola = criarBola();
 
@@ -744,8 +748,10 @@ export function criarPartida(o = {}) {
     Jm.cortadaGratis = false;
     const outro = slimes[outroI(i)];
     const tMax = (oc.guiada || guia.fase === 'oferecida') && humano[i] ? Cort.CORTADA.tMiraTutorial : modo === 'dois' ? Cort.CORTADA.tMira2P : Cort.CORTADA.tMira;
-    // o humano comeca na mira guiada (longe do rival); a CPU, na padrao (o fundo)
-    const alvoX = humano[i] && modo === 'cpu' ? Cort.miraGuiada(s.lado, outro.x, outro.vx) : Cort.miraPadrao(s.lado, outro.x, outro.vx);
+    // o humano comeca na mira guiada (longe do rival; na cortada guiada da 1a partida, a direta e
+    // rapida); a CPU, na padrao (o fundo)
+    const alvoX = oc.guiada ? Cort.miraGuiada(s.lado, outro.x, outro.vx, Cort.pontoBatida(s), ginasio.vento)
+      : humano[i] && modo === 'cpu' ? Cort.miraGuiada(s.lado, outro.x, outro.vx) : Cort.miraPadrao(s.lado, outro.x, outro.vx);
     cortada = Cort.iniciar(i, s, { tMax, alvoX, gratis, vento: ginasio.vento });
     cortada.guiada = !!oc.guiada;
     cortada.cpuSegura = humanoOuCpu ? 0 : 0.4 + rng() * 0.2;
@@ -1178,7 +1184,10 @@ export function criarPartida(o = {}) {
       s.x = s.lado * ax;
     }
     if (r === 'pulo') { Jm.pulos++; ev({ tipo: 'pulo', i, x: s.x }); }
-    if (r === 'pouso') ev({ tipo: 'pouso', i, x: s.x, forca: 1 });
+    if (r === 'pouso') {
+      ev({ tipo: 'pouso', i, x: s.x, forca: 1 });
+      if (i === 1 && entrando) { entrando = false; amassar(s, 0.6); ev({ tipo: 'rival-entra', i, x: s.x }); }
+    }
     passoPele(Jm.pele, s, dtM);
     if (Jm.tExpr > 0) {
       Jm.tExpr -= dtM;
@@ -1429,6 +1438,8 @@ export function criarPartida(o = {}) {
     get humano() { return humano; },
     get rali() { return rali; },
     get rival() { return riv; },
+    /** o rival ainda caindo do ceu (a transicao direta) */
+    get entrando() { return entrando; },
     /** vento e teto do ginasio (o novato simulado le para prever a bola como a IA) */
     get ginasio() { return ginasio; },
     /** o anjo: quantos restam e quantos ja salvaram o humano nesta partida */

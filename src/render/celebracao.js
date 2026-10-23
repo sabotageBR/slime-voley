@@ -333,6 +333,75 @@ function desenharCampeao(ctx, cam, dpr, W, H, f, o, n, tons) {
   }
 }
 
+/** Quanto a camera fecha no slime do jogador na transicao direta (o presente), no instante t. @param {number} t */
+export const focoPresente = (t) => {
+  const u = clamp((t - 0.4) / 0.55);
+  const v = clamp((t - 1.85) / 0.35);
+  return u * u * (3 - 2 * u) * (1 - v * v * (3 - 2 * v)) * 0.8;
+};
+
+/**
+ * O presente da 1a vitoria na quadra (a transicao direta da 1a para a 2a partida, M2d): um holofote
+ * leve no slime do jogador, o "NOVO!" dourado com o nome do item embaixo (o item desce na cabeca dele,
+ * src/render/acessorios.js) e, se subiu de nivel, o "NIVEL 2!".
+ * @param {{ foco?: number[], t: number, titulo: string, novo: string, nivel: string }} o foco: px CSS
+ */
+export function desenharPresente(ctx, cam, dpr, W, H, o) {
+  const t = o.t;
+  if (t < 0.4) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const k = focoPresente(t) / 0.8;
+  if (o.foco && k > 0) {
+    const [fx, fy] = o.foco;
+    const r1 = Math.max(70, cam.s * 2.3);
+    const g = ctx.createRadialGradient(fx, fy, r1 * 0.6, fx, fy, r1 + Math.max(W, H) * 0.6);
+    g.addColorStop(0, 'rgba(14,10,30,0)');
+    g.addColorStop(0.35, `rgba(14,10,30,${0.3 * k})`);
+    g.addColorStop(1, `rgba(14,10,30,${0.5 * k})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+  const fora = clamp((t - 1.95) / 0.25);
+  const txt = o.novo ? o.titulo : '';
+  const tam = txt ? cabe(ctx, txt, Math.min(H * 0.14, 120), W * 0.8) : 0;
+  const y = Math.max(H * 0.2, tam * 0.62 + 40);
+  if (txt && t >= 1.0) {
+    const u = (t - 1.0) / 0.3;
+    const esc = (u < 1 ? backOut(u) : 1) * (1 + 0.03 * Math.sin(t * 5));
+    ctx.save();
+    ctx.translate(W / 2, y);
+    ctx.scale(esc, esc);
+    palavraGosma(ctx, txt, 0, 0, tam, OURO, clamp(u * 3) * (1 - fora), 0);
+    ctx.restore();
+    const tam2 = cabe(ctx, o.novo, tam * 0.42, W * 0.8);
+    palavraGosma(ctx, o.novo, W / 2, y + tam * 0.62, tam2, '#ffffff', clamp((t - 1.15) * 4) * (1 - fora), 0);
+  }
+  if (o.nivel && t >= 1.35) {
+    const tam3 = cabe(ctx, o.nivel, Math.min(H * 0.06, 44), W * 0.6);
+    palavraGosma(ctx, o.nivel, W / 2, y + tam * 1.1 + tam3, tam3, '#b38cff', clamp((t - 1.35) * 4) * (1 - fora), 0);
+  }
+}
+
+/**
+ * O letreiro da fase quando a 2a partida entra na transicao direta ("OITAVAS!"): entra com mola,
+ * fica e sai amassando para cima, no terco de cima da quadra.
+ * @param {{ quadra: { x: number, y: number, w: number, h: number } }} o
+ */
+export function desenharLetreiro(ctx, dpr, t, o, txt, cor) {
+  if (t < 0 || t > 1.6 || !txt) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const Q = o.quadra;
+  const tam = cabe(ctx, txt, Math.min(Q.w * 0.14, Q.h * 0.2, 110), Q.w * 0.9);
+  const u = t / 0.3;
+  const sai = clamp((t - 1.3) / 0.3);
+  const esc = u < 1 ? 1.25 * backOut(u) : 1;
+  ctx.save();
+  ctx.translate(Q.x + Q.w / 2, Q.y + Q.h * 0.34 - sai * Q.h * 0.08);
+  ctx.scale(esc * (1 - sai * 0.3), esc * (1 + sai * 0.4));
+  palavraGosma(ctx, txt, 0, 0, tam, cor, clamp(u * 3) * (1 - sai), clamp((t - 0.2) / 0.5));
+  ctx.restore();
+}
+
 /**
  * Inicio da partida e volta da pausa: placar "0 · 0" e "VAI!" (nunca "READY?").
  * @param {CanvasRenderingContext2D} ctx @param {number} dpr @param {number} t s desde o inicio
