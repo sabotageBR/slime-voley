@@ -163,6 +163,14 @@ export function criarCena(el, o = {}) {
       zoom = Math.max(zoom, 1 + (CORTADA.pushIn - 1) * k);
       foco = foco || [C.bx, C.by];
     }
+    // cortada guiada da 1a partida congelada esperando o toque: o mesmo push-in, na bola
+    const G = P.guia;
+    const guiaPresa = !!G && (G.fase === 'congelada' || G.fase === 'salto');
+    if (guiaPresa) {
+      const k = G.fase === 'congelada' ? Math.min(1, G.t / CORTADA.guia.rampa) : 1;
+      zoom = Math.max(zoom, 1 + (CORTADA.pushIn - 1) * k);
+      foco = foco || [b.x, b.y];
+    }
     let { base, cam } = diretor.quadro(L, b, dtR, { zoom, foco, reduzir: o.reduzir });
     // campeao da Copa: a camera fecha no slime do jogador (o letreiro e a taca na celebracao.js)
     const kc = F && F.campeao ? focoCampeao(F.t) : 0;
@@ -184,7 +192,7 @@ export function criarCena(el, o = {}) {
     camQuadro = cam;
     // efeitos de mundo
     passoEfeitos(P, vista, dtR);
-    plateia.passo(dtR * (C && C.fase === 'mirando' ? CORTADA.escalaMundo / 1000 : 1));
+    plateia.passo(dtR * (C && C.fase === 'mirando' ? CORTADA.escalaMundo / 1000 : guiaPresa ? G.escala / 1000 : 1));
     // ---------------- fundo
     ctxFundo.setTransform(1, 0, 0, 1, 0, 0);
     desenharFundo(ctxFundo, cam, dpr, W, H, t, est, { arte });

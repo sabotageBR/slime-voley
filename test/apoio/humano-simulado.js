@@ -155,6 +155,19 @@ export function criarNovato(semente, o = {}) {
         p.intencao(0, it);
         return;
       }
+      // a cortada guiada da 1a partida congelada: um toque qualquer depois de ver a mao (como o inicio)
+      if (p.guia && p.guia.fase === 'congelada') {
+        tEspera += PASSO;
+        if (tEspera >= esperaAlvo) {
+          tEspera = 0;
+          esperaAlvo = entre(P.inicio);
+          it.borda = true;
+          it.botao = true;
+          p.interacao();
+        }
+        p.intencao(0, it);
+        return;
+      }
       if (nulo && !(p.estado === 'saque' && p.sacador === 0)) { p.intencao(0, it); return; }
       const est = p.estado;
       if (est === 'saque') {

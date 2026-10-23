@@ -634,9 +634,13 @@ const TRATADORES = {
     // so o humano (antes de 2026-10-22 a CPU entrava na conta): o gesto (toque simples ou segurou)
     // e a mira (a padrao ou mexida)
     if (e.humano) {
-      poki.measure('cortada', 'gesto', e.toque ? 'toque' : 'segurou');
-      poki.measure('cortada', 'mira', e.auto ? 'auto' : 'manual');
-      if (e.rapida) poki.measure('cortada', 'lenta', 'sem-querer');
+      // a guiada (1a partida) conta a parte, para a serie do toque e do segurou nao misturar
+      if (e.guiada) poki.measure('cortada', 'gesto', 'guiada');
+      else {
+        poki.measure('cortada', 'gesto', e.toque ? 'toque' : 'segurou');
+        poki.measure('cortada', 'mira', e.auto ? 'auto' : 'manual');
+        if (e.rapida) poki.measure('cortada', 'lenta', 'sem-querer');
+      }
       passoTutorial('cortada', 'complete');
     }
   },
@@ -777,6 +781,9 @@ const TRATADORES = {
   // falas em balao: o balbucio no tom de cada slime (o texto a cena desenha)
   'fala': (e) => mesa.balbuciar(vozDaFala(e.id), { nivel: tons[e.i] }),
   'tutorial-cortada': () => { tMao = 0; passoTutorial('cortada', 'start'); },
+  // a cortada guiada congelou esperando o toque, e o toque pulou sozinho
+  'guia-congela': () => { tMao = 0; mesa.tocar('lentaEntra', {}, { max: 1 }); vibrar(20); },
+  'guia-salto': () => {},
   'texto': () => {},
   'lenta': () => {},
   'cortada-cancela': () => {},
@@ -825,6 +832,9 @@ function passo(dt) {
   }
   P.eventos.length = 0;
   tFesta = P.estado === 'ponto' || P.estado === 'fim' ? P.festa.t : 0;
+  // a cortada guiada espera o toque sem limite: depois do portao sem interacao, o gameplay para (o
+  // proximo toque real o retoma em interagir)
+  if (jogando && P.guia.fase === 'congelada' && P.guia.t > TEMPOS.portao) pararJogo();
 }
 
 /** Power-ups ativos de um jogador para o HUD: "id:pontos" (sem pontos: espera o uso). */
@@ -910,12 +920,13 @@ function desenharMao(dt) {
   const acao = pulo ? { x: pulo.x, y: pulo.y } : L.painel ? { x: W * 0.75, y: L.painel.y + L.painel.h * 0.45 } : { x: W * 0.78, y: window.innerHeight * 0.72 };
   if (!primeiraInteracao) m = { ...acao, texto: toque ? T('dica.toque') : T('dica.teclas'), gesto: 'toque' };
   else if (D.auto) m = null;
+  // a cortada guiada congelada: qualquer toque corta
+  else if (P.guia.fase === 'congelada') m = { ...acao, texto: T(toque ? 'dica.cortadaToque' : 'dica.cortadaClique'), gesto: 'forte' };
   else if (P.estado === 'saque' && P.sacador === 0 && P.saque.fase === 'pronto' && (P.saque.t >= TEMPOS.pulsoSaque || perfil.partidas < 2)) {
     // na 1a partida o saque e de um toque (a batida sai sozinha): "toque para sacar"
     const k = P.saqueSimples ? (toque ? 'dica.sacarSimples' : 'dica.sacarTeclaSimples') : toque ? 'dica.sacar' : 'dica.sacarTecla';
     m = { ...acao, texto: T(k), gesto: 'toque' };
   } else if (P.estado === 'saque' && P.sacador === 0 && P.saque.fase === 'levantada' && !P.saqueSimples && perfil.partidas < 3) m = { ...acao, texto: T('dica.bater'), gesto: 'toque' };
-  else if (P.tutorialCortada === 'oferecida' && P.estado === 'jogo' && !P.cortada) m = { ...acao, texto: T('dica.cortada'), gesto: 'duplo' };
   else if (P.esperaToque && P.estado === 'saque' && P.sacador === 1) m = { ...acao, texto: T('dica.receber'), gesto: 'toque' };
   hud.mao(m);
 }

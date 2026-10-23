@@ -9,7 +9,7 @@
 // Puro: a partida chama elegivel(), iniciar(), passo() e mirar(); este modulo nunca toca no DOM.
 // Estados: entrando -> mirando -> soltando -> (fim; a bola fica 'cortada' ate o primeiro contato).
 
-import { prever, eixos, limitesX, RB, REDE_H, REDE_R, LARG, G_BOLA, limitar } from '../fisica/volei.js';
+import { prever, eixos, limitesX, RB, REDE_H, REDE_R, LARG, G_BOLA, G_SLIME, PULO, limitar } from '../fisica/volei.js';
 
 /**
  * Parametros (os valores medidos estao em docs/referencias). Mutavel de proposito: o
@@ -62,6 +62,13 @@ export const CORTADA = {
   gotaMax: 0.28,
   /** a variante "segura": soltar em menos de 200 ms sem mexer a mira devolve os 100 */
   devolucao: 0.2,
+  /**
+   * cortada guiada da 1a partida (M2d, a prova de falha): a escala do mundo com a bola presa
+   * esperando o toque e no pulo automatico (milesimos), a rampa ate elas (s), a mira minima (s), a
+   * vy do slime em que corta (perto do apice), a folga de altura em que a bola congela e o apice
+   * da bola alta que a Gota manda
+   */
+  guia: { escala: 30, escalaSalto: 500, rampa: 0.12, tMira: 0.7, vyCorta: 3, folgaY: 0.6, apice: 10.5 },
 };
 
 /**
@@ -109,6 +116,11 @@ export function pontoBatida(s) {
   const [, b] = eixos(s);
   const frente = -s.lado;
   return [s.x + frente * CORTADA.batidaFrente, s.y + b + CORTADA.batidaAcima + RB * 0.4];
+}
+
+/** O ponto de batida com o slime no apice do pulo (a bola alta da cortada guiada vai para ele). @param {import('../fisica/volei.js').Slime} s */
+export function batidaNoApice(s) {
+  return pontoBatida({ ...s, y: (PULO * PULO * (s.multPulo || 1) * (s.multPulo || 1)) / (2 * G_SLIME) });
 }
 
 /** Faixa da reticula no piso do outro lado: da rede + 1 ate LARG - 0,6. @param {number} lado de quem corta */

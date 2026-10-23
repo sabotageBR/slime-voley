@@ -187,8 +187,20 @@ export function criarPartida(o = {}) {
   let cortada = null;
   let tCortadaSolta = -9;
   let tSaqueSolto = -9;
-  /** primeira partida: a cortada guiada ja foi oferecida/feita */
-  let tutorialCortada = o.primeira ? 'esperando' : 'feito';
+  /**
+   * Cortada guiada da 1a partida (M2d, a prova de falha): esperando -> oferecida (do 2o rali em
+   * diante a Gota manda uma bola alta para o ponto de batida do jogador no apice do pulo, com o
+   * medidor cheio) -> congelada (a bola presa sobre ele, o mundo quase parado, espera qualquer
+   * toque) -> salto (o toque pula sozinho) -> cortando (a cortada sai perto do apice, na mira guiada)
+   * -> feito. Da oferta ate o ponto a Gota assiste e, depois da soltura, nao encosta: BOMBA. Se o
+   * rali acabar antes, volta a esperar e e oferecida de novo.
+   * @type {{ fase: 'esperando'|'oferecida'|'congelada'|'salto'|'cortando'|'feito', t: number, tocou: boolean, bomba: boolean, escala: number }}
+   */
+  const guia = { fase: o.primeira && modo === 'cpu' ? 'esperando' : 'feito', t: 0, tocou: false, bomba: false, escala: 1000 };
+  /** a Gota assiste (nao corre, nao corta, nao encosta depois da soltura) */
+  const guiaSegura = () => guia.bomba || guia.fase === 'oferecida' || guia.fase === 'congelada' || guia.fase === 'salto' || guia.fase === 'cortando';
+  /** a bola esta presa sobre o jogador (congelada ou no pulo automatico) */
+  const guiaPrende = () => guia.fase === 'congelada' || guia.fase === 'salto';
   let tPartida = 0;
   let fimEmitido = false;
   let resultado = 0;
@@ -307,6 +319,91 @@ export function criarPartida(o = {}) {
     return [(xAlvo - x0) / t, vy];
   }
 
+  /**
+   * Velocidade para a bola sair de (x0, y0), passar no apice H e, descendo, cruzar (xP, yP).
+   * @returns {number[]} [vx, vy]
+   */
+  function arcoAte(x0, y0, xP, yP, H, g = G_BOLA) {
+    const Hh = Math.max(H, y0 + 0.3, yP + 0.3);
+    const vy = Math.sqrt(2 * g * (Hh - y0));
+    const t = (vy + Math.sqrt(Math.max(0, vy * vy - 2 * g * (yP - y0)))) / g;
+    return [(xP - x0) / t, vy];
+  }
+
+  /** A CPU `i` (a Gota da 1a partida) pode mandar agora a bola alta da cortada guiada? */
+  function guiaPronta(i) {
+    return guia.fase === 'esperando' && pontoN >= 1 && !humano[i] && humano[outroI(i)];
+  }
+
+  /** Comeca a cortada guiada: o medidor do jogador enche e a bola vai para o ponto de batida dele. */
+  function oferecerGuia(h) {
+    J[h].med.v = Math.max(J[h].med.v, CUSTO.cortada);
+    const [xb, yb] = Cort.batidaNoApice(slimes[h]);
+    const [vx, vy] = arcoAte(bola.x, bola.y, xb, yb, Cort.CORTADA.guia.apice);
+    bola.vx = vx;
+    bola.vy = vy;
+    guia.fase = 'oferecida';
+    guia.t = 0;
+    guia.tocou = false;
+    ev({ tipo: 'tutorial-cortada', i: h });
+  }
+
+  /** A cortada guiada sai (forcada, na mira guiada). */
+  function cortarGuia(h) {
+    J[h].med.v = Math.max(J[h].med.v, CUSTO.cortada);
+    escalarTudo(T, 1000);
+    guia.escala = 1000;
+    if (tentarCortada(h, true, { forcar: true, guiada: true })) guia.fase = 'cortando';
+  }
+
+  /** Avanca a cortada guiada (jogo-real): congela, segura a bola, pula e corta. */
+  function passoGuia(dtR) {
+    if (guia.fase === 'esperando' || guia.fase === 'feito' || guia.fase === 'cortando') return;
+    guia.t += dtR;
+    const h = 0;
+    const s = slimes[h];
+    const G = Cort.CORTADA.guia;
+    if (guia.fase === 'oferecida') {
+      if (estado !== 'jogo' || cortada || !bola.solta) return;
+      const [, yb] = Cort.batidaNoApice(s);
+      if (bola.vy < 0 && bola.x * s.lado > 0 && bola.y <= yb + G.folgaY) {
+        guia.fase = 'congelada';
+        guia.t = 0;
+        guia.tocou = false;
+        ev({ tipo: 'guia-congela', i: h, x: bola.x, y: bola.y });
+      }
+      return;
+    }
+    // congelada ou salto: o mundo vai para a escala da fase (rampa) e a bola fica presa (mola)
+    const alvoEsc = guia.fase === 'congelada' ? G.escala : G.escalaSalto;
+    guia.escala += (alvoEsc - guia.escala) * Math.min(1, dtR / G.rampa);
+    escalarTudo(T, guia.escala);
+    const [bx, by] = s.noChao ? Cort.batidaNoApice(s) : Cort.pontoBatida(s);
+    const k = 1 - Math.exp(-dtR * 10);
+    bola.solta = false;
+    bola.vx = 0;
+    bola.vy = 0;
+    bola.x += (bx - bola.x) * k;
+    bola.y += (by + Math.sin(guia.t * 6) * 0.06 - bola.y) * k;
+    bola.angV = 2;
+    if (guia.fase === 'congelada' && guia.tocou) {
+      guia.tocou = false;
+      if (s.noChao) {
+        // o toque pula sozinho
+        s.vy = PULO * s.multPulo;
+        s.noChao = false;
+        s.tAr = 0;
+        s.sig = -0.6;
+        s.sigV = 0;
+        J[h].pulos++;
+        guia.fase = 'salto';
+        guia.t = 0;
+        ev({ tipo: 'guia-salto', i: h, x: s.x });
+        ev({ tipo: 'pulo', i: h, x: s.x });
+      } else cortarGuia(h);
+    } else if (guia.fase === 'salto' && ((!s.noChao && s.tAr >= Cort.CORTADA.noArMin && s.vy <= G.vyCorta) || (s.noChao && guia.t > 0.2))) cortarGuia(h);
+  }
+
   /** 1o toque do saque: a bola sobe (parabola cinematica, sem colidir com a cupula). */
   function levantar(i) {
     saque.fase = 'levantada';
@@ -375,6 +472,7 @@ export function criarPartida(o = {}) {
    */
   function executarSaque(i, q, prof, erro) {
     const s = slimes[i];
+    let guiaSaque = false;
     let alvo;
     let H = SAQUE.apice;
     let tipo = q;
@@ -391,6 +489,16 @@ export function criarPartida(o = {}) {
       cpuErra();
       alvo = s.lado * (REDE_R + 0.9);
       H = bola.y + 0.8;
+    } else if (guiaPronta(i)) {
+      // cortada guiada: o saque da Gota e a bola alta da guia
+      tipo = 'roteiro';
+      guiaSaque = true;
+      alvo = 0;
+    } else if (saqueSimples && humano[i] && guia.fase === 'esperando' && pontoN >= 1) {
+      // a guia esta pendente: o saque de um toque vai no corpo da Gota (sem ace) e o toque dela
+      // oferece a cortada guiada
+      alvo = slimes[outroI(i)].x;
+      H = Math.max(SAQUE.apice, bola.y + 2.5);
     } else {
       // perfeito: chapado a partir do contato; bom: arco normal; fraco: lob alto e curto
       if (q === 'perfeito') H = bola.y + SAQUE.subidaViagem;
@@ -403,6 +511,7 @@ export function criarPartida(o = {}) {
     bola.vx = vx;
     bola.vy = vy;
     bola.estado = 'normal';
+    if (guiaSaque) oferecerGuia(outroI(i));
     bola.angV = -s.lado * (q === 'perfeito' ? 10 : 6);
     estado = 'jogo';
     saque.valendo = false;
@@ -439,6 +548,9 @@ export function criarPartida(o = {}) {
       repetir(ip, x);
       return;
     }
+    // a guia: o ponto encerra a BOMBA; se o rali acabou antes da cortada guiada, ela volta a esperar
+    guia.bomba = false;
+    if (guia.fase === 'oferecida' || guia.fase === 'congelada' || guia.fase === 'salto' || guia.fase === 'cortando') { guia.fase = 'esperando'; escalarTudo(T, 1000); guia.escala = 1000; }
     const antes = [...placar];
     placar[iv]++;
     pontoN++;
@@ -611,29 +723,31 @@ export function criarPartida(o = {}) {
 
   // ------------------------------------------------------------------ cortada lenta
 
-  function tentarCortada(i, humanoOuCpu) {
+  /** @param {number} i @param {boolean} humanoOuCpu @param {{ forcar?: boolean, guiada?: boolean }} [oc] */
+  function tentarCortada(i, humanoOuCpu, oc = {}) {
     if (cortada || estado !== 'jogo') return false;
     const Jm = J[i];
     const s = slimes[i];
     const gratis = Jm.cortadaGratis;
     if (!gratis && !tem(Jm.med, 'cortada')) return false;
     const meus = rali.lado === s.lado ? rali.toques : 0;
-    const ok = Cort.elegivel({
+    const ok = oc.forcar || Cort.elegivel({
       slime: s, bola, meus,
       recepcaoSaque: rali.recepcaoSaque && rali.saqueDeQuem !== i,
       bolaEspecial: bola.estado !== 'normal',
       toqueAnteriorMeu: rali.ultimoLado === s.lado && rali.toques >= 1,
       nivel: o.nivelCortada || 1,
-      tutorial: tutorialCortada === 'oferecida' && humano[i],
+      tutorial: guia.fase === 'oferecida' && humano[i],
     });
     if (!ok) return false;
     if (!gratis) gastar(Jm.med, 'cortada');
     Jm.cortadaGratis = false;
     const outro = slimes[outroI(i)];
-    const tMax = tutorialCortada === 'oferecida' && humano[i] ? Cort.CORTADA.tMiraTutorial : modo === 'dois' ? Cort.CORTADA.tMira2P : Cort.CORTADA.tMira;
+    const tMax = (oc.guiada || guia.fase === 'oferecida') && humano[i] ? Cort.CORTADA.tMiraTutorial : modo === 'dois' ? Cort.CORTADA.tMira2P : Cort.CORTADA.tMira;
     // o humano comeca na mira guiada (longe do rival); a CPU, na padrao (o fundo)
     const alvoX = humano[i] && modo === 'cpu' ? Cort.miraGuiada(s.lado, outro.x, outro.vx) : Cort.miraPadrao(s.lado, outro.x, outro.vx);
     cortada = Cort.iniciar(i, s, { tMax, alvoX, gratis, vento: ginasio.vento });
+    cortada.guiada = !!oc.guiada;
     cortada.cpuSegura = humanoOuCpu ? 0 : 0.4 + rng() * 0.2;
     cortada.bola0 = [bola.x, bola.y];
     s.congelado = true;
@@ -685,10 +799,12 @@ export function criarPartida(o = {}) {
     novaJogadaIAs();
     caretar(i, 'feliz', 0.8);
     const quick = c.tTotal < Cort.CORTADA.devolucao + Cort.CORTADA.entrada && c.mexido < 1;
-    ev({ tipo: 'cortada-solta', i, x: c.bx, y: c.by, vx: c.vx, vy: c.vy, alvoX: c.alvoX, auto: !c.mexeu, rapida: quick, toque: c.toque, tMira: c.tTotal, humano: humano[i] });
+    ev({ tipo: 'cortada-solta', i, x: c.bx, y: c.by, vx: c.vx, vy: c.vy, alvoX: c.alvoX, auto: !c.mexeu, rapida: quick, toque: c.toque, tMira: c.tTotal, humano: humano[i], guiada: !!c.guiada });
     falar(i, 'cortada');
     if (gatilho === 'segura' && quick && !c.gratis) J[i].med.v = Math.min(300, J[i].med.v + CUSTO.cortada);
-    if (tutorialCortada === 'oferecida' && humano[i]) tutorialCortada = 'feito';
+    // a guia termina na cortada do jogador (a guiada ou a natural depois da oferta): a Gota nao
+    // encosta mais ate o ponto
+    if (humano[i] && guiaSegura()) { guia.fase = 'feito'; guia.bomba = true; }
   }
 
   function terminarCortada(cancelada = false) {
@@ -728,7 +844,7 @@ export function criarPartida(o = {}) {
       if (c.t >= (lenta.entrada ?? Cort.CORTADA.entrada)) { c.fase = 'mirando'; c.t = 0; ev({ tipo: 'cortada-mira', i: c.i }); }
     } else if (c.fase === 'mirando') {
       // o humano: soltar antes do tMinToque (o toque simples) segura a camera lenta ate la (gatilho novo)
-      const minimo = gatilho === 'novo' ? Cort.CORTADA.tMinToque : 0;
+      const minimo = c.guiada ? Math.max(Cort.CORTADA.tMinToque, Cort.CORTADA.guia.tMira) : gatilho === 'novo' ? Cort.CORTADA.tMinToque : 0;
       if (humano[c.i] && !Jm.it.botao && c.t < minimo) c.toque = true;
       const soltou = humano[c.i] ? !Jm.it.botao && c.t >= minimo : c.t >= (c.cpuSegura || 0.5);
       if (soltou || c.t >= c.tMax) soltarCortada();
@@ -804,14 +920,9 @@ export function criarPartida(o = {}) {
       const [vx, vy] = arco(bola.x, bola.y, s.lado * (REDE_R + 0.9), bola.y + 0.8);
       bola.vx = vx;
       bola.vy = vy;
-    } else if (!humano[i] && humano[outroI(i)] && tutorialCortada === 'esperando' && J[outroI(i)].med.v >= CUSTO.cortada && placar[outroI(i)] >= 1) {
-      // cortada guiada: a Gota devolve uma bola alta perto da rede do jogador
-      const alvoX = s.lado * -3.2;
-      const [vx, vy] = arco(bola.x, bola.y, alvoX, 10.5);
-      bola.vx = vx;
-      bola.vy = vy;
-      tutorialCortada = 'oferecida';
-      ev({ tipo: 'tutorial-cortada', i: outroI(i) });
+    } else if (guiaPronta(i)) {
+      // cortada guiada: a Gota devolve a bola alta para o ponto de batida do jogador
+      oferecerGuia(outroI(i));
     }
     if (Jm.bolaPoder) poderNaBola(i);
     rali.ultimaSaida = Math.hypot(bola.vx, bola.vy);
@@ -957,6 +1068,9 @@ export function criarPartida(o = {}) {
         return { eixo: 0, pular: false };
       }
     }
+    // cortada guiada: a Gota assiste do fundo; o jogador fica parado com a bola presa e no pulo
+    if (estado === 'jogo' && a && guiaSegura()) return { eixo: irPara(s.x, s.lado * 7.5, 4), pular: false };
+    if (!a && guiaPrende()) return { eixo: 0, pular: false };
     if (a) {
       if (estado === 'saque') {
         // na levantada a CPU se posiciona sob a bola para a profundidade do plano (telegrafa o saque)
@@ -993,6 +1107,8 @@ export function criarPartida(o = {}) {
     const Jm = J[i];
     const s = slimes[i];
     const it = Jm.it;
+    // a guia congelada ou no pulo automatico: o toque e da guia (interacao), nao vira pulo nem cortada
+    if (guiaPrende()) { it.borda = false; return; }
     if (estado === 'saque' && i === sacador) {
       if (!saque.valendo || esperaToque) { it.borda = false; return; }
       if (saque.fase === 'pronto') {
@@ -1087,8 +1203,8 @@ export function criarPartida(o = {}) {
     if (T.tMundo - tSaqueSolto < 0.2 && rali.recepcaoSaque) { bola.colide[rali.saqueDeQuem] = false; bola.colide[outroI(rali.saqueDeQuem)] = true; }
     else if (T.tMundo - tCortadaSolta < 0.15 && rali.ultimaCortada) bola.colide[rali.ultimo] = false;
     else if (!cortada || cortada.fase === 'soltando') { bola.colide[0] = true; bola.colide[1] = true; }
-    // anjo: a CPU que furou nao encosta mais na bola neste rali
-    if (erraNoRali) for (const i of [0, 1]) if (!humano[i]) bola.colide[i] = false;
+    // anjo: a CPU que furou nao encosta mais na bola neste rali; a guiada: a Gota nao pega a BOMBA
+    if (erraNoRali || guia.bomba) for (const i of [0, 1]) if (!humano[i]) bola.colide[i] = false;
     const evs = passoBola(bola, slimes, dtM, ginasio, [], andaram);
     for (const e of evs) {
       if (e.tipo === 'toque') aoToque(e);
@@ -1198,10 +1314,11 @@ export function criarPartida(o = {}) {
     tSemInteracao += dtR;
     for (const i of [0, 1]) if (humano[i]) lerBordas(i, dtR);
     if (cortada) passoCortada(dtR);
+    passoGuia(dtR);
     const n = passoReal(T, dtR);
     // slimes: quem mira anda no canal do mundo; o outro, no do defensor
     const passos = [0, 1].map((i) => (cortada && i !== cortada.i ? n.defensor : n.mundo));
-    const bolaAnda = !cortada || cortada.fase === 'soltando';
+    const bolaAnda = (!cortada || cortada.fase === 'soltando') && !guiaPrende();
     const kMax = Math.max(passos[0], passos[1], bolaAnda ? n.bola : 0);
     for (let k = 0; k < kMax; k++) {
       const andaram = [k < passos[0], k < passos[1]];
@@ -1225,10 +1342,10 @@ export function criarPartida(o = {}) {
       for (const i of [0, 1]) {
         if (!ias[i] || cortada || estado !== 'jogo') continue;
         const s = slimes[i];
-        if (!s.noChao && ias[i].querCortar() && !rali.recepcaoSaque && !cpuDeveErrar(i)) tentarCortada(i, false);
+        if (!s.noChao && ias[i].querCortar() && !rali.recepcaoSaque && !cpuDeveErrar(i) && !guiaSegura()) tentarCortada(i, false);
       }
     }
-    if (cortada && cortada.fase !== 'soltando') { anterior.bola.x = bola.x; anterior.bola.y = bola.y; }
+    if ((cortada && cortada.fase !== 'soltando') || guiaPrende()) { anterior.bola.x = bola.x; anterior.bola.y = bola.y; }
     // saque da CPU
     if (estado === 'saque' && saque.valendo && ias[sacador]) {
       if (!esperaToque) {
@@ -1278,6 +1395,7 @@ export function criarPartida(o = {}) {
     /** pointerdown/keydown real (portao de interacao, primeiro saque). */
     interacao() {
       tSemInteracao = 0;
+      if (guia.fase === 'congelada') guia.tocou = true;
       if (esperaToque) {
         esperaToque = false;
         primeiroToque = true;
@@ -1317,7 +1435,9 @@ export function criarPartida(o = {}) {
     get anjo() { return { restam: anjo, usados: anjosUsados }; },
     get esperaToque() { return esperaToque; },
     get tPartida() { return tPartida; },
-    get tutorialCortada() { return tutorialCortada; },
+    get tutorialCortada() { return guia.fase; },
+    /** a cortada guiada da 1a partida (fase, tempo na fase) */
+    get guia() { return guia; },
     /** o saque do humano e de um toque (1a partida da vida) */
     get saqueSimples() { return saqueSimples; },
     get anterior() { return anterior; },
@@ -1379,6 +1499,7 @@ export function criarPartida(o = {}) {
       esperaToque = false;
       primeiroToque = true;
       if (nome === 'cortada' || nome === 'mira') {
+        guia.fase = 'feito';
         J[0].med.v = 300;
         estado = 'jogo';
         const s = slimes[0];
@@ -1391,6 +1512,28 @@ export function criarPartida(o = {}) {
         tentarCortada(0, true);
         J[0].it.botao = true;
         return !!cortada;
+      }
+      if (nome === 'guiada') {
+        // a cortada guiada da 1a partida, congelada: a bola presa sobre o jogador esperando o toque
+        estado = 'jogo';
+        placar = [1, 0];
+        pontoN = 1;
+        stats.pontos[0] = 1;
+        J[0].med.v = Math.max(J[0].med.v, CUSTO.cortada);
+        const s = slimes[0];
+        s.x = -6; s.y = 0; s.vy = 0; s.noChao = true;
+        slimes[1].x = 7.5; slimes[1].y = 0;
+        assentar(peles[0], s);
+        assentar(peles[1], slimes[1]);
+        const [bx, by] = Cort.batidaNoApice(s);
+        bola.solta = false; bola.x = bx; bola.y = by; bola.vx = 0; bola.vy = 0;
+        rali.lado = 1; rali.toques = 1; rali.ultimo = 1; rali.ultimoLado = 1; rali.recepcaoSaque = false;
+        guia.fase = 'congelada';
+        guia.t = 0;
+        guia.tocou = false;
+        guia.escala = Cort.CORTADA.guia.escala;
+        escalarTudo(T, guia.escala);
+        return true;
       }
       if (nome === 'ponto' || nome === 'ponto-curto' || nome === 'reacao') {
         estado = 'jogo';

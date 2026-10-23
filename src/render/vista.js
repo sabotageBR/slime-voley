@@ -106,7 +106,10 @@ export function criarVista(partida) {
       sm.dados.expr = J.expr;
     }
     const b = partida.bola;
-    const balfa = c && c.fase !== 'soltando' ? 1 : alfaCanal(T, 'bola', alfaLaco);
+    // a bola presa (mira da cortada, cortada guiada) anda por mola no jogo-real: sem interpolar
+    const g = partida.guia;
+    const presa = (c && c.fase !== 'soltando') || (g && (g.fase === 'congelada' || g.fase === 'salto'));
+    const balfa = presa ? 1 : alfaCanal(T, 'bola', alfaLaco);
     bola.x = ant.bola.x + (b.x - ant.bola.x) * balfa;
     bola.y = ant.bola.y + (b.y - ant.bola.y) * balfa;
     bola.ang = b.ang;

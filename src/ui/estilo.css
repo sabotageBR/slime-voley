@@ -66,8 +66,11 @@ body { font-family: Fredoka, system-ui, sans-serif; color: var(--tinta); }
 .hud .mao .dedo { position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.85); border: 3px solid var(--tinta);
   animation: dedo 1s ease-in-out infinite; }
 .hud .mao[data-gesto="duplo"] .dedo { animation: duplo 1.2s ease-in-out infinite; }
+.hud .mao[data-gesto="forte"] .dedo { animation: forte .5s ease-in-out infinite; }
+.hud .mao[data-gesto="forte"] .texto { font-size: 22px; }
 .hud .mao .texto { position: absolute; left: 50%; top: 34px; transform: translateX(-50%); white-space: nowrap; font-size: 15px; color: #fff; -webkit-text-stroke: 4px var(--tinta); paint-order: stroke fill; }
 @keyframes dedo { 0%, 100% { transform: scale(1); } 45% { transform: scale(.75); } }
+@keyframes forte { 0%, 100% { transform: scale(1.15); } 50% { transform: scale(.7); } }
 @keyframes duplo { 0%, 100% { transform: scale(1); } 20% { transform: scale(.75); } 40% { transform: scale(1); } 60%, 85% { transform: scale(.75) translateY(-6px); } }
 
 /* controles na tela */
